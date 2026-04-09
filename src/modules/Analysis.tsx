@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart3, Loader2, Play, Download, Save, FileText,
-  TrendingDown, Euro, Zap, Building2, AlertCircle
+  BarChart3, Loader2, Play, Save,
+  TrendingDown, Euro, Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
-import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery';
+import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
 import { calculateSimulatedInvoice, distributeConsumption } from '@/lib/calculator';
 import { formatEur, formatPct, safeNum } from '@/lib/utils';
 import type {
@@ -146,7 +146,6 @@ export default function Analysis() {
     if (results.length === 0 || !selectedSPId) return;
     const best = results[0];
 
-    const proposalMutation = useSupabaseMutation('proposals');
     const { error } = await supabase.from('proposals').insert({
       supply_point_id: selectedSPId,
       current_annual_cost_eur: historicalCost,

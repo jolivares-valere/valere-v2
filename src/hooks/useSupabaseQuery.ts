@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -29,6 +29,12 @@ export function useSupabaseQuery<T>({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stabilize filters so they don't cause infinite re-renders
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+  // Keep onSuccess in a ref to avoid triggering refetches when callback identity changes
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+
   const fetch = useCallback(async () => {
     if (!enabled) { setLoading(false); return; }
     try {
@@ -37,7 +43,8 @@ export function useSupabaseQuery<T>({
 
       let query = supabase.from(table).select(select);
 
-      for (const f of filters) {
+      const parsedFilters = JSON.parse(filtersKey) as typeof filters;
+      for (const f of parsedFilters) {
         query = query.filter(f.column, f.op, f.value);
       }
 
@@ -50,7 +57,7 @@ export function useSupabaseQuery<T>({
 
       const rows = (result as T[]) || [];
       setData(rows);
-      onSuccess?.(rows);
+      onSuccessRef.current?.(rows);
     } catch (err) {
       console.error(`Error in useSupabaseQuery(${table}):`, err);
       setError(errorMessage);
@@ -58,7 +65,7 @@ export function useSupabaseQuery<T>({
     } finally {
       setLoading(false);
     }
-  }, [table, select, order?.column, order?.ascending, enabled, errorMessage, JSON.stringify(filters)]);
+  }, [table, select, order?.column, order?.ascending, enabled, errorMessage, filtersKey]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
