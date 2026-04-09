@@ -13,6 +13,7 @@ import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery'
 import type { UserProfile, Retailer, RetailerOffer, GlobalConfig } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { getTariffConfig } from '@/lib/tariffs';
 
 export default function AdminPanel() {
   return (
@@ -137,13 +138,29 @@ function RetailersTab() {
   });
   const mutation = useSupabaseMutation('retailers');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Retailer>>({ name: '', is_active: true, model: '', notes: '' });
 
   const save = async () => {
     if (!form.name?.trim()) { toast.error('Nombre es obligatorio'); return; }
-    await mutation.insert(form as any, 'Comercializadora creada');
+    if (isEditing && editingId) {
+      const { id, created_at, ...updateData } = form as any;
+      await mutation.update(editingId, updateData, 'Comercializadora actualizada');
+    } else {
+      await mutation.insert(form as any, 'Comercializadora creada');
+    }
     setDialogOpen(false);
+    setIsEditing(false);
+    setEditingId(null);
     refetch();
+  };
+
+  const startEdit = (r: Retailer) => {
+    setForm({ name: r.name, is_active: r.is_active, model: r.model || '', notes: r.notes || '' });
+    setIsEditing(true);
+    setEditingId(r.id);
+    setDialogOpen(true);
   };
 
   const remove = async (id: string) => {
@@ -160,7 +177,7 @@ function RetailersTab() {
         <CardHeader className="border-b border-slate-50 flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-display text-valere-blue-dark">Comercializadoras</CardTitle>
           <button
-            onClick={() => { setForm({ name: '', is_active: true, model: '', notes: '' }); setDialogOpen(true); }}
+            onClick={() => { setForm({ name: '', is_active: true, model: '', notes: '' }); setIsEditing(false); setEditingId(null); setDialogOpen(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-valere-blue-dark text-white rounded-xl text-sm hover:bg-valere-blue-medium"
           >
             <Plus className="w-4 h-4" /> Añadir
@@ -189,7 +206,10 @@ function RetailersTab() {
                         {r.is_active ? 'Activa' : 'Inactiva'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right pr-6">
+                    <TableCell className="text-right pr-6 space-x-1">
+                      <button onClick={() => startEdit(r)} className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       <button onClick={() => remove(r.id)} className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -205,7 +225,7 @@ function RetailersTab() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-valere-blue-dark">Nueva Comercializadora</DialogTitle>
+            <DialogTitle className="font-display text-valere-blue-dark">{isEditing ? 'Editar Comercializadora' : 'Nueva Comercializadora'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -230,7 +250,7 @@ function RetailersTab() {
           <DialogFooter>
             <button onClick={() => setDialogOpen(false)} className="px-4 py-2 text-sm text-valere-ink/60">Cancelar</button>
             <button onClick={save} disabled={mutation.loading} className="px-5 py-2 bg-valere-blue-dark text-white rounded-xl text-sm font-medium hover:bg-valere-blue-medium disabled:opacity-50 flex items-center gap-2">
-              {mutation.loading && <Loader2 className="w-4 h-4 animate-spin" />} Crear
+              {mutation.loading && <Loader2 className="w-4 h-4 animate-spin" />} {isEditing ? 'Guardar' : 'Crear'}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -249,9 +269,11 @@ function OffersTab() {
   const mutation = useSupabaseMutation('retailer_offers');
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const defaultTariff = '2.0TD';
+  const defaultCfg = getTariffConfig(defaultTariff);
   const [form, setForm] = useState<any>({
-    retailer_id: '', product_name: '', access_rate: '2.0TD', surplus_model: 'compensacion_simple',
-    energy_prices: [0, 0, 0, 0, 0, 0], power_prices: [0, 0, 0, 0, 0, 0],
+    retailer_id: '', product_name: '', access_rate: defaultTariff, surplus_model: 'compensacion_simple',
+    energy_prices: Array(defaultCfg.energia).fill(0), power_prices: Array(defaultCfg.potencia).fill(0),
     surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
     allow_zero_invoice: false, include_in_comparison: true,
   });
@@ -272,9 +294,10 @@ function OffersTab() {
           <CardTitle className="text-lg font-display text-valere-blue-dark">Ofertas de Comercializadoras</CardTitle>
           <button
             onClick={() => {
+              const cfg = getTariffConfig('2.0TD');
               setForm({
                 retailer_id: '', product_name: '', access_rate: '2.0TD', surplus_model: 'compensacion_simple',
-                energy_prices: [0, 0, 0, 0, 0, 0], power_prices: [0, 0, 0, 0, 0, 0],
+                energy_prices: Array(cfg.energia).fill(0), power_prices: Array(cfg.potencia).fill(0),
                 surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
                 allow_zero_invoice: false, include_in_comparison: true,
               });
@@ -348,7 +371,16 @@ function OffersTab() {
             </div>
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Tarifa</label>
-              <select value={form.access_rate} onChange={e => setForm((p: any) => ({ ...p, access_rate: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white">
+              <select value={form.access_rate} onChange={e => {
+                const newTariff = e.target.value;
+                const cfg = getTariffConfig(newTariff);
+                setForm((p: any) => ({
+                  ...p,
+                  access_rate: newTariff,
+                  energy_prices: Array.from({ length: cfg.energia }, (_, i) => p.energy_prices[i] ?? 0),
+                  power_prices: Array.from({ length: cfg.potencia }, (_, i) => p.power_prices[i] ?? 0),
+                }));
+              }} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white">
                 <option value="2.0TD">2.0TD</option>
                 <option value="3.0TD">3.0TD</option>
                 <option value="6.1TD">6.1TD</option>
@@ -364,15 +396,16 @@ function OffersTab() {
               </select>
             </div>
 
+            {(() => { const cfg = getTariffConfig(form.access_rate); return (<>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Precios Energía (€/kWh) — P1 a P6</label>
-              <div className="grid grid-cols-6 gap-2">
-                {[0, 1, 2, 3, 4, 5].map(i => (
+              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Precios Energía (€/kWh) — {cfg.labels.energia.join(', ')}</label>
+              <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${cfg.energia}, minmax(0, 1fr))` }}>
+                {cfg.labels.energia.map((label, i) => (
                   <div key={i}>
-                    <label className="block text-[10px] text-center text-valere-ink/40 mb-1">P{i + 1}</label>
+                    <label className="block text-[10px] text-center text-valere-ink/40 mb-1">{label}</label>
                     <input
                       type="number" step="0.001"
-                      value={form.energy_prices[i]}
+                      value={form.energy_prices[i] ?? 0}
                       onChange={e => {
                         const arr = [...form.energy_prices];
                         arr[i] = parseFloat(e.target.value) || 0;
@@ -386,14 +419,14 @@ function OffersTab() {
             </div>
 
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Precios Potencia (€/kW/año) — P1 a P6</label>
-              <div className="grid grid-cols-6 gap-2">
-                {[0, 1, 2, 3, 4, 5].map(i => (
+              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Precios Potencia (€/kW/año) — {cfg.labels.potencia.join(', ')}</label>
+              <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${cfg.potencia}, minmax(0, 1fr))` }}>
+                {cfg.labels.potencia.map((label, i) => (
                   <div key={i}>
-                    <label className="block text-[10px] text-center text-valere-ink/40 mb-1">P{i + 1}</label>
+                    <label className="block text-[10px] text-center text-valere-ink/40 mb-1">{label}</label>
                     <input
                       type="number" step="0.001"
-                      value={form.power_prices[i]}
+                      value={form.power_prices[i] ?? 0}
                       onChange={e => {
                         const arr = [...form.power_prices];
                         arr[i] = parseFloat(e.target.value) || 0;
@@ -405,6 +438,7 @@ function OffersTab() {
                 ))}
               </div>
             </div>
+            </>); })()}
 
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Precio Excedente (€/kWh)</label>

@@ -42,6 +42,7 @@ function AppContent() {
     analysis: { component: <Analysis />, label: 'Análisis' },
     proposals: { component: <Proposals />, label: 'Propuestas' },
     tracking: { component: <Tracking />, label: 'Seguimiento' },
+    config: { component: <div className="p-8 text-center text-valere-ink/60"><h2 className="text-2xl font-display font-bold text-valere-blue-dark mb-2">Configuración del sistema</h2><p>En desarrollo</p></div>, label: 'Configuración' },
   };
 
   const current = modules[activeTab] || modules.dashboard;

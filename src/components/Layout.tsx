@@ -30,6 +30,7 @@ const allSidebarItems = [
   { id: 'analysis', label: 'Análisis', icon: BarChart3, minRole: 'client' as const },
   { id: 'proposals', label: 'Propuestas', icon: FileText, minRole: 'client' as const },
   { id: 'tracking', label: 'Seguimiento', icon: Send, minRole: 'client' as const },
+  { id: 'config', label: 'Configuración', icon: Settings, minRole: 'manager' as const },
 ];
 
 const roleHierarchy = { master: 4, manager: 3, consultant: 2, client: 1 };
@@ -92,6 +93,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
           {sidebarItems.map(item => (
             <button
               key={item.id}
+              data-tab={item.id}
               onClick={() => {
                 setActiveTab(item.id);
                 if (isMobile) setCollapsed(true);
@@ -119,10 +121,6 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
 
         {/* Footer */}
         <div className="p-3 border-t border-slate-100 space-y-1">
-          <button className="w-full flex items-center gap-3 p-3 rounded-xl text-valere-ink/50 hover:text-valere-green-dark hover:bg-valere-green-dark/5 transition-all">
-            <Settings className="w-5 h-5 shrink-0" />
-            {(!collapsed || isMobile) && <span className="text-sm">Configuración</span>}
-          </button>
           <button
             onClick={logout}
             className="w-full flex items-center gap-3 p-3 rounded-xl text-valere-ink/50 hover:text-red-500 hover:bg-red-50 transition-all"
