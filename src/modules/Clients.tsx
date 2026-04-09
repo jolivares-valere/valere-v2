@@ -169,7 +169,7 @@ export default function Clients() {
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                        <DropdownMenuTrigger>
                           <button className="p-2 hover:bg-slate-50 rounded-xl text-valere-ink/40 hover:text-valere-blue-dark transition-colors">
                             <MoreVertical className="w-4 h-4" />
                           </button>

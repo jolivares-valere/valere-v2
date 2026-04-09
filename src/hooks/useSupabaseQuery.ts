@@ -78,10 +78,10 @@ export function useSupabaseQuery<T>({
 export function useSupabaseMutation(table: string) {
   const [loading, setLoading] = useState(false);
 
-  const insert = async <T extends Record<string, unknown>>(row: T, successMsg?: string) => {
+  const insert = async (row: Record<string, unknown>, successMsg?: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from(table).insert(row).select().single();
+      const { data, error } = await supabase.from(table).insert(row as any).select().single();
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { data, error: null };
@@ -93,10 +93,10 @@ export function useSupabaseMutation(table: string) {
     }
   };
 
-  const update = async <T extends Record<string, unknown>>(id: string, row: T, successMsg?: string) => {
+  const update = async (id: string, row: Record<string, unknown>, successMsg?: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from(table).update(row).eq('id', id).select().single();
+      const { data, error } = await supabase.from(table).update(row as any).eq('id', id).select().single();
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { data, error: null };
