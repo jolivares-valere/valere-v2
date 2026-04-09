@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   BarChart3, Loader2, Play, Save,
-  TrendingDown, Euro, Zap
+  TrendingDown, Euro, Zap, CheckCircle2, XCircle, AlertTriangle, Info
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
 import { calculateSimulatedInvoice, distributeConsumption } from '@/lib/calculator';
 import { formatEur, formatPct, safeNum } from '@/lib/utils';
+import { getTariffConfig } from '@/lib/tariffs';
 import type {
   Client, SupplyPoint, InvoiceHistory, RetailerOffer,
   BoeRegulatedPrice, GlobalConfig, RetailerOfferWithName
@@ -51,23 +52,100 @@ export default function Analysis() {
 
   const selectedSP = supplyPoints.find(sp => sp.id === selectedSPId) || null;
 
+  // === VALIDATION CHECKS ===
+  const validationChecks = useMemo(() => {
+    if (!selectedSP) return [];
+
+    const checks: { label: string; status: 'ok' | 'warn' | 'error'; detail: string }[] = [];
+    const tariffConfig = getTariffConfig(selectedSP.tariff);
+
+    // Check 1: Powers configured
+    const powers = selectedSP.powers || {};
+    const powersConfigured = Array.from({ length: tariffConfig.potencia }, (_, i) =>
+      safeNum((powers as any)[`p${i + 1}`])
+    );
+    const hasPowers = powersConfigured.some(p => p > 0);
+    checks.push({
+      label: 'Potencias contratadas',
+      status: hasPowers ? 'ok' : 'error',
+      detail: hasPowers
+        ? powersConfigured.map((p, i) => `P${i + 1}: ${p} kW`).join(', ')
+        : 'No hay potencias configuradas. Edítalas en Captura de Datos.',
+    });
+
+    // Check 2: Energy distribution
+    const energyPeriods = [
+      safeNum(selectedSP.e1_kwh), safeNum(selectedSP.e2_kwh), safeNum(selectedSP.e3_kwh),
+      safeNum(selectedSP.e4_kwh), safeNum(selectedSP.e5_kwh), safeNum(selectedSP.e6_kwh),
+    ];
+    const hasEnergyDist = energyPeriods.some(e => e > 0);
+    checks.push({
+      label: 'Distribución energética (E1-E6)',
+      status: hasEnergyDist ? 'ok' : 'warn',
+      detail: hasEnergyDist
+        ? energyPeriods.slice(0, tariffConfig.energia).map((e, i) => `E${i + 1}: ${e} kWh`).join(', ')
+        : 'Sin distribución. Se asumirá todo el consumo en P1 (menos preciso).',
+    });
+
+    // Check 3: Number of invoices
+    const numInv = invoices.length;
+    checks.push({
+      label: 'Facturas cargadas',
+      status: numInv >= 6 ? 'ok' : numInv >= 1 ? 'warn' : 'error',
+      detail: numInv === 0
+        ? 'Sin facturas. Carga al menos 1 factura en Captura de Datos.'
+        : numInv < 6
+          ? `${numInv} factura${numInv > 1 ? 's' : ''} — se recomienda mínimo 6 (medio año) para mayor precisión.`
+          : `${numInv} factura${numInv > 1 ? 's' : ''} cargadas`,
+    });
+
+    // Check 4: Invoices have amounts
+    const invoicesWithAmount = invoices.filter(i => safeNum(i.total_amount_eur) > 0);
+    if (numInv > 0) {
+      checks.push({
+        label: 'Importes facturados',
+        status: invoicesWithAmount.length === numInv ? 'ok' : invoicesWithAmount.length > 0 ? 'warn' : 'error',
+        detail: invoicesWithAmount.length < numInv
+          ? `${numInv - invoicesWithAmount.length} factura(s) sin importe total. El coste histórico será impreciso.`
+          : `Coste histórico: ${formatEur(invoices.reduce((a, i) => a + safeNum(i.total_amount_eur), 0))}`,
+      });
+    }
+
+    return checks;
+  }, [selectedSP, invoices]);
+
+  const canRunAnalysis = selectedSP && invoices.length > 0 &&
+    validationChecks.some(c => c.label === 'Potencias contratadas' && c.status === 'ok');
+
   const runAnalysis = async () => {
     if (!selectedSPId || !selectedSP) {
       toast.error('Selecciona un punto de suministro');
       return;
     }
     if (invoices.length === 0) {
-      toast.error('No hay facturas registradas para este punto');
+      toast.error('No hay facturas registradas. Ve a Captura de Datos para cargarlas.');
+      return;
+    }
+
+    const powers = selectedSP.powers || {};
+    const tariffConfig = getTariffConfig(selectedSP.tariff);
+    const hasPowers = Array.from({ length: tariffConfig.potencia }, (_, i) =>
+      safeNum((powers as any)[`p${i + 1}`])
+    ).some(p => p > 0);
+
+    if (!hasPowers) {
+      toast.error('Las potencias contratadas son 0. Configúralas en Captura de Datos antes de analizar.');
       return;
     }
 
     setRunning(true);
     try {
-      // Fetch offers
+      // Fetch offers — FILTER BY MATCHING TARIFF
       const { data: offers } = await supabase
         .from('retailer_offers')
         .select('*, retailers(name)')
-        .eq('include_in_comparison', true);
+        .eq('include_in_comparison', true)
+        .eq('access_rate', selectedSP.tariff);
 
       // Fetch BOE prices
       const { data: boePrices } = await supabase
@@ -84,14 +162,22 @@ export default function Analysis() {
       }
 
       if (!offers || offers.length === 0) {
-        toast.error('No hay ofertas de comercializadoras configuradas. Añádelas en Administración.');
+        toast.error(`No hay ofertas para tarifa ${selectedSP.tariff} marcadas para comparar. Añádelas en Administración → Ofertas.`);
         setRunning(false);
         return;
+      }
+
+      if (!boePrices || boePrices.length === 0) {
+        toast.warning(`No hay precios BOE regulados para tarifa ${selectedSP.tariff}. Los costes regulados serán 0.`);
       }
 
       // Calculate historical annual cost
       const totalHistorical = invoices.reduce((acc, inv) => acc + safeNum(inv.total_amount_eur), 0);
       setHistoricalCost(totalHistorical);
+
+      if (totalHistorical <= 0) {
+        toast.warning('El coste histórico total es 0€. Comprueba que las facturas tengan el importe total rellenado.');
+      }
 
       // For each offer, simulate all invoices and sum annual cost
       const compResults: ComparisonResult[] = [];
@@ -133,10 +219,10 @@ export default function Analysis() {
       // Sort by savings descending
       compResults.sort((a, b) => b.savings - a.savings);
       setResults(compResults);
-      toast.success(`Análisis completado: ${compResults.length} ofertas comparadas`);
+      toast.success(`Análisis completado: ${compResults.length} oferta${compResults.length !== 1 ? 's' : ''} comparada${compResults.length !== 1 ? 's' : ''} para tarifa ${selectedSP.tariff}`);
     } catch (error) {
       console.error('Analysis error:', error);
-      toast.error('Error al ejecutar el análisis');
+      toast.error('Error inesperado al ejecutar el análisis. Revisa la consola para más detalles.');
     } finally {
       setRunning(false);
     }
@@ -224,20 +310,74 @@ export default function Analysis() {
             </div>
             <button
               onClick={runAnalysis}
-              disabled={running || !selectedSPId}
+              disabled={running || !canRunAnalysis}
               className="px-6 py-2.5 bg-valere-blue-dark text-white rounded-xl text-sm font-medium hover:bg-valere-blue-medium transition-colors disabled:opacity-40 flex items-center gap-2 shrink-0"
             >
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               Ejecutar Análisis
             </button>
           </div>
-          {selectedSPId && invoices.length > 0 && (
-            <p className="text-xs text-valere-ink/40 mt-3">
-              {invoices.length} facturas cargadas · Coste histórico: {formatEur(invoices.reduce((a, i) => a + safeNum(i.total_amount_eur), 0))}
-            </p>
+
+          {/* Tariff info */}
+          {selectedSP && (
+            <div className="flex items-center gap-2 mt-3">
+              <Badge variant="outline" className="text-xs">{selectedSP.tariff}</Badge>
+              <span className="text-xs text-valere-ink/40">
+                {getTariffConfig(selectedSP.tariff).potencia} periodos potencia · {getTariffConfig(selectedSP.tariff).energia} periodos energía
+              </span>
+              {selectedSP.autoconsumption_model && (
+                <Badge className="bg-valere-green-dark/10 text-valere-green-dark text-[10px]">
+                  {selectedSP.autoconsumption_model === 'compensacion_simple' ? 'Comp. Simplificada' :
+                   selectedSP.autoconsumption_model === 'bateria_virtual_kwh' ? 'Batería Virtual' :
+                   selectedSP.autoconsumption_model === 'gestion_silver' ? 'Gestión Silver' :
+                   selectedSP.autoconsumption_model}
+                </Badge>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Validation Panel */}
+      {selectedSP && validationChecks.length > 0 && results.length === 0 && (
+        <Card className="border-none shadow-md bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-display text-valere-blue-dark flex items-center gap-2">
+              <Info className="w-4 h-4" /> Verificación de datos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {validationChecks.map((check, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm">
+                  {check.status === 'ok' ? (
+                    <CheckCircle2 className="w-4 h-4 text-valere-green-dark shrink-0 mt-0.5" />
+                  ) : check.status === 'warn' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <span className={
+                      check.status === 'ok' ? 'text-valere-ink/70 font-medium' :
+                      check.status === 'warn' ? 'text-amber-700 font-medium' :
+                      'text-red-600 font-medium'
+                    }>
+                      {check.label}
+                    </span>
+                    <p className="text-xs text-valere-ink/40 mt-0.5">{check.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!canRunAnalysis && (
+              <p className="text-xs text-red-500 mt-3 font-medium">
+                ⚠ Corrige los errores marcados en rojo antes de ejecutar el análisis.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results */}
       {results.length > 0 && (
