@@ -1,0 +1,250 @@
+﻿/**
+ * Valere CRM · Types de dominio del núcleo.
+ * Mapea 1:1 supabase/migrations/001_crm_core.sql.
+ */
+
+export type RolUsuario = 'admin' | 'jefe_equipo' | 'comercial' | 'visor'
+export type TipoEmpresa = 'empresa' | 'autonomo' | 'comunidad_propietarios' | 'cooperativa' | 'asociacion'
+export type SegmentoEmpresa = 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
+export type TipoEnergia = 'electrica' | 'gas' | 'dual'
+export type TipoPrecio = 'fijo' | 'indexado' | 'mixto'
+export type EstadoContrato = 'borrador' | 'tramite' | 'activo' | 'vencido' | 'baja' | 'incidencia' | 'cancelado'
+export type EstadoCups = 'activo' | 'baja' | 'pendiente'
+export type TipoOportunidad = 'nueva_venta' | 'renovacion' | 'ampliacion' | 'recuperacion'
+export type EtapaOportunidad = 'prospecto' | 'contactado' | 'analisis' | 'propuesta_enviada' | 'negociacion' | 'ganada' | 'perdida' | 'cancelada'
+export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'tarea' | 'nota' | 'cambio_estado' | 'documento' | 'whatsapp' | 'visita'
+export type ResultadoActividad = 'positivo' | 'neutral' | 'negativo' | 'sin_respuesta'
+export type EstadoTarea = 'pendiente' | 'completada' | 'cancelada'
+export type EntidadTipo = 'empresa' | 'contacto' | 'contrato' | 'oportunidad'
+export type EstadoPropuesta = 'borrador' | 'enviada' | 'vista' | 'aceptada' | 'rechazada' | 'caducada'
+export type TipoDatoCustom = 'texto' | 'numero' | 'fecha' | 'booleano' | 'lista' | 'multiselect'
+export type PrioridadRenovacion = 'critica' | 'alta' | 'media' | 'baja' | 'ok'
+
+export interface UserProfile {
+  id: string
+  nombre_completo: string
+  rol: RolUsuario
+  activo: boolean
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Empresa {
+  id: string
+  nombre: string
+  nif: string | null
+  tipo: TipoEmpresa | null
+  segmento: SegmentoEmpresa | null
+  email_principal: string | null
+  telefono_principal: string | null
+  web: string | null
+  direccion: string | null
+  cp: string | null
+  ciudad: string | null
+  provincia: string | null
+  pais: string | null
+  comercial_id: string | null
+  notas: string | null
+  tags: string[]
+  external_id: string | null
+  deleted_at: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Contacto {
+  id: string
+  empresa_id: string
+  nombre: string
+  apellidos: string | null
+  email: string | null
+  telefono: string | null
+  movil: string | null
+  cargo: string | null
+  departamento: string | null
+  es_decisor: boolean
+  es_firmante: boolean
+  notas: string | null
+  tags: string[]
+  deleted_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Contrato {
+  id: string
+  empresa_id: string
+  contacto_firmante_id: string | null
+  comercial_id: string | null
+  numero_contrato: string | null
+  compania: string
+  tarifa_acceso: string | null
+  tarifa_cliente: string | null
+  tipo_energia: TipoEnergia | null
+  tipo_precio: TipoPrecio | null
+  fecha_firma: string | null
+  fecha_inicio: string | null
+  fecha_fin: string | null
+  duracion_meses: number | null
+  consumo_sips_kwh: number | null
+  consumo_po_kwh: number | null
+  potencia_contratada: number | null
+  comision_integra: number | null
+  comision_comercial: number | null
+  comision_jefe: number | null
+  estado: EstadoContrato
+  observaciones: string | null
+  external_id: string | null
+  deleted_at: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Cups {
+  id: string
+  contrato_id: string
+  empresa_id: string
+  codigo_cups: string
+  direccion_suministro: string | null
+  distribuidor: string | null
+  estado: EstadoCups
+  deleted_at: string | null
+  created_at: string
+}
+
+export interface Oportunidad {
+  id: string
+  empresa_id: string
+  contrato_origen_id: string | null
+  comercial_id: string | null
+  tipo: TipoOportunidad
+  nombre: string
+  etapa: EtapaOportunidad
+  probabilidad_pct: number
+  valor_estimado_eur: number | null
+  fecha_cierre_prevista: string | null
+  motivo_perdida: string | null
+  notas: string | null
+  tags: string[]
+  external_id: string | null
+  deleted_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Actividad {
+  id: string
+  tipo: TipoActividad
+  titulo: string
+  descripcion: string | null
+  fecha_actividad: string
+  duracion_min: number | null
+  resultado: ResultadoActividad | null
+  estado_tarea: EstadoTarea | null
+  fecha_vencimiento: string | null
+  entidad_tipo: EntidadTipo
+  entidad_id: string
+  usuario_id: string | null
+  asignado_a: string | null
+  adjunto_url: string | null
+  adjunto_nombre: string | null
+  privada: boolean
+  deleted_at: string | null
+  created_at: string
+}
+
+export interface Propuesta {
+  id: string
+  oportunidad_id: string | null
+  empresa_id: string
+  creada_por: string | null
+  version: number
+  compania_propuesta: string | null
+  tarifa_propuesta: string | null
+  precio_kwh: number | null
+  potencia: number | null
+  ahorro_estimado_pct: number | null
+  comision_estimada: number | null
+  estado: EstadoPropuesta
+  fecha_envio: string | null
+  fecha_validez: string | null
+  fecha_respuesta: string | null
+  notas_cliente: string | null
+  pdf_url: string | null
+  datos_json: Record<string, unknown> | null
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomFieldSchema {
+  id: string
+  entidad_tipo: EntidadTipo
+  nombre_campo: string
+  etiqueta: string
+  tipo_dato: TipoDatoCustom
+  opciones_lista: unknown | null
+  obligatorio: boolean
+  orden: number
+  activo: boolean
+  created_at: string
+}
+
+export interface CustomFieldValue {
+  id: string
+  schema_id: string
+  entidad_id: string
+  valor_texto: string | null
+  valor_numero: number | null
+  valor_fecha: string | null
+  valor_json: unknown | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Notificacion {
+  id: string
+  usuario_id: string
+  tipo: string | null
+  titulo: string | null
+  cuerpo: string | null
+  entidad_tipo: string | null
+  entidad_id: string | null
+  leida: boolean
+  leida_at: string | null
+  created_at: string
+}
+
+type AutoCols = 'id' | 'created_at' | 'updated_at' | 'deleted_at'
+export type Insert<T> = Omit<T, Extract<keyof T, AutoCols>>
+export type Update<T> = Partial<Insert<T>>
+
+export type UserProfileInsert = Insert<UserProfile>
+export type UserProfileUpdate = Update<UserProfile>
+export type EmpresaInsert = Insert<Empresa>
+export type EmpresaUpdate = Update<Empresa>
+export type ContactoInsert = Insert<Contacto>
+export type ContactoUpdate = Update<Contacto>
+export type ContratoInsert = Insert<Contrato>
+export type ContratoUpdate = Update<Contrato>
+export type CupsInsert = Insert<Cups>
+export type CupsUpdate = Update<Cups>
+export type OportunidadInsert = Insert<Oportunidad>
+export type OportunidadUpdate = Update<Oportunidad>
+export type ActividadInsert = Insert<Actividad>
+export type ActividadUpdate = Update<Actividad>
+export type PropuestaInsert = Insert<Propuesta>
+export type PropuestaUpdate = Update<Propuesta>
+export type CustomFieldSchemaInsert = Insert<CustomFieldSchema>
+export type CustomFieldSchemaUpdate = Update<CustomFieldSchema>
+export type CustomFieldValueInsert = Insert<CustomFieldValue>
+export type CustomFieldValueUpdate = Update<CustomFieldValue>
+export type NotificacionInsert = Insert<Notificacion>
+export type NotificacionUpdate = Update<Notificacion>

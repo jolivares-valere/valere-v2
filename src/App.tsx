@@ -1,65 +1,51 @@
-import React, { useState } from 'react';
-import { AuthProvider, useAuth } from '@/hooks/useAuth';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import Layout from '@/components/Layout';
-import LoginPage from '@/components/LoginPage';
-import Dashboard from '@/modules/Dashboard';
-import Clients from '@/modules/Clients';
-import DataCapture from '@/modules/DataCapture';
-import Analysis from '@/modules/Analysis';
-import Proposals from '@/modules/Proposals';
-import Tracking from '@/modules/Tracking';
-import AdminPanel from '@/modules/AdminPanel';
-import { Loader2 } from 'lucide-react';
+﻿import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useAuth } from './core/hooks/useAuth'
+import AppShell from './components/layout/AppShell'
+import LoginPage from './features/auth/LoginPage'
+import DashboardPage from './features/dashboard/DashboardPage'
+import EmpresasPage from './features/empresas/EmpresasPage'
+import EmpresaDetailPage from './features/empresas/EmpresaDetailPage'
+import ContratosPage from './features/contratos/ContratosPage'
+import ContratoDetailPage from './features/contratos/ContratoDetailPage'
+import OportunidadesPage from './features/oportunidades/OportunidadesPage'
+import ImportadorPage from './features/importador/ImportadorPage'
 
-function AppContent() {
-  const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, session, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-valere-paper flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 animate-spin text-valere-blue-dark mx-auto" />
-          <div>
-            <p className="font-display font-bold text-xl text-valere-blue-dark">Valere</p>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-valere-green-dark font-bold">Consultores</p>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center text-slate-500">
+        Cargando…
       </div>
-    );
+    )
   }
-
-  if (!user) {
-    return <LoginPage />;
+  if (!session || !user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
-
-  const modules: Record<string, { component: React.ReactNode; label: string }> = {
-    dashboard: { component: <Dashboard />, label: 'Dashboard' },
-    admin: { component: <AdminPanel />, label: 'Administración' },
-    clients: { component: <Clients />, label: 'Clientes' },
-    'data-capture': { component: <DataCapture />, label: 'Captura de Datos' },
-    analysis: { component: <Analysis />, label: 'Análisis' },
-    proposals: { component: <Proposals />, label: 'Propuestas' },
-    tracking: { component: <Tracking />, label: 'Seguimiento' },
-    config: { component: <div className="p-8 text-center text-valere-ink/60"><h2 className="text-2xl font-display font-bold text-valere-blue-dark mb-2">Configuración del sistema</h2><p>En desarrollo</p></div>, label: 'Configuración' },
-  };
-
-  const current = modules[activeTab] || modules.dashboard;
-
-  return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-      <ErrorBoundary moduleName={current.label}>
-        {current.component}
-      </ErrorBoundary>
-    </Layout>
-  );
+  return <AppShell>{children}</AppShell>
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route path="/" element={<AuthGuard><Navigate to="/dashboard" replace /></AuthGuard>} />
+      <Route path="/dashboard" element={<AuthGuard><DashboardPage /></AuthGuard>} />
+
+      <Route path="/empresas" element={<AuthGuard><EmpresasPage /></AuthGuard>} />
+      <Route path="/empresas/:id" element={<AuthGuard><EmpresaDetailPage /></AuthGuard>} />
+
+      <Route path="/contratos" element={<AuthGuard><ContratosPage /></AuthGuard>} />
+      <Route path="/contratos/:id" element={<AuthGuard><ContratoDetailPage /></AuthGuard>} />
+
+      <Route path="/oportunidades" element={<AuthGuard><OportunidadesPage /></AuthGuard>} />
+
+      <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }
