@@ -10,27 +10,43 @@ import ContratoDetailPage from './features/contratos/ContratoDetailPage'
 import OportunidadesPage from './features/oportunidades/OportunidadesPage'
 import ImportadorPage from './features/importador/ImportadorPage'
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center text-slate-500">
+      Cargando...
+    </div>
+  )
+}
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, session, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500">
-        Cargando…
-      </div>
-    )
-  }
+  if (loading) return <LoadingScreen />
   if (!session || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
   return <AppShell>{children}</AppShell>
 }
 
+// Si ya hay sesion, redirige a la pagina previa o al dashboard.
+// Centraliza la redireccion post-login en el router, reactiva al store.
+function LoginRoute() {
+  const { user, session, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) return <LoadingScreen />
+  if (session && user) {
+    const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
+    return <Navigate to={from} replace />
+  }
+  return <LoginPage />
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={<LoginRoute />} />
 
       <Route path="/" element={<AuthGuard><Navigate to="/dashboard" replace /></AuthGuard>} />
       <Route path="/dashboard" element={<AuthGuard><DashboardPage /></AuthGuard>} />

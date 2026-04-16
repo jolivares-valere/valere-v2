@@ -1,17 +1,12 @@
 ﻿import { useState, type FormEvent } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../core/hooks/useAuth'
 
 export default function LoginPage() {
   const { signIn } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-
-  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -19,9 +14,10 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await signIn(email, password)
-      navigate(from, { replace: true })
+      // No navigate manual. onAuthStateChange poblara el store
+      // y LoginRoute (en App.tsx) redirigira automaticamente.
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
+      setError(err instanceof Error ? err.message : 'Error al iniciar sesion')
     } finally {
       setSubmitting(false)
     }
@@ -52,7 +48,7 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium text-slate-700">Contraseña</label>
+          <label htmlFor="password" className="text-sm font-medium text-slate-700">Contrasena</label>
           <input
             id="password"
             type="password"
@@ -73,7 +69,7 @@ export default function LoginPage() {
           disabled={submitting}
           className="w-full rounded-md bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
         >
-          {submitting ? 'Entrando…' : 'Entrar'}
+          {submitting ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
     </div>

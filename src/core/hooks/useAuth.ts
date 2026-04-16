@@ -23,59 +23,46 @@ async function fetchProfile(userId: string | undefined): Promise<UserProfile | n
   }
 }
 
+// ---------------------------------------------------------------------------
+// Singleton de inicializacion a nivel de modulo.
+// La suscripcion a onAuthStateChange se crea UNA sola vez por vida de la SPA.
+// Cualquier instancia del hook useAuth() reutiliza esa misma suscripcion.
+// ---------------------------------------------------------------------------
+let initialized = false
+
+function ensureAuthInitialized() {
+  if (initialized) return
+  initialized = true
+
+  const safetyTimeout = setTimeout(() => {
+    if (useAuthStore.getState().loading) {
+      console.warn('[useAuth] safety timeout 3s - forzando loading=false')
+      useAuthStore.getState().setLoading(false)
+    }
+  }, 3000)
+
+  supabase.auth.onAuthStateChange(async (_evt, session) => {
+    const store = useAuthStore.getState()
+    store.setSession(session)
+    if (session) {
+      const profile = await fetchProfile(session.user.id)
+      useAuthStore.getState().setUser(profile)
+    } else {
+      store.setUser(null)
+    }
+    useAuthStore.getState().setLoading(false)
+    clearTimeout(safetyTimeout)
+  })
+}
+
 export function useAuth() {
-  const state = useAuthStore()
-  const { user, session, loading, setUser, setSession, setLoading, logout } = state
+  const user = useAuthStore((s) => s.user)
+  const session = useAuthStore((s) => s.session)
+  const loading = useAuthStore((s) => s.loading)
+  const logout = useAuthStore((s) => s.logout)
 
   useEffect(() => {
-    let mounted = true
-    const timeout = setTimeout(() => {
-      if (mounted) {
-        console.warn('[useAuth] timeout 5s - forzando loading=false')
-        setLoading(false)
-      }
-    }, 5000)
-
-    const init = async () => {
-      try {
-        console.log('[useAuth] getSession start')
-        const { data } = await supabase.auth.getSession()
-        console.log('[useAuth] getSession ok, session:', !!data.session)
-        if (!mounted) return
-        setSession(data.session)
-        if (data.session) {
-          const profile = await fetchProfile(data.session.user.id)
-          console.log('[useAuth] profile:', profile)
-          if (mounted) setUser(profile)
-        }
-      } catch (err) {
-        console.error('[useAuth] init error:', err)
-      } finally {
-        if (mounted) {
-          clearTimeout(timeout)
-          setLoading(false)
-        }
-      }
-    }
-    init()
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (evt, newSession) => {
-      console.log('[useAuth] auth event:', evt)
-      if (!mounted) return
-      setSession(newSession)
-      if (newSession) {
-        const profile = await fetchProfile(newSession.user.id)
-        if (mounted) setUser(profile)
-      } else {
-        setUser(null)
-      }
-    })
-
-    return () => {
-      mounted = false
-      clearTimeout(timeout)
-      sub.subscription.unsubscribe()
-    }
+    ensureAuthInitialized()
   }, [])
 
   const signIn = async (email: string, password: string) => {
@@ -93,7 +80,11 @@ export function useAuth() {
   }
 
   return {
-    user, session, loading, signIn, signOut,
+    user,
+    session,
+    loading,
+    signIn,
+    signOut,
     getCurrentUserProfile: () => fetchProfile(session?.user?.id),
   }
 }
