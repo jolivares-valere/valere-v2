@@ -22,7 +22,7 @@ export function useEmpresas(options?: QueryOptions) {
 
       let q = supabase
         .from('empresas')
-        .select('*, comercial:users_profile(id, nombre_completo)', { count: 'exact' })
+        .select('*, comercial:users_profile!empresas_comercial_id_fkey(id, nombre_completo)', { count: 'exact' })
         .is('deleted_at', null)
 
       const search = options?.filter?.search as string | undefined
@@ -30,6 +30,7 @@ export function useEmpresas(options?: QueryOptions) {
         const s = search.trim()
         q = q.or(`nombre.ilike.%${s}%,nif.ilike.%${s}%`)
       }
+
       if (options?.filter?.tipo) q = q.eq('tipo', options.filter.tipo)
       if (options?.filter?.segmento) q = q.eq('segmento', options.filter.segmento)
       if (options?.filter?.comercial_id) {
@@ -41,10 +42,12 @@ export function useEmpresas(options?: QueryOptions) {
       q = q.order(sortField, { ascending: sortAsc }).range(from, to)
 
       const { data, count, error } = await q
+
       if (error) {
         logError(error, 'useEmpresas')
         throw error
       }
+
       return {
         data: (data ?? []) as unknown as Empresa[],
         count: count ?? 0,
@@ -66,10 +69,12 @@ export function useEmpresaById(id: string | undefined) {
         .eq('id', id!)
         .is('deleted_at', null)
         .maybeSingle()
+
       if (error) {
         logError(error, 'useEmpresaById')
         throw error
       }
+
       return (data as Empresa | null) ?? null
     },
   })
@@ -77,6 +82,7 @@ export function useEmpresaById(id: string | undefined) {
 
 export function useCreateEmpresa() {
   const qc = useQueryClient()
+
   return useMutation({
     mutationFn: async (input: EmpresaInsert): Promise<Empresa> => {
       const { data, error } = await supabase
@@ -84,12 +90,15 @@ export function useCreateEmpresa() {
         .insert(input as unknown as Record<string, unknown>)
         .select('*')
         .single()
+
       if (error) {
         logError(error, 'useCreateEmpresa')
         throw error
       }
+
       return data as unknown as Empresa
     },
+
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
     },
@@ -98,6 +107,7 @@ export function useCreateEmpresa() {
 
 export function useUpdateEmpresa() {
   const qc = useQueryClient()
+
   return useMutation({
     mutationFn: async ({
       id,
@@ -112,12 +122,15 @@ export function useUpdateEmpresa() {
         .eq('id', id)
         .select('*')
         .single()
+
       if (error) {
         logError(error, 'useUpdateEmpresa')
         throw error
       }
+
       return data as unknown as Empresa
     },
+
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
       qc.invalidateQueries({ queryKey: [RESOURCE, 'byId', vars.id] })
@@ -127,19 +140,9 @@ export function useUpdateEmpresa() {
 
 export function useDeleteEmpresa() {
   const qc = useQueryClient()
+
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
       const { error } = await supabase
         .from('empresas')
         .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id)
-      if (error) {
-        logError(error, 'useDeleteEmpresa')
-        throw error
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [RESOURCE] })
-    },
-  })
-}
