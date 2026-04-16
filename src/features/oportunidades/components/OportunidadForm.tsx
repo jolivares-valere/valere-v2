@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -56,6 +57,11 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       notas: defaultValues?.notas ?? '',
     },
   })
+  useEffect(() => {
+    if (defaultValues?.empresa_id && empresas.data && !form.getValues('empresa_id')) {
+      form.setValue('empresa_id', defaultValues.empresa_id)
+    }
+  }, [empresas.data, defaultValues?.empresa_id])
 
   const handle = form.handleSubmit(async (values) => {
     const v = values as unknown as {
