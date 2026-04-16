@@ -7,8 +7,8 @@ import { normalizarNIF } from '../../../core/utils/energy'
 const schema = z.object({
   nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   nif: z.string().optional().transform((v) => (v ? normalizarNIF(v) : null)),
-  tipo: z.enum(['empresa', 'autonomo', 'comunidad_propietarios', 'cooperativa', 'asociacion']).nullable().optional(),
-  segmento: z.enum(['industrial', 'comercial', 'servicios', 'agricola', 'residencial_colectivo']).nullable().optional(),
+  tipo: z.enum(['empresa', 'autonomo', 'comunidad_propietarios', 'cooperativa', 'asociacion']).nullable().optional().or(z.literal('')).transform((v) => v || null),
+  segmento: z.enum(['industrial', 'comercial', 'servicios', 'agricola', 'residencial_colectivo']).nullable().optional().or(z.literal('')).transform((v) => v || null),
   email_principal: z.string().email('Email inválido').optional().or(z.literal('')).transform((v) => v || null),
   telefono_principal: z.string().optional().transform((v) => v || null),
   web: z.string().optional().transform((v) => v || null),
