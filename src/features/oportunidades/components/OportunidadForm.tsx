@@ -58,8 +58,11 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
     },
   })
   useEffect(() => {
-    if (defaultValues?.empresa_id && empresas.data && !form.getValues('empresa_id')) {
-      form.setValue('empresa_id', defaultValues.empresa_id)
+    if (empresas.data && defaultValues) {
+      form.reset({
+        ...form.getValues(),
+        empresa_id: defaultValues.empresa_id ?? '',
+      })
     }
   }, [empresas.data, defaultValues?.empresa_id])
 
