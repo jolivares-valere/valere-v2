@@ -8,14 +8,16 @@ import type { UserProfile } from '../types/entities'
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('users_profile')
       .select('*')
       .eq('id', userId)
       .maybeSingle()
+
     if (error) {
       logError(error, 'useAuth.fetchProfile')
       return null
     }
+
     return (data as UserProfile | null) ?? null
   } catch (e) {
     logError(e, 'useAuth.fetchProfile')
@@ -26,12 +28,14 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
 function bootstrapFromSession(session: Session): UserProfile {
   const email = session.user.email ?? ''
   const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>
+
   const nombreMeta =
     typeof meta.nombre_completo === 'string'
       ? meta.nombre_completo
       : typeof meta.full_name === 'string'
       ? meta.full_name
       : null
+
   return {
     id: session.user.id,
     nombre_completo: nombreMeta ?? email.split('@')[0] ?? 'Usuario',
@@ -53,8 +57,8 @@ function ensureAuthInitialized() {
 
   supabase.auth.onAuthStateChange((event, session) => {
     console.log('[useAuth] onAuthStateChange:', event, 'session:', !!session)
-    const store = useAuthStore.getState()
 
+    const store = useAuthStore.getState()
     store.setSession(session)
 
     if (session?.user) {
