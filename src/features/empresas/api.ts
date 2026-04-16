@@ -146,3 +146,16 @@ export function useDeleteEmpresa() {
       const { error } = await supabase
         .from('empresas')
         .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) {
+        logError(error, 'useDeleteEmpresa')
+        throw error
+      }
+    },
+
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [RESOURCE] })
+    },
+  })
+}
