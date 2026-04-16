@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect } from 'react'
 import { supabase } from '../supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { logError } from '../utils/logger'
@@ -26,11 +26,8 @@ async function fetchProfile(userId: string | undefined): Promise<UserProfile | n
 export function useAuth() {
   const state = useAuthStore()
   const { user, session, loading, setUser, setSession, setLoading, logout } = state
-  const initialized = useRef(false)
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
     let mounted = true
     const timeout = setTimeout(() => {
       if (mounted) {
