@@ -1,38 +1,37 @@
-﻿import { useDraggable } from '@dnd-kit/core'
+﻿import { useDroppable } from '@dnd-kit/core'
 import type { OportunidadConEmpresa } from '../api'
-import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../../core/utils/energy'
-import PrioridadBadge from '../../contratos/components/PrioridadBadge'
+import type { EtapaOportunidad } from '../../../core/types/entities'
+import KanbanCard from './KanbanCard'
 
 interface Props {
-  op: OportunidadConEmpresa
-  onClick: () => void
+  etapa: EtapaOportunidad
+  titulo: string
+  items: OportunidadConEmpresa[]
+  onCardClick: (op: OportunidadConEmpresa) => void
 }
 
-export default function KanbanCard({ op, onClick }: Props) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: op.id })
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
-  const dias = calcDiasVencimiento(op.contrato_origen?.fecha_fin ?? null)
-  const prioridad = calcPrioridad(dias)
+export default function KanbanColumn({ etapa, titulo, items, onCardClick }: Props) {
+  const { setNodeRef, isOver } = useDroppable({ id: etapa })
+  const total = items.reduce((sum, o) => sum + (o.valor_estimado_eur ?? 0), 0)
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      onClick={onClick}
-      className={`cursor-grab rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm hover:shadow-md active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+      className={`flex w-72 shrink-0 flex-col rounded-lg border border-slate-200 bg-slate-50 p-3 ${isOver ? 'ring-2 ring-slate-900' : ''}`}
     >
-      <p className="mb-1 font-medium text-slate-900">{op.empresa?.nombre ?? op.nombre}</p>
-      <p className="mb-2 text-xs text-slate-500">
-        {op.tipo.replace('_', ' ')} · {formatComision(op.valor_estimado_eur)}
+      <div className="mb-3 flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold text-slate-900 capitalize">{titulo}</h3>
+        <span className="text-xs text-slate-500">{items.length}</span>
+      </div>
+      <p className="mb-3 text-xs text-slate-500">
+        {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(total)}
       </p>
-      {op.tipo === 'renovacion' && op.contrato_origen?.fecha_fin && (
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">{dias}d</span>
-          <PrioridadBadge prioridad={prioridad} />
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        {items.map((op) => (
+          <KanbanCard key={op.id} op={op} onClick={() => onCardClick(op)} />
+        ))}
+        {items.length === 0 && <p className="text-xs text-slate-400">—</p>}
+      </div>
     </div>
   )
 }

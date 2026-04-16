@@ -1,7 +1,8 @@
 ﻿import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
-import { useOportunidades, useUpdateEtapa, useCreateOportunidad } from './api'
+import { useOportunidades, useUpdateEtapa, useCreateOportunidad, useUpdateOportunidad } from './api'
+import type { OportunidadConEmpresa } from './api'
 import KanbanColumn from './components/KanbanColumn'
 import OportunidadForm from './components/OportunidadForm'
 import type { EtapaOportunidad, OportunidadInsert } from '../../core/types/entities'
@@ -16,12 +17,15 @@ const ETAPAS: { etapa: EtapaOportunidad; titulo: string }[] = [
   { etapa: 'perdida', titulo: 'Perdida' },
 ]
 
+type EditingState = OportunidadConEmpresa | 'new' | null
+
 export default function OportunidadesPage() {
   const { data, isLoading } = useOportunidades()
   const updateEtapa = useUpdateEtapa()
   const createMut = useCreateOportunidad()
+  const updateMut = useUpdateOportunidad()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
-  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<EditingState>(null)
 
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
@@ -34,10 +38,16 @@ export default function OportunidadesPage() {
     updateEtapa.mutate({ id, etapa })
   }
 
-  const onCreate = async (values: OportunidadInsert) => {
-    await createMut.mutateAsync(values)
-    setShowForm(false)
+  const onSubmit = async (values: OportunidadInsert) => {
+    if (editing && editing !== 'new') {
+      await updateMut.mutateAsync({ id: editing.id, patch: values as Partial<OportunidadInsert> })
+    } else {
+      await createMut.mutateAsync(values)
+    }
+    setEditing(null)
   }
+
+  const submitting = createMut.isPending || updateMut.isPending
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando pipeline…</div>
 
@@ -50,7 +60,7 @@ export default function OportunidadesPage() {
         </div>
         <button
           type="button"
-          onClick={() => setShowForm(true)}
+          onClick={() => setEditing('new')}
           className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
         >
           <Plus className="h-4 w-4" /> Nueva oportunidad
@@ -65,26 +75,30 @@ export default function OportunidadesPage() {
               etapa={etapa}
               titulo={titulo}
               items={(data ?? []).filter((o) => o.etapa === etapa)}
+              onCardClick={(op) => setEditing(op)}
             />
           ))}
         </div>
       </DndContext>
 
-      {showForm && (
+      {editing && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setEditing(null)} />
           <div className="fixed right-0 top-0 z-50 h-full w-full max-w-xl overflow-y-auto bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-900">Nueva oportunidad</h2>
-              <button type="button" onClick={() => setShowForm(false)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {editing === 'new' ? 'Nueva oportunidad' : 'Editar oportunidad'}
+              </h2>
+              <button type="button" onClick={() => setEditing(null)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-6">
               <OportunidadForm
-                onSubmit={onCreate}
-                onCancel={() => setShowForm(false)}
-                submitting={createMut.isPending}
+                defaultValues={editing === 'new' ? undefined : editing}
+                onSubmit={onSubmit}
+                onCancel={() => setEditing(null)}
+                submitting={submitting}
               />
             </div>
           </div>
