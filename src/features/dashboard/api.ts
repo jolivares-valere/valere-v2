@@ -48,7 +48,7 @@ export function useOportunidadesKPI() {
     queryFn: async (): Promise<OportunidadKPI[]> => {
       const { data, error } = await supabase
         .from('oportunidades')
-        .select('etapa, valor_estimado')
+        .select('etapa, valor_estimado_eur')
         .is('deleted_at', null)
         .not('etapa', 'in', '(ganada,perdida)')
       if (error) { logError(error, 'useOportunidadesKPI'); throw error }
@@ -57,7 +57,7 @@ export function useOportunidadesKPI() {
         const e = row.etapa as string
         if (!byEtapa[e]) byEtapa[e] = { etapa: e, count: 0, valor_total: 0 }
         byEtapa[e].count++
-        byEtapa[e].valor_total += row.valor_estimado ?? 0
+        byEtapa[e].valor_total += (row.valor_estimado_eur as number | null) ?? 0
       }
       const orden = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion']
       return orden.filter(e => byEtapa[e]).map(e => byEtapa[e])
