@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react'
+import { useEffect } from 'react'
 import { supabase } from '../supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { logError } from '../utils/logger'
@@ -23,25 +23,12 @@ async function fetchProfile(userId: string | undefined): Promise<UserProfile | n
   }
 }
 
-// ---------------------------------------------------------------------------
-// Singleton de inicializacion a nivel de modulo (corre 1 sola vez por SPA).
-//
-// Patron canonico Supabase v2:
-//   1) getSession() hidrata desde localStorage y RESUELVE loading=false.
-//   2) onAuthStateChange() solo maneja eventos futuros (SIGNED_IN, SIGNED_OUT,
-//      TOKEN_REFRESHED). NO toca loading.
-//
-// No usamos solo onAuthStateChange porque INITIAL_SESSION no siempre se emite
-// de forma fiable cuando hay sesion persistida (HMR Vite, versiones de
-// supabase-js, etc). Sin timeouts, sin reintentos, sin bucles.
-// ---------------------------------------------------------------------------
 let initialized = false
 
 function ensureAuthInitialized() {
   if (initialized) return
   initialized = true
 
-  // 1. Hidratacion inicial: lee la sesion persistida y resuelve loading.
   supabase.auth.getSession().then(async ({ data: { session }, error }) => {
     if (error) logError(error, 'useAuth.getSession')
     console.log('[useAuth] getSession resolved - session:', !!session)
@@ -54,8 +41,6 @@ function ensureAuthInitialized() {
     useAuthStore.getState().setLoading(false)
   })
 
-  // 2. Cambios futuros: SIGNED_IN (post-login), SIGNED_OUT, TOKEN_REFRESHED.
-  //    NO tocamos loading aqui - ya se resolvio en getSession().
   supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('[useAuth] onAuthStateChange:', event, 'session:', !!session)
     const store = useAuthStore.getState()
@@ -85,8 +70,6 @@ export function useAuth() {
       logError(error, 'useAuth.signIn')
       throw error
     }
-    // No navigate. onAuthStateChange disparara SIGNED_IN, populara el store
-    // y LoginRoute (en App.tsx) redirigira reactivamente.
   }
 
   const signOut = async () => {
