@@ -29,15 +29,20 @@ function ensureAuthInitialized() {
   if (initialized) return
   initialized = true
 
+  console.log('[useAuth] ensureAuthInitialized - llamando a getSession()')
+
   supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+    console.log('[useAuth] getSession .then() ejecutado, session:', !!session, 'error:', error)
     if (error) logError(error, 'useAuth.getSession')
-    console.log('[useAuth] getSession resolved - session:', !!session)
     const store = useAuthStore.getState()
     store.setSession(session)
     if (session?.user) {
       const profile = await fetchProfile(session.user.id)
       useAuthStore.getState().setUser(profile)
     }
+    useAuthStore.getState().setLoading(false)
+  }).catch((err) => {
+    console.error('[useAuth] getSession() .catch():', err)
     useAuthStore.getState().setLoading(false)
   })
 
@@ -51,6 +56,7 @@ function ensureAuthInitialized() {
     } else {
       store.setUser(null)
     }
+    useAuthStore.getState().setLoading(false)
   })
 }
 
