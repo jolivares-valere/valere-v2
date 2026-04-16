@@ -18,23 +18,49 @@ export function useDashboardKPIs() {
       const in30 = new Date(hoy.getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
       const in60 = new Date(hoy.getTime() + 60 * 86_400_000).toISOString().slice(0, 10)
       const hoyISO = hoy.toISOString().slice(0, 10)
-
       const [empresas, contratos, v30, v60] = await Promise.all([
         supabase.from('empresas').select('id', { count: 'exact', head: true }).is('deleted_at', null),
         supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null),
         supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null).gte('fecha_fin', hoyISO).lte('fecha_fin', in30),
         supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null).gte('fecha_fin', hoyISO).lte('fecha_fin', in60),
       ])
-
       if (empresas.error) logError(empresas.error, 'kpis.empresas')
       if (contratos.error) logError(contratos.error, 'kpis.contratos')
-
       return {
         empresas_activas: empresas.count ?? 0,
         contratos_activos: contratos.count ?? 0,
         vencen_30d: v30.count ?? 0,
         vencen_60d: v60.count ?? 0,
       }
+    },
+  })
+}
+
+export interface OportunidadKPI {
+  etapa: string
+  count: number
+  valor_total: number
+}
+
+export function useOportunidadesKPI() {
+  return useQuery({
+    queryKey: ['dashboard', 'oportunidades-kpi'],
+    queryFn: async (): Promise<OportunidadKPI[]> => {
+      const { data, error } = await supabase
+        .from('oportunidades')
+        .select('etapa, valor_estimado')
+        .is('deleted_at', null)
+        .not('etapa', 'in', '("ganada","perdida")')
+      if (error) { logError(error, 'useOportunidadesKPI'); throw error }
+      const byEtapa: Record<string, OportunidadKPI> = {}
+      for (const row of data ?? []) {
+        const e = row.etapa as string
+        if (!byEtapa[e]) byEtapa[e] = { etapa: e, count: 0, valor_total: 0 }
+        byEtapa[e].count++
+        byEtapa[e].valor_total += row.valor_estimado ?? 0
+      }
+      const orden = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion']
+      return orden.filter(e => byEtapa[e]).map(e => byEtapa[e])
     },
   })
 }
