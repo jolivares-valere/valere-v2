@@ -5,12 +5,15 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../core/supabase/client'
 import type { Contrato, ContratoInsert } from '../../../core/types/entities'
 
+const ESTADOS_CONTRATO = ['tramite', 'activo', 'vencido', 'incidencia', 'baja', 'cancelado', 'borrador'] as const
+
 const schema = z.object({
   empresa_id: z.string().uuid('Empresa obligatoria'),
   compania: z.string().min(2, 'Mínimo 2 caracteres'),
   numero_contrato: z.string().optional().transform((v) => v || null),
-  tipo_energia: z.enum(['electrica', 'gas', 'dual']).nullable().optional().or(z.literal('')).transform((v) => v || null),
-  tipo_precio: z.enum(['fijo', 'indexado', 'mixto']).nullable().optional().or(z.literal('')).transform((v) => v || null),
+  estado: z.enum(ESTADOS_CONTRATO),
+  tipo_energia: z.enum(['electrica', 'gas', 'dual']).or(z.literal('')).transform((v) => v || null),
+  tipo_precio: z.enum(['fijo', 'indexado', 'mixto']).or(z.literal('')).transform((v) => v || null),
   tarifa_acceso: z.string().optional().transform((v) => v || null),
   fecha_inicio: z.string().optional().transform((v) => v || null),
   fecha_fin: z.string().optional().transform((v) => v || null),
@@ -43,14 +46,16 @@ function useEmpresasOptions() {
 
 export default function ContratoForm({ defaultValues, onSubmit, onCancel, submitting }: Props) {
   const empresas = useEmpresasOptions()
+
   const form = useForm<ContratoFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       empresa_id: defaultValues?.empresa_id ?? '',
       compania: defaultValues?.compania ?? '',
       numero_contrato: defaultValues?.numero_contrato ?? '',
-      tipo_energia: defaultValues?.tipo_energia ?? undefined,
-      tipo_precio: defaultValues?.tipo_precio ?? undefined,
+      estado: (defaultValues?.estado as typeof ESTADOS_CONTRATO[number]) ?? 'tramite',
+      tipo_energia: defaultValues?.tipo_energia ?? '',
+      tipo_precio: defaultValues?.tipo_precio ?? '',
       tarifa_acceso: defaultValues?.tarifa_acceso ?? '',
       fecha_inicio: defaultValues?.fecha_inicio ?? '',
       fecha_fin: defaultValues?.fecha_fin ?? '',
@@ -58,11 +63,12 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
     },
   })
 
-  const handle = form.handleSubmit(async (values) => {
-    const v = values as unknown as {
+  const handle = form.handleSubmit(async (raw) => {
+    const v = raw as unknown as {
       empresa_id: string
       compania: string
       numero_contrato: string | null
+      estado: typeof ESTADOS_CONTRATO[number]
       tipo_energia: 'electrica' | 'gas' | 'dual' | null
       tipo_precio: 'fijo' | 'indexado' | 'mixto' | null
       tarifa_acceso: string | null
@@ -90,7 +96,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
       comision_integra: defaultValues?.comision_integra ?? null,
       comision_comercial: defaultValues?.comision_comercial ?? null,
       comision_jefe: defaultValues?.comision_jefe ?? null,
-      estado: defaultValues?.estado ?? 'borrador',
+      estado: v.estado,
       observaciones: v.observaciones,
       external_id: defaultValues?.external_id ?? null,
       created_by: defaultValues?.created_by ?? null,
@@ -102,7 +108,11 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
   const field = (name: keyof ContratoFormValues, label: string, type = 'text') => (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      <input type={type} {...form.register(name)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none" />
+      <input
+        type={type}
+        {...form.register(name)}
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+      />
       {form.formState.errors[name] && (
         <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors[name]?.message)}</span>
       )}
@@ -122,8 +132,23 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
             <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.empresa_id?.message)}</span>
           )}
         </label>
+
         {field('compania', 'Compañía *')}
         {field('numero_contrato', 'Nº contrato')}
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Estado *</span>
+          <select {...form.register('estado')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <option value="tramite">En trámite</option>
+            <option value="activo">Activo</option>
+            <option value="vencido">Vencido</option>
+            <option value="incidencia">Incidencia</option>
+            <option value="baja">Baja</option>
+            <option value="cancelado">Cancelado</option>
+            <option value="borrador">Borrador</option>
+          </select>
+        </label>
+
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo energía</span>
           <select {...form.register('tipo_energia')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
@@ -133,6 +158,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
             <option value="dual">Ambos</option>
           </select>
         </label>
+
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo precio</span>
           <select {...form.register('tipo_precio')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
@@ -142,14 +168,17 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
             <option value="mixto">Mixto</option>
           </select>
         </label>
+
         {field('tarifa_acceso', 'Tarifa acceso')}
         {field('fecha_inicio', 'Fecha inicio', 'date')}
         {field('fecha_fin', 'Fecha fin', 'date')}
       </div>
+
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">Notas</span>
         <textarea {...form.register('observaciones')} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
       </label>
+
       <div className="flex justify-end gap-2">
         {onCancel && (
           <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>

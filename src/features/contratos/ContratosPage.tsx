@@ -1,21 +1,24 @@
 ﻿import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, X } from 'lucide-react'
-import { useContratos, useCreateContrato } from './api'
+import { Plus, X, Pencil } from 'lucide-react'
+import { useContratos, useCreateContrato, useUpdateContrato } from './api'
 import EstadoBadge from './components/EstadoBadge'
 import PrioridadBadge from './components/PrioridadBadge'
 import ContratoForm from './components/ContratoForm'
 import { calcDiasVencimiento, calcPrioridad } from '../../core/utils/energy'
 import { formatDate } from '../../core/utils/dates'
 import type { EstadoContrato, ContratoInsert } from '../../core/types/entities'
+import type { ContratoConEmpresa } from './api'
 
 const ESTADOS: EstadoContrato[] = ['activo', 'tramite', 'vencido', 'incidencia', 'baja', 'cancelado', 'borrador']
+
+type PanelState = ContratoConEmpresa | 'new' | null
 
 export default function ContratosPage() {
   const [params, setParams] = useSearchParams()
   const page = Number(params.get('page') ?? '1')
   const estado = params.get('estado') ?? ''
-  const [showForm, setShowForm] = useState(false)
+  const [panel, setPanel] = useState<PanelState>(null)
 
   const { data, isLoading } = useContratos({
     page,
@@ -23,8 +26,9 @@ export default function ContratosPage() {
     filter: { estado: estado || undefined },
     sort: { field: 'fecha_fin', direction: 'asc' },
   })
-
   const createMut = useCreateContrato()
+  const updateMut = useUpdateContrato()
+
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / 20))
 
   const updateParam = (key: string, value: string) => {
@@ -35,10 +39,18 @@ export default function ContratosPage() {
     setParams(next)
   }
 
-  const onCreate = async (values: ContratoInsert) => {
-    await createMut.mutateAsync(values)
-    setShowForm(false)
+  const onSubmit = async (values: ContratoInsert) => {
+    if (panel && panel !== 'new') {
+      await updateMut.mutateAsync({ id: panel.id, patch: values })
+    } else {
+      await createMut.mutateAsync(values)
+    }
+    setPanel(null)
   }
+
+  const isSubmitting = createMut.isPending || updateMut.isPending
+  const editingContrato = panel !== null && panel !== 'new' ? panel : undefined
+  const panelTitle = editingContrato ? 'Editar contrato' : 'Nuevo contrato'
 
   return (
     <div className="p-8">
@@ -49,14 +61,15 @@ export default function ContratosPage() {
         </div>
         <button
           type="button"
-          onClick={() => setShowForm(true)}
+          onClick={() => setPanel('new')}
           className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
         >
-          <Plus className="h-4 w-4" /> Nuevo contrato
+          <Plus className="h-4 w-4" />
+          Nuevo contrato
         </button>
       </div>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => updateParam('estado', '')}
@@ -87,11 +100,12 @@ export default function ContratosPage() {
               <th className="px-4 py-3">Vence</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Prioridad</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">Cargando…</td></tr>}
-            {!isLoading && data?.data.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">Sin resultados</td></tr>}
+            {isLoading && <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-500">Cargando…</td></tr>}
+            {!isLoading && data?.data.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-500">Sin resultados</td></tr>}
             {data?.data.map((c) => {
               const dias = calcDiasVencimiento(c.fecha_fin)
               const prioridad = calcPrioridad(dias)
@@ -113,6 +127,16 @@ export default function ContratosPage() {
                   </td>
                   <td className="px-4 py-3"><EstadoBadge estado={c.estado} /></td>
                   <td className="px-4 py-3"><PrioridadBadge prioridad={prioridad} /></td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setPanel(c)}
+                      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      title="Editar contrato"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               )
             })}
@@ -128,21 +152,22 @@ export default function ContratosPage() {
         </div>
       )}
 
-      {showForm && (
+      {panel !== null && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setPanel(null)} />
           <div className="fixed right-0 top-0 z-50 h-full w-full max-w-xl overflow-y-auto bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-900">Nuevo contrato</h2>
-              <button type="button" onClick={() => setShowForm(false)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100">
+              <h2 className="text-lg font-semibold text-slate-900">{panelTitle}</h2>
+              <button type="button" onClick={() => setPanel(null)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-6">
               <ContratoForm
-                onSubmit={onCreate}
-                onCancel={() => setShowForm(false)}
-                submitting={createMut.isPending}
+                defaultValues={editingContrato}
+                onSubmit={onSubmit}
+                onCancel={() => setPanel(null)}
+                submitting={isSubmitting}
               />
             </div>
           </div>
