@@ -3,7 +3,12 @@ import type { OportunidadConEmpresa } from '../api'
 import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../../core/utils/energy'
 import PrioridadBadge from '../../contratos/components/PrioridadBadge'
 
-export default function KanbanCard({ op }: { op: OportunidadConEmpresa }) {
+interface Props {
+  op: OportunidadConEmpresa
+  onClick: () => void
+}
+
+export default function KanbanCard({ op, onClick }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: op.id })
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
   const dias = calcDiasVencimiento(op.contrato_origen?.fecha_fin ?? null)
@@ -15,6 +20,7 @@ export default function KanbanCard({ op }: { op: OportunidadConEmpresa }) {
       style={style}
       {...listeners}
       {...attributes}
+      onClick={onClick}
       className={`cursor-grab rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm hover:shadow-md active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
     >
       <p className="mb-1 font-medium text-slate-900">{op.empresa?.nombre ?? op.nombre}</p>
