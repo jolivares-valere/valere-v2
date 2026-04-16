@@ -2,10 +2,10 @@ import { useEffect } from 'react'
 import { supabase } from '../supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { logError } from '../utils/logger'
+import type { Session } from '@supabase/supabase-js'
 import type { UserProfile } from '../types/entities'
 
-async function fetchProfile(userId: string | undefined): Promise<UserProfile | null> {
-  if (!userId) return null
+async function fetchProfile(userId: string): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
       .from('user_profiles')
@@ -23,40 +23,55 @@ async function fetchProfile(userId: string | undefined): Promise<UserProfile | n
   }
 }
 
+function bootstrapFromSession(session: Session): UserProfile {
+  const email = session.user.email ?? ''
+  const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>
+  const nombreMeta =
+    typeof meta.nombre_completo === 'string'
+      ? meta.nombre_completo
+      : typeof meta.full_name === 'string'
+      ? meta.full_name
+      : null
+  return {
+    id: session.user.id,
+    nombre_completo: nombreMeta ?? email.split('@')[0] ?? 'Usuario',
+    rol: 'comercial',
+    activo: true,
+    avatar_url: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+}
+
 let initialized = false
 
 function ensureAuthInitialized() {
   if (initialized) return
   initialized = true
 
-  console.log('[useAuth] ensureAuthInitialized - llamando a getSession()')
+  console.log('[useAuth] ensureAuthInitialized - suscribiendo onAuthStateChange')
 
-  supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-    console.log('[useAuth] getSession .then() ejecutado, session:', !!session, 'error:', error)
-    if (error) logError(error, 'useAuth.getSession')
-    const store = useAuthStore.getState()
-    store.setSession(session)
-    if (session?.user) {
-      const profile = await fetchProfile(session.user.id)
-      useAuthStore.getState().setUser(profile)
-    }
-    useAuthStore.getState().setLoading(false)
-  }).catch((err) => {
-    console.error('[useAuth] getSession() .catch():', err)
-    useAuthStore.getState().setLoading(false)
-  })
-
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     console.log('[useAuth] onAuthStateChange:', event, 'session:', !!session)
     const store = useAuthStore.getState()
+
     store.setSession(session)
+
     if (session?.user) {
-      const profile = await fetchProfile(session.user.id)
-      useAuthStore.getState().setUser(profile)
+      store.setUser(bootstrapFromSession(session))
     } else {
       store.setUser(null)
     }
-    useAuthStore.getState().setLoading(false)
+
+    store.setLoading(false)
+
+    if (session?.user) {
+      fetchProfile(session.user.id)
+        .then((profile) => {
+          if (profile) useAuthStore.getState().setUser(profile)
+        })
+        .catch((err) => console.error('[useAuth] fetchProfile bg:', err))
+    }
   })
 }
 
@@ -90,6 +105,7 @@ export function useAuth() {
     loading,
     signIn,
     signOut,
-    getCurrentUserProfile: () => fetchProfile(session?.user?.id),
+    getCurrentUserProfile: () =>
+      session?.user ? fetchProfile(session.user.id) : Promise.resolve(null),
   }
 }
