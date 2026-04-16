@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../core/supabase/client'
+import { useContactosPorEmpresa } from '../../contactos/api'
 import type { Oportunidad, OportunidadInsert } from '../../../core/types/entities'
 
 const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
@@ -16,6 +17,7 @@ const optNum = z.preprocess(
 
 const schema = z.object({
   empresa_id: z.string().uuid('Empresa obligatoria'),
+  contacto_id: z.string().uuid().or(z.literal('')).transform((v) => v || null),
   nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   tipo: z.enum(TIPOS),
   etapa: z.enum(ETAPAS),
@@ -48,6 +50,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
     resolver: zodResolver(schema),
     defaultValues: {
       empresa_id: defaultValues?.empresa_id ?? '',
+      contacto_id: defaultValues?.contacto_id ?? '',
       nombre: defaultValues?.nombre ?? '',
       tipo: defaultValues?.tipo ?? 'nueva_venta',
       etapa: defaultValues?.etapa ?? 'prospecto',
@@ -57,18 +60,24 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       notas: defaultValues?.notas ?? '',
     },
   })
+
+  const empresaIdWatched = form.watch('empresa_id')
+  const contactos = useContactosPorEmpresa(empresaIdWatched)
+
   useEffect(() => {
     if (empresas.data && defaultValues) {
       form.reset({
         ...form.getValues(),
         empresa_id: defaultValues.empresa_id ?? '',
+        contacto_id: defaultValues.contacto_id ?? '',
       })
     }
-  }, [empresas.data, defaultValues?.empresa_id])
+  }, [empresas.data, defaultValues?.empresa_id, defaultValues?.contacto_id])
 
   const handle = form.handleSubmit(async (values) => {
     const v = values as unknown as {
       empresa_id: string
+      contacto_id: string | null
       nombre: string
       tipo: typeof TIPOS[number]
       etapa: typeof ETAPAS[number]
@@ -79,6 +88,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
     }
     const insert: OportunidadInsert = {
       empresa_id: v.empresa_id,
+      contacto_id: v.contacto_id,
       contrato_origen_id: defaultValues?.contrato_origen_id ?? null,
       comercial_id: defaultValues?.comercial_id ?? null,
       tipo: v.tipo,
@@ -111,12 +121,38 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium text-slate-700">Empresa *</span>
-          <select {...form.register('empresa_id')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select
+            {...form.register('empresa_id', {
+              onChange: () => form.setValue('contacto_id', ''),
+            })}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
             <option value="">— Selecciona empresa —</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
           {form.formState.errors.empresa_id && (
             <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.empresa_id?.message)}</span>
+          )}
+        </label>
+        <label className="block md:col-span-2">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Contacto principal</span>
+          <select
+            {...form.register('contacto_id')}
+            disabled={!empresaIdWatched}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+          >
+            <option value="">— Sin contacto —</option>
+            {contactos.data?.map((c) => {
+              const nombre = `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`
+              const cargo = c.cargo ? ` — ${c.cargo}` : ''
+              const decisor = c.es_decisor ? ' ⭐' : ''
+              return (
+                <option key={c.id} value={c.id}>{`${nombre}${cargo}${decisor}`}</option>
+              )
+            })}
+          </select>
+          {empresaIdWatched && contactos.data && contactos.data.length === 0 && (
+            <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene contactos aún.</span>
           )}
         </label>
         {field('nombre', 'Nombre *')}
