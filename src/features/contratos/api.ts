@@ -28,7 +28,7 @@ export function useContratos(options?: QueryOptions) {
 
       let q = supabase
         .from('contratos')
-        .select('*, empresa:empresas(id, nombre, nif), comercial:users_profile(id, nombre_completo)', { count: 'exact' })
+        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo)', { count: 'exact' })
         .is('deleted_at', null)
 
       const f = options?.filter ?? {}
@@ -55,10 +55,11 @@ export function useContratoById(id: string | undefined) {
     queryFn: async () => {
       const { data: contrato, error: e1 } = await supabase
         .from('contratos')
-        .select('*, empresa:empresas(id, nombre, nif), comercial:users_profile(id, nombre_completo)')
+        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo)')
         .eq('id', id!)
         .is('deleted_at', null)
         .maybeSingle()
+
       if (e1) { logError(e1, 'useContratoById'); throw e1 }
       if (!contrato) return null
 
@@ -80,7 +81,11 @@ export function useCreateContrato() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: ContratoInsert) => {
-      const { data, error } = await supabase.from('contratos').insert(input as unknown as Record<string, unknown>).select('*').single()
+      const { data, error } = await supabase
+        .from('contratos')
+        .insert(input as unknown as Record<string, unknown>)
+        .select('*')
+        .single()
       if (error) { logError(error, 'useCreateContrato'); throw error }
       return data as unknown as Contrato
     },
@@ -92,7 +97,12 @@ export function useUpdateContrato() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: ContratoUpdate }) => {
-      const { data, error } = await supabase.from('contratos').update(patch as unknown as Record<string, unknown>).eq('id', id).select('*').single()
+      const { data, error } = await supabase
+        .from('contratos')
+        .update(patch as unknown as Record<string, unknown>)
+        .eq('id', id)
+        .select('*')
+        .single()
       if (error) { logError(error, 'useUpdateContrato'); throw error }
       return data as unknown as Contrato
     },
@@ -107,7 +117,10 @@ export function useDeleteContrato() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('contratos').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+      const { error } = await supabase
+        .from('contratos')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
       if (error) { logError(error, 'useDeleteContrato'); throw error }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [RESOURCE] }),
