@@ -5,6 +5,7 @@ import LoginPage from './features/auth/LoginPage'
 import DashboardPage from './features/dashboard/DashboardPage'
 import EmpresasPage from './features/empresas/EmpresasPage'
 import EmpresaDetailPage from './features/empresas/EmpresaDetailPage'
+import ContactosPage from './features/contactos/ContactosPage'
 import ContratosPage from './features/contratos/ContratosPage'
 import ContratoDetailPage from './features/contratos/ContratoDetailPage'
 import OportunidadesPage from './features/oportunidades/OportunidadesPage'
@@ -53,6 +54,8 @@ export default function App() {
 
       <Route path="/empresas" element={<AuthGuard><EmpresasPage /></AuthGuard>} />
       <Route path="/empresas/:id" element={<AuthGuard><EmpresaDetailPage /></AuthGuard>} />
+
+      <Route path="/contactos" element={<AuthGuard><ContactosPage /></AuthGuard>} />
 
       <Route path="/contratos" element={<AuthGuard><ContratosPage /></AuthGuard>} />
       <Route path="/contratos/:id" element={<AuthGuard><ContratoDetailPage /></AuthGuard>} />

@@ -1,10 +1,11 @@
 ﻿import { NavLink } from 'react-router-dom'
-import { Building2, FileText, GitBranch, LayoutDashboard, Upload } from 'lucide-react'
+import { Building2, FileText, GitBranch, LayoutDashboard, Upload, Users } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
 const items = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/empresas', label: 'Empresas', icon: Building2 },
+  { to: '/contactos', label: 'Contactos', icon: Users },
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
   { to: '/importador', label: 'Importador', icon: Upload },
