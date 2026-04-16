@@ -50,8 +50,7 @@ export function useOportunidadesKPI() {
         .from('oportunidades')
         .select('etapa, valor_estimado')
         .is('deleted_at', null)
-        .neq('etapa', 'ganada')
-        .neq('etapa', 'perdida')
+        .not('etapa', 'in', '(ganada,perdida)')
       if (error) { logError(error, 'useOportunidadesKPI'); throw error }
       const byEtapa: Record<string, OportunidadKPI> = {}
       for (const row of data ?? []) {
