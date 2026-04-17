@@ -285,4 +285,4 @@ function KPI({
     </Link>
   )
 }
-
+Is avanzados, alertas y pipeline visual"
