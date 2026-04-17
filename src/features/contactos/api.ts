@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 import { buildQueryKey } from '../../core/hooks/useQueryBase'
@@ -44,6 +45,35 @@ export function useContactos(options?: QueryOptions) {
   })
 }
 
+export interface ContactoOption {
+  id: string
+  nombre: string
+  apellidos: string | null
+  cargo: string | null
+  email: string | null
+  telefono: string | null
+  movil: string | null
+  es_decisor: boolean
+  es_firmante: boolean
+}
+
+export function useContactosPorEmpresa(empresaId: string | null | undefined) {
+  return useQuery({
+    queryKey: [RESOURCE, 'por-empresa', empresaId],
+    enabled: Boolean(empresaId),
+    queryFn: async (): Promise<ContactoOption[]> => {
+      const { data, error } = await supabase
+        .from('contactos')
+        .select('id, nombre, apellidos, cargo, email, telefono, movil, es_decisor, es_firmante')
+        .eq('empresa_id', empresaId!)
+        .is('deleted_at', null)
+        .order('nombre', { ascending: true })
+      if (error) { logError(error, 'useContactosPorEmpresa'); throw error }
+      return (data ?? []) as ContactoOption[]
+    },
+  })
+}
+
 export function useContactoById(id: string | undefined) {
   return useQuery({
     queryKey: [RESOURCE, 'byId', id],
@@ -73,7 +103,11 @@ export function useCreateContacto() {
       if (error) { logError(error, 'useCreateContacto'); throw error }
       return data as unknown as Contacto
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: [RESOURCE] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Contacto creado')
+    },
+    onError: (e) => toast.error('No se pudo crear el contacto', { description: (e as Error).message }),
   })
 }
 
@@ -93,7 +127,9 @@ export function useUpdateContacto() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
       qc.invalidateQueries({ queryKey: [RESOURCE, 'byId', vars.id] })
+      toast.success('Contacto actualizado')
     },
+    onError: (e) => toast.error('No se pudo actualizar el contacto', { description: (e as Error).message }),
   })
 }
 
@@ -107,6 +143,10 @@ export function useDeleteContacto() {
         .eq('id', id)
       if (error) { logError(error, 'useDeleteContacto'); throw error }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: [RESOURCE] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Contacto eliminado')
+    },
+    onError: (e) => toast.error('No se pudo eliminar el contacto', { description: (e as Error).message }),
   })
 }

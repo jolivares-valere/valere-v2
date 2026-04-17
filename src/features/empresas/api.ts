@@ -1,4 +1,5 @@
 ﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 import { buildQueryKey } from '../../core/hooks/useQueryBase'
@@ -101,7 +102,9 @@ export function useCreateEmpresa() {
 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Empresa creada')
     },
+    onError: (e) => toast.error('No se pudo crear la empresa', { description: (e as Error).message }),
   })
 }
 
@@ -134,7 +137,9 @@ export function useUpdateEmpresa() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
       qc.invalidateQueries({ queryKey: [RESOURCE, 'byId', vars.id] })
+      toast.success('Empresa actualizada')
     },
+    onError: (e) => toast.error('No se pudo actualizar la empresa', { description: (e as Error).message }),
   })
 }
 
@@ -156,6 +161,8 @@ export function useDeleteEmpresa() {
 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Empresa eliminada')
     },
+    onError: (e) => toast.error('No se pudo eliminar la empresa', { description: (e as Error).message }),
   })
 }

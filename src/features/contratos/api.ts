@@ -1,4 +1,5 @@
 ﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 import { buildQueryKey } from '../../core/hooks/useQueryBase'
@@ -15,6 +16,7 @@ const RESOURCE = 'contratos'
 export interface ContratoConEmpresa extends Contrato {
   empresa?: { id: string; nombre: string; nif: string | null } | null
   comercial?: { id: string; nombre_completo: string } | null
+  contacto_firmante?: { id: string; nombre: string; apellidos: string | null; cargo: string | null } | null
 }
 
 export function useContratos(options?: QueryOptions) {
@@ -28,7 +30,7 @@ export function useContratos(options?: QueryOptions) {
 
       let q = supabase
         .from('contratos')
-        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo)', { count: 'exact' })
+        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)', { count: 'exact' })
         .is('deleted_at', null)
 
       const f = options?.filter ?? {}
@@ -55,7 +57,7 @@ export function useContratoById(id: string | undefined) {
     queryFn: async () => {
       const { data: contrato, error: e1 } = await supabase
         .from('contratos')
-        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo)')
+        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)')
         .eq('id', id!)
         .is('deleted_at', null)
         .maybeSingle()
@@ -89,7 +91,11 @@ export function useCreateContrato() {
       if (error) { logError(error, 'useCreateContrato'); throw error }
       return data as unknown as Contrato
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: [RESOURCE] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Contrato creado')
+    },
+    onError: (e) => toast.error('No se pudo crear el contrato', { description: (e as Error).message }),
   })
 }
 
@@ -109,7 +115,9 @@ export function useUpdateContrato() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
       qc.invalidateQueries({ queryKey: [RESOURCE, 'byId', vars.id] })
+      toast.success('Contrato actualizado')
     },
+    onError: (e) => toast.error('No se pudo actualizar el contrato', { description: (e as Error).message }),
   })
 }
 
@@ -123,6 +131,10 @@ export function useDeleteContrato() {
         .eq('id', id)
       if (error) { logError(error, 'useDeleteContrato'); throw error }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: [RESOURCE] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Contrato eliminado')
+    },
+    onError: (e) => toast.error('No se pudo eliminar el contrato', { description: (e as Error).message }),
   })
 }
