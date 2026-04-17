@@ -256,6 +256,50 @@ INSERT INTO boe_regulated_prices (tariff, period, price) VALUES
   ('6.1TD', 'P4E', 0.019382),
   ('6.1TD', 'P5E', 0.014162),
   ('6.1TD', 'P6E', 0.008668);
+  -- Tarifa 6.2TD (mismos peajes que 6.1TD)
+  INSERT INTO boe_regulated_prices (tariff, period, price) VALUES
+    ('6.2TD', 'P1', 24.012060),
+      ('6.2TD', 'P2', 16.199820),
+        ('6.2TD', 'P3', 10.610940),
+          ('6.2TD', 'P4', 7.032960),
+            ('6.2TD', 'P5', 4.904640),
+              ('6.2TD', 'P6', 2.340000),
+                ('6.2TD', 'P1E', 0.042286),
+                  ('6.2TD', 'P2E', 0.034482),
+                    ('6.2TD', 'P3E', 0.025870),
+                      ('6.2TD', 'P4E', 0.019382),
+                        ('6.2TD', 'P5E', 0.014162),
+                          ('6.2TD', 'P6E', 0.008668);
+
+                          -- Tarifa 6.3TD (mismos peajes que 6.1TD)
+                          INSERT INTO boe_regulated_prices (tariff, period, price) VALUES
+                            ('6.3TD', 'P1', 24.012060),
+                              ('6.3TD', 'P2', 16.199820),
+                                ('6.3TD', 'P3', 10.610940),
+                                  ('6.3TD', 'P4', 7.032960),
+                                    ('6.3TD', 'P5', 4.904640),
+                                      ('6.3TD', 'P6', 2.340000),
+                                        ('6.3TD', 'P1E', 0.042286),
+                                          ('6.3TD', 'P2E', 0.034482),
+                                            ('6.3TD', 'P3E', 0.025870),
+                                              ('6.3TD', 'P4E', 0.019382),
+                                                ('6.3TD', 'P5E', 0.014162),
+                                                  ('6.3TD', 'P6E', 0.008668);
+
+                                                  -- Tarifa 6.4TD (mismos peajes que 6.1TD)
+                                                  INSERT INTO boe_regulated_prices (tariff, period, price) VALUES
+                                                    ('6.4TD', 'P1', 24.012060),
+                                                      ('6.4TD', 'P2', 16.199820),
+                                                        ('6.4TD', 'P3', 10.610940),
+                                                          ('6.4TD', 'P4', 7.032960),
+                                                            ('6.4TD', 'P5', 4.904640),
+                                                              ('6.4TD', 'P6', 2.340000),
+                                                                ('6.4TD', 'P1E', 0.042286),
+                                                                  ('6.4TD', 'P2E', 0.034482),
+                                                                    ('6.4TD', 'P3E', 0.025870),
+                                                                      ('6.4TD', 'P4E', 0.019382),
+                                                                        ('6.4TD', 'P5E', 0.014162),
+                                                                          ('6.4TD', 'P6E', 0.008668);
 
 -- Comercializadoras de ejemplo
 INSERT INTO retailers (name, is_active, model) VALUES
