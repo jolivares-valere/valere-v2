@@ -122,6 +122,7 @@ export interface Oportunidad {
   id: string
   empresa_id: string
   contrato_origen_id: string | null
+  contacto_id: string | null
   comercial_id: string | null
   tipo: TipoOportunidad
   nombre: string

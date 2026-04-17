@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,7 +8,7 @@ import { useContactosPorEmpresa } from '../../contactos/api'
 import type { Oportunidad, OportunidadInsert } from '../../../core/types/entities'
 
 const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
-const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida'] as const
+const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida', 'cancelada'] as const
 
 const optNum = z.preprocess(
   (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
@@ -18,11 +18,11 @@ const optNum = z.preprocess(
 const schema = z.object({
   empresa_id: z.string().uuid('Empresa obligatoria'),
   contacto_id: z.string().uuid().or(z.literal('')).transform((v) => v || null),
-  nombre: z.string().min(2, 'Mínimo 2 caracteres'),
+  nombre: z.string().min(2, 'MÃ­nimo 2 caracteres'),
   tipo: z.enum(TIPOS),
   etapa: z.enum(ETAPAS),
   probabilidad_pct: optNum.refine((v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 100), 'Entre 0 y 100'),
-  valor_estimado_eur: optNum.refine((v) => v === null || v >= 0, 'Importe inválido'),
+  valor_estimado_eur: optNum.refine((v) => v === null || v >= 0, 'Importe invÃ¡lido'),
   fecha_cierre_prevista: z.string().optional().transform((v) => v || null),
   notas: z.string().optional().transform((v) => v || null),
 })
@@ -127,7 +127,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
             })}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
-            <option value="">— Selecciona empresa —</option>
+            <option value="">â€” Selecciona empresa â€”</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
           {form.formState.errors.empresa_id && (
@@ -141,18 +141,18 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
             disabled={!empresaIdWatched}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
-            <option value="">— Sin contacto —</option>
+            <option value="">â€” Sin contacto â€”</option>
             {contactos.data?.map((c) => {
               const nombre = `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`
-              const cargo = c.cargo ? ` — ${c.cargo}` : ''
-              const decisor = c.es_decisor ? ' ⭐' : ''
+              const cargo = c.cargo ? ` â€” ${c.cargo}` : ''
+              const decisor = c.es_decisor ? ' â­' : ''
               return (
                 <option key={c.id} value={c.id}>{`${nombre}${cargo}${decisor}`}</option>
               )
             })}
           </select>
           {empresaIdWatched && contactos.data && contactos.data.length === 0 && (
-            <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene contactos aún.</span>
+            <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene contactos aÃºn.</span>
           )}
         </label>
         {field('nombre', 'Nombre *')}
@@ -160,9 +160,9 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo *</span>
           <select {...form.register('tipo')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
             <option value="nueva_venta">Nueva venta</option>
-            <option value="renovacion">Renovación</option>
-            <option value="ampliacion">Ampliación</option>
-            <option value="recuperacion">Recuperación</option>
+            <option value="renovacion">RenovaciÃ³n</option>
+            <option value="ampliacion">AmpliaciÃ³n</option>
+            <option value="recuperacion">RecuperaciÃ³n</option>
           </select>
         </label>
         <label className="block">
@@ -170,15 +170,15 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
           <select {...form.register('etapa')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
             <option value="prospecto">Prospecto</option>
             <option value="contactado">Contactado</option>
-            <option value="analisis">Análisis</option>
+            <option value="analisis">AnÃ¡lisis</option>
             <option value="propuesta_enviada">Propuesta enviada</option>
-            <option value="negociacion">Negociación</option>
+            <option value="negociacion">NegociaciÃ³n</option>
             <option value="ganada">Ganada</option>
             <option value="perdida">Perdida</option>
           </select>
         </label>
         {field('probabilidad_pct', 'Probabilidad (%)', 'number')}
-        {field('valor_estimado_eur', 'Valor estimado (€)', 'number')}
+        {field('valor_estimado_eur', 'Valor estimado (â‚¬)', 'number')}
         {field('fecha_cierre_prevista', 'Fecha cierre prevista', 'date')}
       </div>
       <label className="block">
@@ -190,7 +190,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
           <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
         )}
         <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
-          {submitting ? 'Guardando…' : 'Guardar'}
+          {submitting ? 'Guardandoâ€¦' : 'Guardar'}
         </button>
       </div>
     </form>

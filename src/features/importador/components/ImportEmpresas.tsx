@@ -66,7 +66,7 @@ export default function ImportEmpresas() {
     let creadas = 0
     for (const r of validos) {
       const { _errors: _ignored, ...data } = r
-      const { error } = await supabase.from('empresas').upsert(data, { onConflict: 'nif' })
+      const { error } = await supabase.from('empresas').upsert(data as never, { onConflict: 'nif' })
       if (error) errores.push(`${r.nombre}: ${error.message}`)
       else creadas++
     }

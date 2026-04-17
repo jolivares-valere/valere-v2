@@ -260,7 +260,6 @@ function ContactosSection({ empresaId }: { empresaId: string }) {
             <div className="p-6">
               <ContactoForm
                 defaultValues={{ empresa_id: empresaId }}
-                empresaLocked
                 onSubmit={onSubmit}
                 onCancel={() => setAdding(false)}
                 submitting={createMut.isPending}

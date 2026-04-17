@@ -16,6 +16,9 @@ const RESOURCE = 'contratos'
 export interface ContratoConEmpresa extends Contrato {
   empresa?: { id: string; nombre: string; nif: string | null } | null
   comercial?: { id: string; nombre_completo: string } | null
+  comision_eur?: number | null
+  cups?: string | null
+  tipo_punto?: string | null
   contacto_firmante?: { id: string; nombre: string; apellidos: string | null; cargo: string | null } | null
 }
 

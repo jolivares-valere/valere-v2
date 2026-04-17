@@ -33,7 +33,7 @@ export default function ContactosPage() {
   }
 
   const submitting = createMut.isPending || updateMut.isPending
-  const lista = data ?? []
+  const lista = data?.data ?? []
   const aBorrar = lista.find((c) => c.id === confirmDeleteId)
 
   return (

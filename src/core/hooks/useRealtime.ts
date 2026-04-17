@@ -19,7 +19,6 @@ export function useRealtime(
       const channel = supabase
         .channel(`rt-${table}-${filter ?? 'all'}`)
         .on(
-          // @ts-expect-error supabase-js omite el literal en el tipo publico
           'postgres_changes',
           { event: '*', schema: 'public', table, filter },
           (payload: unknown) => onData(payload as RealtimePayload),

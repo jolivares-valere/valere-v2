@@ -8,10 +8,10 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
 import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../core/utils/energy'
 import { formatDate } from '../../core/utils/dates'
-import type { ContratoConRelaciones } from './api'
+import type { ContratoConEmpresa } from './api'
 import type { ContratoInsert } from '../../core/types/entities'
 
-type EditingState = ContratoConRelaciones | 'new' | null
+type EditingState = ContratoConEmpresa | 'new' | null
 
 export default function ContratosPage() {
   const { data, isLoading } = useContratos()
@@ -37,7 +37,7 @@ export default function ContratosPage() {
   }
 
   const submitting = createMut.isPending || updateMut.isPending
-  const lista = data ?? []
+  const lista = data?.data ?? []
   const aBorrar = lista.find((c) => c.id === confirmDeleteId)
 
   return (

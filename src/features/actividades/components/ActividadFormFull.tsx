@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+﻿import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -23,10 +23,10 @@ const optNum = z.preprocess(
 
 const schema = z.object({
   tipo: z.enum(['nota', 'llamada', 'email', 'reunion', 'tarea', 'whatsapp', 'visita', 'documento']),
-  titulo: z.string().min(2, 'Mínimo 2 caracteres').max(200),
+  titulo: z.string().min(2, 'MÃ­nimo 2 caracteres').max(200),
   descripcion: z.string().optional().transform((v) => v || null),
   fecha_actividad: z.string().min(1, 'Fecha obligatoria'),
-  duracion_min: optNum.refine((v) => v === null || v >= 0, 'Duración inválida'),
+  duracion_min: optNum.refine((v) => v === null || v >= 0, 'DuraciÃ³n invÃ¡lida'),
   resultado: z.enum(['positivo', 'neutral', 'negativo', 'sin_respuesta']).or(z.literal('')).transform((v) => v || null),
   estado_tarea: z.enum(['pendiente', 'completada', 'cancelada']).or(z.literal('')).transform((v) => v || null),
   fecha_vencimiento: z.string().optional().transform((v) => v || null),
@@ -127,7 +127,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
   const form = useForm<ActividadFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: (defaultValues?.tipo as TipoActividad | undefined) ?? 'nota',
+      tipo: ((defaultValues?.tipo === 'cambio_estado' ? 'nota' : defaultValues?.tipo) as Exclude<TipoActividad, 'cambio_estado'> | undefined) ?? 'nota',
       titulo: defaultValues?.titulo ?? '',
       descripcion: defaultValues?.descripcion ?? '',
       fecha_actividad: toDateTimeLocal(defaultValues?.fecha_actividad) || toDateTimeLocal(new Date().toISOString()),
@@ -159,15 +159,15 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
     if (entidadTipoWatched === 'empresa') return null
     if (entidadTipoWatched === 'contacto') return contactos.data?.map((c) => ({
       id: c.id,
-      label: `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}${c.cargo ? ' — ' + c.cargo : ''}`,
+      label: `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}${c.cargo ? ' â€” ' + c.cargo : ''}`,
     })) ?? []
     if (entidadTipoWatched === 'oportunidad') return oportunidades.data?.map((o) => ({
       id: o.id,
-      label: `${o.nombre} · ${o.etapa}`,
+      label: `${o.nombre} Â· ${o.etapa}`,
     })) ?? []
     if (entidadTipoWatched === 'contrato') return contratos.data?.map((c) => ({
       id: c.id,
-      label: `${c.compania}${c.numero_contrato ? ' · ' + c.numero_contrato : ''}`,
+      label: `${c.compania}${c.numero_contrato ? ' Â· ' + c.numero_contrato : ''}`,
     })) ?? []
     return []
   }, [entidadTipoWatched, contactos.data, oportunidades.data, contratos.data])
@@ -252,7 +252,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
         </label>
 
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Título *</span>
+          <span className="mb-1 block text-sm font-medium text-slate-700">TÃ­tulo *</span>
           <input type="text" {...form.register('titulo')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           {form.formState.errors.titulo && (
             <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.titulo.message)}</span>
@@ -260,7 +260,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
         </label>
 
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-slate-700">Descripción</span>
+          <span className="mb-1 block text-sm font-medium text-slate-700">DescripciÃ³n</span>
           <textarea {...form.register('descripcion')} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
         </label>
 
@@ -292,7 +292,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
             disabled={entidadLocked}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
           >
-            <option value="">— Selecciona empresa —</option>
+            <option value="">â€” Selecciona empresa â€”</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
           {form.formState.errors.empresa_id && (
@@ -312,7 +312,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
               disabled={entidadLocked || !empresaIdWatched}
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
             >
-              <option value="">— Selecciona —</option>
+              <option value="">â€” Selecciona â€”</option>
               {secondLevelOptions?.map((opt) => (
                 <option key={opt.id} value={opt.id}>{opt.label}</option>
               ))}
@@ -321,14 +321,14 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
               <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.entidad_id.message)}</span>
             )}
             {empresaIdWatched && secondLevelOptions && secondLevelOptions.length === 0 && (
-              <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene {entidadTipoWatched}s aún.</span>
+              <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene {entidadTipoWatched}s aÃºn.</span>
             )}
           </label>
         )}
 
         {isReunionOLlamada && (
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Duración (min)</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">DuraciÃ³n (min)</span>
             <input type="number" {...form.register('duracion_min')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </label>
         )}
@@ -337,7 +337,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Resultado</span>
             <select {...form.register('resultado')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-              <option value="">—</option>
+              <option value="">â€”</option>
               <option value="positivo">Positivo</option>
               <option value="neutral">Neutral</option>
               <option value="negativo">Negativo</option>
@@ -363,7 +363,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
             <label className="block md:col-span-2">
               <span className="mb-1 block text-sm font-medium text-slate-700">Asignado a</span>
               <select {...form.register('asignado_a')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-                <option value="">— Yo ({user?.nombre_completo ?? 'usuario actual'}) —</option>
+                <option value="">â€” Yo ({user?.nombre_completo ?? 'usuario actual'}) â€”</option>
                 {usuarios.data?.map((u) => <option key={u.id} value={u.id}>{u.nombre_completo}</option>)}
               </select>
             </label>
@@ -372,7 +372,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
 
         <label className="flex items-center gap-2 md:col-span-2 text-sm text-slate-700">
           <input type="checkbox" {...form.register('privada')} />
-          Actividad privada (solo visible para mí)
+          Actividad privada (solo visible para mÃ­)
         </label>
       </div>
 
@@ -381,7 +381,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
           <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
         )}
         <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
-          {submitting ? 'Guardando…' : 'Guardar'}
+          {submitting ? 'Guardandoâ€¦' : 'Guardar'}
         </button>
       </div>
     </form>

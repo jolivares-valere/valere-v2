@@ -51,8 +51,8 @@ export default function EmpresaForm({ defaultValues, onSubmit, onCancel, submitt
     const insert: EmpresaInsert = {
       nombre: values.nombre,
       nif: (values as unknown as { nif: string | null }).nif ?? null,
-      tipo: values.tipo ?? null,
-      segmento: values.segmento ?? null,
+      tipo: (values.tipo || null) as EmpresaInsert['tipo'],
+      segmento: (values.segmento || null) as EmpresaInsert['segmento'],
       email_principal: (values as unknown as { email_principal: string | null }).email_principal ?? null,
       telefono_principal: (values as unknown as { telefono_principal: string | null }).telefono_principal ?? null,
       web: (values as unknown as { web: string | null }).web ?? null,

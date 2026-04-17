@@ -61,7 +61,7 @@ export function useCreateOportunidad() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: OportunidadInsert) => {
-      const { data, error } = await supabase.from('oportunidades').insert(input as unknown as Record<string, unknown>).select('*').single()
+      const { data, error } = await supabase.from('oportunidades').insert(input as never).select('*').single()
       if (error) { logError(error, 'useCreateOportunidad'); throw error }
       return data as unknown as Oportunidad
     },
@@ -77,7 +77,7 @@ export function useUpdateOportunidad() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: OportunidadUpdate }) => {
-      const { data, error } = await supabase.from('oportunidades').update(patch as unknown as Record<string, unknown>).eq('id', id).select('*').single()
+      const { data, error } = await supabase.from('oportunidades').update(patch as never).eq('id', id).select('*').single()
       if (error) { logError(error, 'useUpdateOportunidad'); throw error }
       return data as unknown as Oportunidad
     },
@@ -94,7 +94,7 @@ export function useUpdateEtapa() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, etapa }: { id: string; etapa: EtapaOportunidad }) => {
-      const { error } = await supabase.from('oportunidades').update({ etapa }).eq('id', id)
+      const { error } = await supabase.from('oportunidades').update({ etapa } as never).eq('id', id)
       if (error) { logError(error, 'useUpdateEtapa'); throw error }
     },
     onMutate: async ({ id, etapa }) => {
