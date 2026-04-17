@@ -1,12 +1,18 @@
 ﻿import type { ReactNode } from 'react'
 import { Toaster } from 'sonner'
 import Sidebar from './Sidebar'
+import GlobalSearch from '../search/GlobalSearch'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center gap-4 border-b border-slate-200 bg-white px-4">
+          <GlobalSearch />
+        </header>
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
       <Toaster
         position="top-right"
         richColors
