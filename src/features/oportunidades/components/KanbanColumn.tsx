@@ -7,10 +7,11 @@ interface Props {
   etapa: EtapaOportunidad
   titulo: string
   items: OportunidadConEmpresa[]
+  tareasPorOportunidad?: Record<string, number>
   onCardClick: (op: OportunidadConEmpresa) => void
 }
 
-export default function KanbanColumn({ etapa, titulo, items, onCardClick }: Props) {
+export default function KanbanColumn({ etapa, titulo, items, tareasPorOportunidad, onCardClick }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa })
   const total = items.reduce((sum, o) => sum + (o.valor_estimado_eur ?? 0), 0)
 
@@ -28,7 +29,12 @@ export default function KanbanColumn({ etapa, titulo, items, onCardClick }: Prop
       </p>
       <div className="flex flex-col gap-2">
         {items.map((op) => (
-          <KanbanCard key={op.id} op={op} onClick={() => onCardClick(op)} />
+          <KanbanCard
+            key={op.id}
+            op={op}
+            tareasPendientes={tareasPorOportunidad?.[op.id]}
+            onClick={() => onCardClick(op)}
+          />
         ))}
         {items.length === 0 && <p className="text-xs text-slate-400">—</p>}
       </div>

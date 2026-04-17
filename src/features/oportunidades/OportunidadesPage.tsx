@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { useOportunidades, useUpdateEtapa, useCreateOportunidad, useUpdateOportunidad } from './api'
 import type { OportunidadConEmpresa } from './api'
+import { useTareasPendientesPorOportunidad } from '../actividades/api'
 import KanbanColumn from './components/KanbanColumn'
 import OportunidadForm from './components/OportunidadForm'
 import type { EtapaOportunidad, OportunidadInsert } from '../../core/types/entities'
@@ -21,6 +22,7 @@ type EditingState = OportunidadConEmpresa | 'new' | null
 
 export default function OportunidadesPage() {
   const { data, isLoading } = useOportunidades()
+  const tareasPendientes = useTareasPendientesPorOportunidad()
   const updateEtapa = useUpdateEtapa()
   const createMut = useCreateOportunidad()
   const updateMut = useUpdateOportunidad()
@@ -75,6 +77,7 @@ export default function OportunidadesPage() {
               etapa={etapa}
               titulo={titulo}
               items={(data ?? []).filter((o) => o.etapa === etapa)}
+              tareasPorOportunidad={tareasPendientes.data}
               onCardClick={(op) => setEditing(op)}
             />
           ))}

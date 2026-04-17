@@ -1,11 +1,14 @@
 ﻿import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
+import { useContactosPorEmpresa, useCreateContacto } from '../contactos/api'
+import ContactoForm from '../contactos/components/ContactoForm'
 import { formatDate } from '../../core/utils/dates'
-import type { EmpresaUpdate } from '../../core/types/entities'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import type { EmpresaUpdate, ContactoInsert } from '../../core/types/entities'
 
 type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'propuestas'
 
@@ -16,6 +19,7 @@ export default function EmpresaDetailPage() {
   const deleteMut = useDeleteEmpresa()
   const [editing, setEditing] = useState(false)
   const [tab, setTab] = useState<Tab>('resumen')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando…</div>
   if (!empresa) return <div className="p-8 text-slate-500">Empresa no encontrada</div>
@@ -25,9 +29,9 @@ export default function EmpresaDetailPage() {
     setEditing(false)
   }
 
-  const onDelete = async () => {
-    if (!confirm(`¿Eliminar "${empresa.nombre}"? (soft delete)`)) return
+  const onDeleteConfirmed = async () => {
     await deleteMut.mutateAsync(empresa.id)
+    setConfirmDelete(false)
     window.location.href = '/empresas'
   }
 
@@ -48,7 +52,7 @@ export default function EmpresaDetailPage() {
           <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
             <Pencil className="h-3.5 w-3.5" /> {editing ? 'Cancelar' : 'Editar'}
           </button>
-          <button type="button" onClick={onDelete} className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
+          <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
             <Trash2 className="h-3.5 w-3.5" /> Eliminar
           </button>
         </div>
@@ -71,9 +75,18 @@ export default function EmpresaDetailPage() {
               <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                 {tab === 'resumen' && <Resumen empresa={empresa} />}
                 {tab === 'actividades' && (
-                  <ActividadTimeline entidadTipo="empresa" entidadId={empresa.id} />
+                  <div className="space-y-4">
+                    <ActividadTimeline entidadTipo="empresa" entidadId={empresa.id} />
+                    <Link
+                      to={`/actividades?entidad_tipo=empresa&entidad_id=${empresa.id}`}
+                      className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900"
+                    >
+                      Ver todas las actividades de esta empresa →
+                    </Link>
+                  </div>
                 )}
-                {(tab === 'contactos' || tab === 'contratos' || tab === 'propuestas') && (
+                {tab === 'contactos' && <ContactosSection empresaId={empresa.id} />}
+                {(tab === 'contratos' || tab === 'propuestas') && (
                   <p className="text-sm text-slate-500">
                     Sección "{tab}" — próximas iteraciones.
                   </p>
@@ -93,6 +106,17 @@ export default function EmpresaDetailPage() {
           </InfoCard>
         </aside>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDelete}
+        title="Eliminar empresa"
+        message={`¿Seguro que quieres eliminar "${empresa.nombre}"? (soft delete)`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={deleteMut.isPending}
+        onConfirm={onDeleteConfirmed}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }
@@ -144,6 +168,107 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="text-slate-900">{value}</dd>
+    </div>
+  )
+}
+
+function ContactosSection({ empresaId }: { empresaId: string }) {
+  const contactos = useContactosPorEmpresa(empresaId)
+  const createMut = useCreateContacto()
+  const [adding, setAdding] = useState(false)
+
+  const onSubmit = async (values: ContactoInsert) => {
+    await createMut.mutateAsync({ ...values, empresa_id: empresaId })
+    setAdding(false)
+  }
+
+  const lista = contactos.data ?? []
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-900">Contactos de la empresa</h3>
+        {lista.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+          >
+            <Plus className="h-3.5 w-3.5" /> Añadir contacto
+          </button>
+        )}
+      </div>
+
+      {contactos.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+
+      {!contactos.isLoading && lista.length === 0 && (
+        <div className="rounded-md border border-dashed border-slate-300 p-6 text-center">
+          <p className="mb-3 text-sm text-slate-500">Sin contactos registrados</p>
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+          >
+            <Plus className="h-3.5 w-3.5" /> Añadir el primero
+          </button>
+        </div>
+      )}
+
+      {lista.length > 0 && (
+        <ul className="divide-y divide-slate-100">
+          {lista.map((c) => {
+            const phones = [c.telefono, c.movil].filter(Boolean).join(' · ')
+            return (
+              <li key={c.id} className="py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900">
+                      {c.nombre}{c.apellidos ? ` ${c.apellidos}` : ''}
+                    </p>
+                    {c.cargo && <p className="text-xs text-slate-500">{c.cargo}</p>}
+                    {(c.email || phones) && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        {c.email ?? ''}{c.email && phones ? ' · ' : ''}{phones}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    {c.es_decisor && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">Decisor</span>
+                    )}
+                    {c.es_firmante && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-800">Firmante</span>
+                    )}
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {adding && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setAdding(false)} />
+          <div className="fixed right-0 top-0 z-50 h-full w-full max-w-xl overflow-y-auto bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 p-4">
+              <h2 className="text-lg font-semibold text-slate-900">Nuevo contacto</h2>
+              <button type="button" onClick={() => setAdding(false)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <ContactoForm
+                defaultValues={{ empresa_id: empresaId }}
+                empresaLocked
+                onSubmit={onSubmit}
+                onCancel={() => setAdding(false)}
+                submitting={createMut.isPending}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

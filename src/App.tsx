@@ -10,6 +10,7 @@ import ContratosPage from './features/contratos/ContratosPage'
 import ContratoDetailPage from './features/contratos/ContratoDetailPage'
 import OportunidadesPage from './features/oportunidades/OportunidadesPage'
 import ImportadorPage from './features/importador/ImportadorPage'
+import ActividadesPage from './features/actividades/ActividadesPage'
 
 function LoadingScreen() {
   return (
@@ -30,8 +31,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <AppShell>{children}</AppShell>
 }
 
-// Si ya hay sesion, redirige a la pagina previa o al dashboard.
-// Centraliza la redireccion post-login en el router, reactiva al store.
 function LoginRoute() {
   const { user, session, loading } = useAuth()
   const location = useLocation()
@@ -61,6 +60,8 @@ export default function App() {
       <Route path="/contratos/:id" element={<AuthGuard><ContratoDetailPage /></AuthGuard>} />
 
       <Route path="/oportunidades" element={<AuthGuard><OportunidadesPage /></AuthGuard>} />
+
+      <Route path="/actividades" element={<AuthGuard><ActividadesPage /></AuthGuard>} />
 
       <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
 
