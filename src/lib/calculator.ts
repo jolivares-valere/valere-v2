@@ -11,6 +11,7 @@ import type {
   InvoiceSimulationResult
 } from '@/types/database';
 import { safeNum, safeArray } from './utils';
+import { getTariffConfig } from './tariffs';
 
 interface SimulationParams {
   supplyPoint: SupplyPoint | null;
@@ -42,6 +43,7 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
   const tariff = supplyPoint?.tariff || '';
   const pvPowerKwp = safeNum(supplyPoint?.pv_power_kwp);
   const fvInstallationCost = safeNum(supplyPoint?.fv_installation_cost_eur);
+    const tariffCfg = getTariffConfig(tariff);
 
   const offerEnergyPrices = safeArray(offer?.energy_prices);
   const offerPowerPrices = safeArray(offer?.power_prices);
@@ -62,7 +64,7 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
     p => p.tariff === tariff && p.period.startsWith('P') && !p.period.includes('E')
   );
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < tariffCfg.potencia; i++) {
     const periodKey = `p${i + 1}` as keyof typeof powers;
     const powerKw = safeNum(powers[periodKey]);
     const boePrice = boePowerPrices.find(p => p.period === `P${i + 1}`)?.price ?? 0;
@@ -81,7 +83,7 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
     p => p.tariff === tariff && p.period.startsWith('P') && p.period.includes('E')
   );
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < tariffCfg.energia; i++) {
     const consumption = consumption_p[i];
     const boePrice = boeEnergyPrices.find(p => p.period === `P${i + 1}E`)?.price ?? 0;
     const cost = consumption * boePrice;
@@ -94,7 +96,7 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
   let totalFreeEnergy = 0;
   const isSilver = surplusModel === 'gestion_silver';
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < tariffCfg.energia; i++) {
     const consumption = consumption_p[i];
     const price = isSilver ? 0 : offerEnergyPrices[i];
     const cost = consumption * price;
