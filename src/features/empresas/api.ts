@@ -23,7 +23,7 @@ export function useEmpresas(options?: QueryOptions) {
 
       let q = supabase
         .from('empresas')
-        .select('*, comercial:users_profile!empresas_comercial_id_fkey(id, nombre_completo)', { count: 'exact' })
+        .select('*, comercial:user_profiles!empresas_comercial_id_fkey(id, full_name)', { count: 'exact' })
         .is('deleted_at', null)
 
       const search = options?.filter?.search as string | undefined

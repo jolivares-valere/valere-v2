@@ -15,7 +15,7 @@ const RESOURCE = 'contratos'
 
 export interface ContratoConEmpresa extends Contrato {
   empresa?: { id: string; nombre: string; nif: string | null } | null
-  comercial?: { id: string; nombre_completo: string } | null
+  comercial?: { id: string; full_name: string } | null
   comision_eur?: number | null
   cups?: string | null
   tipo_punto?: string | null
@@ -33,7 +33,7 @@ export function useContratos(options?: QueryOptions) {
 
       let q = supabase
         .from('contratos')
-        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)', { count: 'exact' })
+        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:user_profiles!contratos_comercial_id_fkey(id, full_name), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)', { count: 'exact' })
         .is('deleted_at', null)
 
       const f = options?.filter ?? {}
@@ -60,7 +60,7 @@ export function useContratoById(id: string | undefined) {
     queryFn: async () => {
       const { data: contrato, error: e1 } = await supabase
         .from('contratos')
-        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:users_profile!contratos_comercial_id_fkey(id, nombre_completo), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)')
+        .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:user_profiles!contratos_comercial_id_fkey(id, full_name), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)')
         .eq('id', id!)
         .is('deleted_at', null)
         .maybeSingle()

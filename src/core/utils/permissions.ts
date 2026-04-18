@@ -13,23 +13,15 @@ const RO: Action[] = ['read']
 const RO_EXPORT: Action[] = ['read', 'export']
 
 const matrix: Record<RolUsuario, Partial<Record<Resource, Action[]>>> = {
-  admin: {
+  master: {
     empresa: ALL, contacto: ALL, contrato: ALL, oportunidad: ALL,
     actividad: ALL, propuesta: ALL, admin: ALL,
   },
-  jefe_equipo: {
+  manager: {
     empresa: RW, contacto: RW, contrato: RW, oportunidad: RW,
     actividad: RW, propuesta: RW,
   },
-  comercial: {
-    empresa: [...OWN, 'export'],
-    contacto: OWN,
-    contrato: [...OWN, 'export'],
-    oportunidad: OWN,
-    actividad: OWN,
-    propuesta: OWN,
-  },
-  visor: {
+  client: {
     empresa: RO_EXPORT, contacto: RO, contrato: RO_EXPORT,
     oportunidad: RO, actividad: RO, propuesta: RO,
   },

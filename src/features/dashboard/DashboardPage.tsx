@@ -58,7 +58,7 @@ export default function DashboardPage() {
     <div className="p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Hola, {user?.nombre_completo ?? 'equipo'}</p>
+        <p className="text-sm text-slate-500">Hola, {user?.full_name ?? 'equipo'}</p>
       </div>
 
       {/* KPIs fila 1 */}

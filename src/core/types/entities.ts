@@ -3,7 +3,7 @@
  * Mapea 1:1 supabase/migrations/001_crm_core.sql.
  */
 
-export type RolUsuario = 'admin' | 'jefe_equipo' | 'comercial' | 'visor'
+export type RolUsuario = 'master' | 'manager' | 'client'
 export type TipoEmpresa = 'empresa' | 'autonomo' | 'comunidad_propietarios' | 'cooperativa' | 'asociacion'
 export type SegmentoEmpresa = 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
 export type TipoEnergia = 'electrica' | 'gas' | 'dual'
@@ -22,12 +22,14 @@ export type PrioridadRenovacion = 'critica' | 'alta' | 'media' | 'baja' | 'ok'
 
 export interface UserProfile {
   id: string
-  nombre_completo: string
-  rol: RolUsuario
-  activo: boolean
+  email: string | null
+  full_name: string | null
+  role: string | null
+  status: string | null
+  approved: boolean | null
   avatar_url: string | null
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 export interface Empresa {

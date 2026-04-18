@@ -206,7 +206,7 @@ export default function ActividadesPage() {
                       <span className="ml-1 text-xs text-slate-500">{a.resultado}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{a.usuario?.nombre_completo ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{a.usuario?.full_name ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"

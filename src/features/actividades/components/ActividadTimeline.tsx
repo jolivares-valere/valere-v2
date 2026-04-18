@@ -91,7 +91,7 @@ function Item({ a }: { a: ActividadConUsuario }) {
         </div>
         {a.descripcion && <p className="mt-0.5 text-slate-600">{a.descripcion}</p>}
         <p className="mt-0.5 text-xs text-slate-400">
-          {a.usuario?.nombre_completo ?? 'Sistema'} · {a.tipo.replace('_', ' ')}
+          {a.usuario?.full_name ?? 'Sistema'} · {a.tipo.replace('_', ' ')}
           {a.estado_tarea && ` · ${a.estado_tarea}`}
         </p>
       </div>

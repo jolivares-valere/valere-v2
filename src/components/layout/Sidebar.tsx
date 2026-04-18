@@ -19,7 +19,7 @@ export default function Sidebar() {
       <div className="px-5 pb-3 pt-6">
         <h1 className="text-lg font-bold text-slate-900">Valere CRM</h1>
         <p className="text-xs text-slate-500">
-          {user?.nombre_completo ?? 'Usuario'} · {user?.rol ?? '—'}
+          {user?.full_name ?? 'Usuario'} · {user?.role ?? '—'}
         </p>
       </div>
       <nav className="flex-1 space-y-1 px-3">

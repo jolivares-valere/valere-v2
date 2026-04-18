@@ -14,7 +14,7 @@ import type {
 const RESOURCE = 'actividades'
 
 export interface ActividadConUsuario extends Actividad {
-  usuario?: { id: string; nombre_completo: string } | null
+  usuario?: { id: string; full_name: string } | null
 }
 
 export interface ActividadFilter {
@@ -48,7 +48,7 @@ export function useActividades(entidadTipo: EntidadTipo, entidadId: string | und
     queryFn: async (): Promise<ActividadConUsuario[]> => {
       const { data, error } = await supabase
         .from('actividades')
-        .select('*, usuario:users_profile!actividades_usuario_id_fkey(id, nombre_completo)')
+        .select('*, usuario:user_profiles!actividades_usuario_id_fkey(id, full_name)')
         .eq('entidad_tipo', entidadTipo)
         .eq('entidad_id', entidadId!)
         .is('deleted_at', null)
@@ -79,7 +79,7 @@ export function useActividadesTodas(options?: ActividadQueryOptions) {
 
       let q = supabase
         .from('actividades')
-        .select('*, usuario:users_profile!actividades_usuario_id_fkey(id, nombre_completo)', { count: 'exact' })
+        .select('*, usuario:user_profiles!actividades_usuario_id_fkey(id, full_name)', { count: 'exact' })
         .is('deleted_at', null)
 
       const f = options?.filter ?? {}
