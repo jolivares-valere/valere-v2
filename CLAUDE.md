@@ -13,14 +13,17 @@ Ambos módulos comparten usuarios (roles) y cliente/empresa.
 
 ## Arquitectura
 
-Convivencia temporal de dos arquitecturas durante la fusión:
+Arquitectura unificada feature-based (fusión completada FASE 20.3-20.6):
 
-| Dominio | Arquitectura destino (feature-based) | Legacy a migrar |
-|---|---|---|
-| CRM | `src/core/`, `src/features/*` (contactos, contratos, oportunidades, actividades, empresas, dashboard, importador) | — |
-| Calculadora | **destino**: `src/features/calculadora/*`, `src/features/analisis/*`, `src/features/propuestas/*`, `src/features/tracking/*`, `src/features/admin/*` | `src/modules/*`, `src/lib/*`, `src/hooks/useAuth.tsx`, `src/hooks/useSupabaseQuery.ts`, `src/components/*` (excepto `ui/`) |
+| Dominio | Ubicación |
+|---|---|
+| CRM | `src/features/` (empresas, contactos, contratos, oportunidades, actividades, dashboard, importador) |
+| Calculadora | `src/features/` (admin, datos, analisis, propuestas-energia, tracking, chat-ia) |
+| Transversal | `src/core/` (hooks, supabase, types, utils, energia, components, stores) |
+| UI (shadcn) | `src/components/ui/` |
+| Layout/Search | `src/components/layout/`, `src/components/search/` |
 
-**Regla:** nada nuevo se escribe en `src/modules/`, `src/lib/`, `src/hooks/` o `src/components/` (excepto `src/components/ui/`). Todo va a `src/core/` o `src/features/<dominio>/`.
+**Regla:** todo va a `src/core/` o `src/features/<dominio>/`. `src/modules/`, `src/lib/`, `src/hooks/` ya no existen.
 
 ### Estructura de una feature
 
@@ -106,18 +109,18 @@ supabase gen types typescript --project-id <PROJECT_REF> > src/core/types/databa
 
 ## Decisiones tomadas
 
-1. **Fusionar CRM y Calculadora en una sola app** bajo arquitectura feature-based (decisión abril 2026).
-2. **`Database = any`** temporal en `src/core/supabase/client.ts` hasta FASE 20.1 (regeneración de tipos).
-3. **`src/modules` está excluido del tsconfig** temporalmente durante la migración. Se reactiva cuando quede vacío (FASE 20.6).
+1. **Fusionar CRM y Calculadora en una sola app** bajo arquitectura feature-based (decisión abril 2026). ✅ COMPLETADO FASE 20.6.
+2. **`Database = any`** temporal en `src/core/supabase/client.ts` hasta FASE 20.1 (regeneración de tipos). �� COMPLETADO.
+3. **`src/modules` eliminado** — migración completada en FASE 20.5-20.6. Exclusión del tsconfig removida.
 4. **Chat Gemini expone la API key en cliente**. Pendiente mover a Edge Function de Supabase (FASE 20.8).
 5. **RLS permisivo actual** (all authenticated CRUD all). Se endurece en FASE 20.9 con filtrado por `comercial_id` / `consultor_asignado`.
 
 ## Gotchas conocidos
 
-- **useAuth duplicado**: `src/core/hooks/useAuth.ts` (CRM, tabla `users_profile` — legacy) y `src/hooks/useAuth.tsx` (Calc, tabla `user_profiles` — canónica). Se unifica en FASE 20.3 adaptando el CRM a la tabla canónica.
+- ~~**useAuth duplicado**~~: RESUELTO en FASE 20.3. Solo existe `src/core/hooks/useAuth.ts` leyendo de `user_profiles`.
 - **Cowork trabaja en `main`**, nosotros en `claude/valere-crm-architecture-2vvEV`. Antes de fusionar comprobar `git log origin/main --oneline` por si hay commits nuevos que portar.
 - **PowerShell Windows + sandbox Linux**: parte de los flujos aplican parches en el Windows del usuario vía PowerShell; usar `[regex]::Replace()` o `@'...'@` heredocs para evitar problemas de CRLF/LF.
-- **StrictMode duplica efectos**: el antiguo `useAuth.tsx` tiene un `useRef(false)` guard que rompe — el nuevo de `src/core/` ya no lo tiene (fix FASE 1 FINAL).
+- **Tipos Calc en `src/types/database.ts`**: tipos de la Calculadora (Client, SupplyPoint, etc.) aún viven aquí. Se integrarán con los tipos generados de Supabase en FASE 20.7.
 
 ## Roadmap
 

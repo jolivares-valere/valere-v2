@@ -330,8 +330,14 @@ Dos informes iniciales:
 - [x] FASE 20.0.1 — invoice_history columnas ✅
 - [x] FASE 20.1 — Tipos Supabase reales ✅
 - [x] FASE 20.2 — Merge main ✅
-- [ ] FASE 20.3 — Unificar useAuth (⏳ bloqueada por Cowork)
-- [ ] FASE 20.4 → 20.10
+- [x] FASE 20.3 — Unificar useAuth ✅
+- [x] FASE 20.4 — Mover src/lib → core/energia + core/utils ✅
+- [x] FASE 20.5 — Migrar módulos Calc a features/ ✅
+- [x] FASE 20.6 — Eliminar estructura legacy flat ✅
+- [ ] FASE 20.7 — Unificar schema Supabase (requiere Cowork SQL)
+- [ ] FASE 20.8 — Chat Gemini → Edge Function (requiere Supabase CLI)
+- [ ] FASE 20.9 — RLS granular (requiere Cowork SQL)
+- [ ] FASE 20.10 — Pendientes menores del audit
 
 ## Checklist — Mejoras post-fusión (21-26)
 
