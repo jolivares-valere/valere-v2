@@ -10,7 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery';
 import type { Client, SupplyPoint, InvoiceHistory } from '@/types/database';
 import { toast } from 'sonner';
-import { getTariffConfig, validateCUPS, validatePowers } from '@/lib/tariffs';
+import { getTariffConfig, validateCUPS, validatePowers } from '@/core/energia/tariffs';
 
 export default function DataCapture() {
   const { data: clients } = useSupabaseQuery<Client>({

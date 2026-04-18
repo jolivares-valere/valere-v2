@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
 import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
-import { calculateSimulatedInvoice, distributeConsumption } from '@/lib/calculator';
+import { calculateSimulatedInvoice, distributeConsumption } from '@/core/energia/calculator';
 import { formatEur, formatPct, safeNum } from '@/core/utils/format';
-import { getTariffConfig } from '@/lib/tariffs';
+import { getTariffConfig } from '@/core/energia/tariffs';
 import type {
   Client, SupplyPoint, InvoiceHistory, RetailerOffer,
   BoeRegulatedPrice, GlobalConfig, RetailerOfferWithName

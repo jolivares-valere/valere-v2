@@ -13,7 +13,7 @@ import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery'
 import type { UserProfile, Retailer, RetailerOffer, GlobalConfig } from '@/types/database';
 import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
-import { getTariffConfig } from '@/lib/tariffs';
+import { getTariffConfig } from '@/core/energia/tariffs';
 
 export default function AdminPanel() {
   return (
