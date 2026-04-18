@@ -1,7 +1,15 @@
 ﻿import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
-import { useContratos, useCreateContrato, useUpdateContrato, useDeleteContrato, fetchContratosForExport } from './api'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Plus, Pencil, Trash2, X, Flame, ChevronRight } from 'lucide-react'
+import {
+  useContratos,
+  useCreateContrato,
+  useUpdateContrato,
+  useDeleteContrato,
+  fetchContratosForExport,
+  useContratosPorVencer,
+  useResumenVencimientos,
+} from './api'
 import ContratoForm from './components/ContratoForm'
 import PrioridadBadge from './components/PrioridadBadge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -9,18 +17,30 @@ import ExportButton from '../../core/components/ExportButton'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
 import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../core/utils/energy'
 import { formatDate } from '../../core/utils/dates'
-import type { ContratoConEmpresa } from './api'
+import type { ContratoConEmpresa, ContratoPorVencer } from './api'
 import type { ContratoInsert } from '../../core/types/entities'
 
 type EditingState = ContratoConEmpresa | 'new' | null
 
 export default function ContratosPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const vencimientoMode = searchParams.get('vencimiento') === '1'
+
   const { data, isLoading } = useContratos()
+  const porVencer = useContratosPorVencer(100)
+  const resumen = useResumenVencimientos()
   const createMut = useCreateContrato()
   const updateMut = useUpdateContrato()
   const deleteMut = useDeleteContrato()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const toggleVencimiento = () => {
+    const next = new URLSearchParams(searchParams)
+    if (vencimientoMode) next.delete('vencimiento')
+    else next.set('vencimiento', '1')
+    setSearchParams(next)
+  }
 
   const onSubmit = async (values: ContratoInsert) => {
     if (editing && editing !== 'new') {
@@ -79,7 +99,48 @@ export default function ContratosPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {/* Filtro: Solo próximos a vencer */}
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleVencimiento}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            vencimientoMode
+              ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-300'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          <Flame className="h-3.5 w-3.5" />
+          Próximos a vencer
+          {vencimientoMode && <X className="ml-1 h-3 w-3" />}
+        </button>
+      </div>
+
+      {vencimientoMode && resumen.data && resumen.data.total > 0 && (
+        <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600" />
+              <span className="font-semibold text-red-700">{resumen.data.criticas}</span>
+              <span className="text-slate-600">críticas (≤15 días)</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
+              <span className="font-semibold text-orange-700">{resumen.data.proximas}</span>
+              <span className="text-slate-600">próximas (≤30 días)</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+              <span className="font-semibold text-amber-700">{resumen.data.futuras}</span>
+              <span className="text-slate-600">futuras (≤90 días)</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {vencimientoMode ? (
+        <VencimientoList loading={porVencer.isLoading} rows={porVencer.data ?? []} />
+      ) : isLoading ? (
         <>
           <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white">
             <table className="w-full text-sm">
@@ -238,4 +299,70 @@ export default function ContratosPage() {
       />
     </div>
   )
+}
+
+function VencimientoList({ loading, rows }: { loading: boolean; rows: ContratoPorVencer[] }) {
+  if (loading) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <table className="w-full text-sm">
+          <tbody>
+            {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
+        <p className="text-sm text-slate-500">No hay contratos próximos a vencer.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <table className="w-full text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-4 py-3">Empresa</th>
+            <th className="px-4 py-3">Nº contrato</th>
+            <th className="px-4 py-3">Fin</th>
+            <th className="px-4 py-3">Días restantes</th>
+            <th className="px-4 py-3">Alerta</th>
+            <th className="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((r) => (
+            <tr key={r.id} className="hover:bg-slate-50">
+              <td className="px-4 py-3">
+                <Link to={`/empresas/${r.empresa_id}`} className="font-medium text-slate-900 hover:underline">
+                  {r.empresa_nombre}
+                </Link>
+              </td>
+              <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.numero_contrato ?? '—'}</td>
+              <td className="px-4 py-3 text-slate-600">{formatDate(r.fecha_fin)}</td>
+              <td className="px-4 py-3 font-medium text-slate-900">{r.dias_restantes}d</td>
+              <td className="px-4 py-3"><AlertaBadge estado={r.estado_alerta} /></td>
+              <td className="px-4 py-3 text-right">
+                <Link to={`/contratos/${r.id}`} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900">
+                  Ver <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AlertaBadge({ estado }: { estado: ContratoPorVencer['estado_alerta'] }) {
+  const cfg = {
+    critica: { bg: 'bg-red-600 text-white', label: 'Crítica' },
+    proxima: { bg: 'bg-orange-500 text-white', label: 'Próxima' },
+    futura: { bg: 'bg-amber-400 text-slate-900', label: 'Futura' },
+  }[estado]
+  return <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${cfg.bg}`}>{cfg.label}</span>
 }

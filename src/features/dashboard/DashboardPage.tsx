@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom'
-import { Building2, FileText, Clock, AlertTriangle, TrendingUp, Percent, Timer, ChevronRight } from 'lucide-react'
+import { Building2, FileText, Clock, AlertTriangle, TrendingUp, Percent, Timer, ChevronRight, Flame } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 import {
   useDashboardKPIs,
@@ -12,6 +12,7 @@ import {
   type AlertaVencimiento,
   type OportunidadEstancada,
 } from './api'
+import { useResumenVencimientos } from '../contratos/api'
 import { formatDate } from '../../core/utils/dates'
 
 const ETAPA_LABEL: Record<string, string> = {
@@ -49,6 +50,7 @@ export default function DashboardPage() {
   const opKPI = useOportunidadesKPI()
   const alertasVenc = useAlertasVencimiento()
   const opEstancadas = useOportunidadesEstancadas()
+  const resumenVenc = useResumenVencimientos()
 
   const totalOps = opKPI.data?.reduce((s, r) => s + r.count, 0) ?? 0
   const totalValor = opKPI.data?.reduce((s, r) => s + r.valor_total, 0) ?? 0
@@ -60,6 +62,38 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-sm text-slate-500">Hola, {user?.full_name ?? 'equipo'}</p>
       </div>
+
+      {/* Tira de alertas de vencimiento */}
+      {resumenVenc.data && resumenVenc.data.total > 0 && (
+        <Link
+          to="/contratos?vencimiento=1"
+          className="mb-6 flex items-center gap-4 rounded-lg border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm transition hover:shadow-md"
+        >
+          <span className="inline-flex rounded-md bg-orange-100 p-2 text-orange-700">
+            <Flame className="h-5 w-5" />
+          </span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">
+              {resumenVenc.data.total} contrato{resumenVenc.data.total === 1 ? '' : 's'} próximo{resumenVenc.data.total === 1 ? '' : 's'} a vencer
+            </p>
+            <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-red-600" />
+                <span className="font-medium text-red-700">{resumenVenc.data.criticas}</span> críticas (≤15 días)
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-orange-500" />
+                <span className="font-medium text-orange-700">{resumenVenc.data.proximas}</span> próximas (≤30 días)
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                <span className="font-medium text-amber-700">{resumenVenc.data.futuras}</span> futuras (≤90 días)
+              </span>
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400" />
+        </Link>
+      )}
 
       {/* KPIs fila 1 */}
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

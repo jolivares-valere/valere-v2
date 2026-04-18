@@ -13,6 +13,52 @@ import type {
 
 const RESOURCE = 'contratos'
 
+export interface ContratoPorVencer {
+  id: string
+  numero_contrato: string | null
+  empresa_id: string
+  fecha_fin: string
+  dias_restantes: number
+  estado_alerta: 'critica' | 'proxima' | 'futura'
+  empresa_nombre: string
+}
+
+export interface ResumenVencimientos {
+  criticas: number
+  proximas: number
+  futuras: number
+  total: number
+}
+
+export function useResumenVencimientos(comercialId?: string | null) {
+  return useQuery({
+    queryKey: [RESOURCE, 'resumen-vencimientos', comercialId ?? null],
+    queryFn: async (): Promise<ResumenVencimientos> => {
+      const { data, error } = await supabase.rpc('get_resumen_vencimientos', {
+        p_comercial_id: comercialId ?? undefined,
+      })
+      if (error) { logError(error, 'useResumenVencimientos'); throw error }
+      const row = (data ?? [])[0] as ResumenVencimientos | undefined
+      return row ?? { criticas: 0, proximas: 0, futuras: 0, total: 0 }
+    },
+  })
+}
+
+export function useContratosPorVencer(limit = 50) {
+  return useQuery({
+    queryKey: [RESOURCE, 'por-vencer', limit],
+    queryFn: async (): Promise<ContratoPorVencer[]> => {
+      const { data, error } = await supabase
+        .from('contratos_por_vencer')
+        .select('*')
+        .order('fecha_fin', { ascending: true })
+        .limit(limit)
+      if (error) { logError(error, 'useContratosPorVencer'); throw error }
+      return (data ?? []) as unknown as ContratoPorVencer[]
+    },
+  })
+}
+
 export interface ContratoConEmpresa extends Contrato {
   empresa?: { id: string; nombre: string; nif: string | null } | null
   comercial?: { id: string; full_name: string } | null
