@@ -59,6 +59,33 @@ export function useEmpresas(options?: QueryOptions) {
   })
 }
 
+export async function fetchEmpresasForExport(filter?: {
+  search?: string
+  tipo?: string
+  segmento?: string
+  comercial_id?: string
+}): Promise<Empresa[]> {
+  let q = supabase
+    .from('empresas')
+    .select('*, comercial:user_profiles!empresas_comercial_id_fkey(id, full_name)')
+    .is('deleted_at', null)
+
+  if (filter?.search && filter.search.trim()) {
+    const s = filter.search.trim()
+    q = q.or(`nombre.ilike.%${s}%,nif.ilike.%${s}%`)
+  }
+  if (filter?.tipo) q = q.eq('tipo', filter.tipo as never)
+  if (filter?.segmento) q = q.eq('segmento', filter.segmento as never)
+  if (filter?.comercial_id) q = q.eq('comercial_id', filter.comercial_id)
+
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(10000)
+  if (error) {
+    logError(error, 'fetchEmpresasForExport')
+    throw error
+  }
+  return (data ?? []) as unknown as Empresa[]
+}
+
 export function useEmpresaById(id: string | undefined) {
   return useQuery({
     queryKey: [RESOURCE, 'byId', id],

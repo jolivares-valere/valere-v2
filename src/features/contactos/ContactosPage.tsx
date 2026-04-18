@@ -1,8 +1,9 @@
 ﻿import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useContactos, useCreateContacto, useUpdateContacto, useDeleteContacto } from './api'
+import { useContactos, useCreateContacto, useUpdateContacto, useDeleteContacto, fetchContactosForExport, type ContactoConEmpresa } from './api'
 import ContactoForm from './components/ContactoForm'
+import ExportButton from '../../core/components/ExportButton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
 import type { Contacto, ContactoInsert } from '../../core/types/entities'
@@ -43,13 +44,30 @@ export default function ContactosPage() {
           <h1 className="text-2xl font-bold text-slate-900">Contactos</h1>
           <p className="text-sm text-slate-500">{lista.length} contactos</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" /> Nuevo contacto
-        </button>
+        <div className="flex gap-2">
+          <ExportButton<ContactoConEmpresa>
+            filename="contactos"
+            fetchRows={() => fetchContactosForExport()}
+            columns={[
+              { header: 'Nombre', value: (c) => c.nombre },
+              { header: 'Apellidos', value: (c) => c.apellidos },
+              { header: 'Cargo', value: (c) => c.cargo },
+              { header: 'Empresa', value: (c) => c.empresa?.nombre },
+              { header: 'Email', value: (c) => c.email },
+              { header: 'Teléfono', value: (c) => c.telefono },
+              { header: 'Móvil', value: (c) => c.movil },
+              { header: 'Decisor', value: (c) => c.es_decisor ? 'Sí' : 'No' },
+              { header: 'Firmante', value: (c) => c.es_firmante ? 'Sí' : 'No' },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" /> Nuevo contacto
+          </button>
+        </div>
       </div>
 
       {isLoading ? (

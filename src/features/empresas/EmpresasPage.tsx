@@ -1,10 +1,11 @@
 ﻿import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import { useEmpresas, useCreateEmpresa } from './api'
+import { useEmpresas, useCreateEmpresa, fetchEmpresasForExport } from './api'
 import EmpresaForm from './components/EmpresaForm'
+import ExportButton from '../../core/components/ExportButton'
 import { formatDate } from '../../core/utils/dates'
-import type { EmpresaInsert } from '../../core/types/entities'
+import type { Empresa, EmpresaInsert } from '../../core/types/entities'
 
 export default function EmpresasPage() {
   const [params, setParams] = useSearchParams()
@@ -44,13 +45,32 @@ export default function EmpresasPage() {
           <h1 className="text-2xl font-bold text-slate-900">Empresas</h1>
           <p className="text-sm text-slate-500">{data?.count ?? 0} en total</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" /> Nueva empresa
-        </button>
+        <div className="flex gap-2">
+          <ExportButton<Empresa>
+            filename="empresas"
+            fetchRows={() => fetchEmpresasForExport({ search, tipo: tipo || undefined })}
+            columns={[
+              { header: 'Nombre', value: (e) => e.nombre },
+              { header: 'NIF', value: (e) => e.nif },
+              { header: 'Tipo', value: (e) => e.tipo },
+              { header: 'Segmento', value: (e) => e.segmento },
+              { header: 'Email', value: (e) => e.email_principal },
+              { header: 'Teléfono', value: (e) => e.telefono_principal },
+              { header: 'Dirección', value: (e) => e.direccion },
+              { header: 'CP', value: (e) => e.cp },
+              { header: 'Ciudad', value: (e) => e.ciudad },
+              { header: 'Provincia', value: (e) => e.provincia },
+              { header: 'Alta', value: (e) => formatDate(e.created_at) },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" /> Nueva empresa
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex gap-3">

@@ -45,6 +45,26 @@ export function useContactos(options?: QueryOptions) {
   })
 }
 
+export async function fetchContactosForExport(filter?: {
+  search?: string
+  empresa_id?: string
+}): Promise<ContactoConEmpresa[]> {
+  let q = supabase
+    .from('contactos')
+    .select('*, empresa:empresas!contactos_empresa_id_fkey(id, nombre)')
+    .is('deleted_at', null)
+
+  if (filter?.search && filter.search.trim()) {
+    const s = filter.search.trim()
+    q = q.or(`nombre.ilike.%${s}%,apellidos.ilike.%${s}%,email.ilike.%${s}%`)
+  }
+  if (filter?.empresa_id) q = q.eq('empresa_id', filter.empresa_id)
+
+  const { data, error } = await q.order('nombre', { ascending: true }).limit(10000)
+  if (error) { logError(error, 'fetchContactosForExport'); throw error }
+  return (data ?? []) as unknown as ContactoConEmpresa[]
+}
+
 export interface ContactoOption {
   id: string
   nombre: string
