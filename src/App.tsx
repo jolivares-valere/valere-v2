@@ -17,6 +17,7 @@ import AnalisisPage from './features/analisis/AnalisisPage'
 import PropuestasEnergiaPage from './features/propuestas-energia/PropuestasEnergiaPage'
 import TrackingPage from './features/tracking/TrackingPage'
 import InformesPage from './features/informes/InformesPage'
+import IncidenciasPage from './features/incidencias/IncidenciasPage'
 
 function LoadingScreen() {
   return (
@@ -70,6 +71,8 @@ export default function App() {
       <Route path="/actividades" element={<AuthGuard><ActividadesPage /></AuthGuard>} />
 
       <Route path="/informes" element={<AuthGuard><InformesPage /></AuthGuard>} />
+
+      <Route path="/incidencias" element={<AuthGuard><IncidenciasPage /></AuthGuard>} />
 
       <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
 

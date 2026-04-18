@@ -1,6 +1,6 @@
 ﻿import { NavLink } from 'react-router-dom'
 import {
-  Activity, BarChart3, Building2, FileText, FileUp, GitBranch,
+  Activity, AlertTriangle, BarChart3, Building2, FileText, FileUp, GitBranch,
   LayoutDashboard, Send, ShieldCheck, Upload, Users, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
@@ -13,6 +13,7 @@ const items = [
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
   { to: '/informes', label: 'Informes', icon: BarChart3 },
+  { to: '/incidencias', label: 'Incidencias', icon: AlertTriangle },
   { to: '/importador', label: 'Importador', icon: Upload },
   { to: '/datos', label: 'Datos Energía', icon: FileUp },
   { to: '/analisis', label: 'Análisis', icon: BarChart3 },

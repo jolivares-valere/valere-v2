@@ -11,7 +11,11 @@ export type TipoPrecio = 'fijo' | 'indexado' | 'mixto'
 export type EstadoContrato = 'borrador' | 'tramite' | 'activo' | 'vencido' | 'baja' | 'incidencia' | 'cancelado'
 export type EstadoCups = 'activo' | 'baja' | 'pendiente'
 export type TipoOportunidad = 'nueva_venta' | 'renovacion' | 'ampliacion' | 'recuperacion'
-export type EtapaOportunidad = 'prospecto' | 'contactado' | 'analisis' | 'propuesta_enviada' | 'negociacion' | 'ganada' | 'perdida' | 'cancelada'
+export type EtapaOportunidad = 'prospecto' | 'contactado' | 'analisis' | 'propuesta_enviada' | 'negociacion' | 'ganada' | 'perdida' | 'cancelada' | 'auditoria_consumo' | 'oferta_presentada' | 'contrato_firmado' | 'activo' | 'cerrada_ganada' | 'cerrada_perdida'
+export type TipoIncidencia = 'facturacion' | 'cambio_comercializadora' | 'corte_suministro' | 'potencia' | 'acceso_red' | 'otro'
+export type EstadoIncidencia = 'abierta' | 'en_gestion' | 'pendiente_cliente' | 'pendiente_comercializadora' | 'resuelta' | 'cerrada'
+export type PrioridadIncidencia = 'baja' | 'media' | 'alta' | 'critica'
+export type EstadoRenovacion = 'detectada' | 'contactado' | 'oferta_enviada' | 'negociacion' | 'renovado' | 'perdido'
 export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'tarea' | 'nota' | 'cambio_estado' | 'documento' | 'whatsapp' | 'visita'
 export type ResultadoActividad = 'positivo' | 'neutral' | 'negativo' | 'sin_respuesta'
 export type EstadoTarea = 'pendiente' | 'completada' | 'cancelada'
@@ -212,6 +216,60 @@ export interface CustomFieldValue {
   updated_at: string
 }
 
+export interface Incidencia {
+  id: string
+  empresa_id: string
+  contrato_id: string | null
+  cups: string | null
+  titulo: string
+  descripcion: string | null
+  tipo: TipoIncidencia
+  estado: EstadoIncidencia
+  prioridad: PrioridadIncidencia
+  asignado_a: string | null
+  fecha_apertura: string
+  fecha_limite: string | null
+  fecha_resolucion: string | null
+  importe_reclamado: number | null
+  importe_recuperado: number | null
+  notas_resolucion: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export interface Renovacion {
+  id: string
+  contrato_id: string
+  empresa_id: string
+  estado: EstadoRenovacion
+  fecha_deteccion: string
+  fecha_vencimiento_contrato: string | null
+  motivo_perdida: string | null
+  nuevo_contrato_id: string | null
+  asignado_a: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export interface Documento {
+  id: string
+  entidad_tipo: EntidadTipo
+  entidad_id: string
+  nombre: string
+  tipo: string | null
+  ruta_storage: string
+  tamanio: number | null
+  mime_type: string | null
+  descripcion: string | null
+  subido_por: string | null
+  created_at: string
+  deleted_at: string | null
+}
+
 export interface Notificacion {
   id: string
   usuario_id: string
@@ -251,3 +309,9 @@ export type CustomFieldValueInsert = Insert<CustomFieldValue>
 export type CustomFieldValueUpdate = Update<CustomFieldValue>
 export type NotificacionInsert = Insert<Notificacion>
 export type NotificacionUpdate = Update<Notificacion>
+export type IncidenciaInsert = Insert<Incidencia>
+export type IncidenciaUpdate = Update<Incidencia>
+export type RenovacionInsert = Insert<Renovacion>
+export type RenovacionUpdate = Update<Renovacion>
+export type DocumentoInsert = Insert<Documento>
+export type DocumentoUpdate = Update<Documento>

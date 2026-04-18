@@ -8,7 +8,7 @@ import { useContactosPorEmpresa } from '../../contactos/api'
 import type { Oportunidad, OportunidadInsert } from '../../../core/types/entities'
 
 const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
-const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida', 'cancelada'] as const
+const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida', 'cancelada', 'auditoria_consumo', 'oferta_presentada', 'contrato_firmado', 'activo', 'cerrada_ganada', 'cerrada_perdida'] as const
 
 const optNum = z.preprocess(
   (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
