@@ -10,7 +10,7 @@ import type {
   InvoiceData,
   InvoiceSimulationResult
 } from '@/types/database';
-import { safeNum, safeArray } from './utils';
+import { safeNum, safeArray } from '@/core/utils/format';
 import { getTariffConfig } from './tariffs';
 
 interface SimulationParams {

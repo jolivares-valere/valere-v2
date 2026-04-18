@@ -12,7 +12,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/core/utils/cn';
 import { useAuth } from '@/hooks/useAuth';
 import { Toaster } from '@/components/ui/sonner';
 

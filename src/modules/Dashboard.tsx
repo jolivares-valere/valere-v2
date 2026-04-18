@@ -5,7 +5,8 @@ import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
 import ConsultantChat from '@/components/ConsultantChat';
 import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
-import { formatEur, formatPct, formatDate } from '@/lib/utils';
+import { formatEur, formatPct } from '@/core/utils/format';
+import { formatDate } from '@/core/utils/dates';
 import type { Client, ProposalWithDetails } from '@/types/database';
 
 export default function Dashboard() {

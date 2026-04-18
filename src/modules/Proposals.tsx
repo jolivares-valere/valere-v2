@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery';
-import { formatEur, formatPct, formatDate, generateCsv, downloadFile } from '@/lib/utils';
+import { formatEur, formatPct, generateCsv, downloadFile } from '@/core/utils/format';
+import { formatDate } from '@/core/utils/dates';
 import type { ProposalWithDetails } from '@/types/database';
 import { toast } from 'sonner';
 
