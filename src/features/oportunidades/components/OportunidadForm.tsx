@@ -23,6 +23,7 @@ const schema = z.object({
   etapa: z.enum(ETAPAS),
   probabilidad_pct: optNum.refine((v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 100), 'Entre 0 y 100'),
   valor_estimado_eur: optNum.refine((v) => v === null || v >= 0, 'Importe invÃ¡lido'),
+  ahorro_anual_estimado: optNum.refine((v) => v === null || v >= 0, 'Importe invÃ¡lido'),
   fecha_cierre_prevista: z.string().optional().transform((v) => v || null),
   notas: z.string().optional().transform((v) => v || null),
 })
@@ -56,6 +57,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       etapa: defaultValues?.etapa ?? 'prospecto',
       probabilidad_pct: defaultValues?.probabilidad_pct?.toString() ?? '',
       valor_estimado_eur: defaultValues?.valor_estimado_eur?.toString() ?? '',
+      ahorro_anual_estimado: defaultValues?.ahorro_anual_estimado?.toString() ?? '',
       fecha_cierre_prevista: defaultValues?.fecha_cierre_prevista ?? '',
       notas: defaultValues?.notas ?? '',
     },
@@ -83,6 +85,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       etapa: typeof ETAPAS[number]
       probabilidad_pct: number | null
       valor_estimado_eur: number | null
+      ahorro_anual_estimado: number | null
       fecha_cierre_prevista: string | null
       notas: string | null
     }
@@ -96,6 +99,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       etapa: v.etapa,
       probabilidad_pct: v.probabilidad_pct ?? 20,
       valor_estimado_eur: v.valor_estimado_eur,
+      ahorro_anual_estimado: v.ahorro_anual_estimado,
       fecha_cierre_prevista: v.fecha_cierre_prevista,
       motivo_perdida: defaultValues?.motivo_perdida ?? null,
       notas: v.notas,
@@ -168,17 +172,29 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Etapa *</span>
           <select {...form.register('etapa')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-            <option value="prospecto">Prospecto</option>
-            <option value="contactado">Contactado</option>
-            <option value="analisis">AnÃ¡lisis</option>
-            <option value="propuesta_enviada">Propuesta enviada</option>
-            <option value="negociacion">NegociaciÃ³n</option>
-            <option value="ganada">Ganada</option>
-            <option value="perdida">Perdida</option>
+            <optgroup label="Pipeline energético">
+              <option value="prospecto">Prospecto</option>
+              <option value="auditoria_consumo">Auditoría consumo</option>
+              <option value="oferta_presentada">Oferta presentada</option>
+              <option value="negociacion">Negociación</option>
+              <option value="contrato_firmado">Contrato firmado</option>
+              <option value="activo">Activo</option>
+              <option value="cerrada_ganada">Ganada</option>
+              <option value="cerrada_perdida">Perdida</option>
+            </optgroup>
+            <optgroup label="Legacy">
+              <option value="contactado">Contactado</option>
+              <option value="analisis">Análisis</option>
+              <option value="propuesta_enviada">Propuesta enviada</option>
+              <option value="ganada">Ganada (legacy)</option>
+              <option value="perdida">Perdida (legacy)</option>
+              <option value="cancelada">Cancelada</option>
+            </optgroup>
           </select>
         </label>
         {field('probabilidad_pct', 'Probabilidad (%)', 'number')}
-        {field('valor_estimado_eur', 'Valor estimado (â‚¬)', 'number')}
+        {field('valor_estimado_eur', 'Valor estimado (€)', 'number')}
+        {field('ahorro_anual_estimado', 'Ahorro anual estimado (€)', 'number')}
         {field('fecha_cierre_prevista', 'Fecha cierre prevista', 'date')}
       </div>
       <label className="block">

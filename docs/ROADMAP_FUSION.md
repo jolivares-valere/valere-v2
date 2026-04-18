@@ -334,22 +334,22 @@ Dos informes iniciales:
 - [x] FASE 20.4 — Mover src/lib → core/energia + core/utils ✅
 - [x] FASE 20.5 — Migrar módulos Calc a features/ ✅
 - [x] FASE 20.6 — Eliminar estructura legacy flat ✅
-- [ ] FASE 20.7 — Unificar schema Supabase (requiere Cowork SQL)
-- [ ] FASE 20.8 — Chat Gemini → Edge Function (requiere Supabase CLI)
-- [ ] FASE 20.9 — RLS granular (requiere Cowork SQL)
-- [ ] FASE 20.10 — Pendientes menores del audit
+- [ ] FASE 20.7 — Unificar schema Supabase (prompt en `.cowork/outbox/` 2026-04-18T19-15)
+- [ ] FASE 20.8 — Chat Gemini → Edge Function (prompt en `.cowork/outbox/` 2026-04-18T19-45)
+- [ ] FASE 20.9 — RLS granular (prompt en `.cowork/outbox/` 2026-04-18T19-30)
+- [x] FASE 20.10 — Pendientes menores del audit ✅ (ediciones + autoprefixer + shadcn)
 
 ## Checklist — Mejoras post-fusión (21-26)
 
-- [ ] FASE 21.a — Pipeline energético
-- [ ] FASE 21.b — Alertas vencimiento
-- [ ] FASE 21.c — Timeline en fichas
-- [ ] FASE 22 — Incidencias
-- [ ] FASE 23 — Renovaciones
-- [ ] FASE 24 — Documentos/Storage
-- [ ] FASE 25 — Notificaciones
-- [ ] FASE 26.a — Exportación CSV/Excel
-- [ ] FASE 26.b — Informes
+- [x] FASE 21.a — Pipeline energético ✅ (frontend; SQL prompt en outbox 2026-04-18T19-00)
+- [x] FASE 21.b — Alertas vencimiento ✅
+- [x] FASE 21.c — Timeline en fichas ✅ (ya integrado en Empresa y Contrato)
+- [x] FASE 22 — Incidencias ✅ (SQL aplicado por Cowork 2026-04-18)
+- [x] FASE 23 — Renovaciones ✅ (SQL aplicado por Cowork 2026-04-18)
+- [x] FASE 24 — Documentos/Storage ✅ (SQL aplicado; bucket Storage manual pendiente)
+- [x] FASE 25 — Notificaciones ✅
+- [x] FASE 26.a — Exportación CSV/Excel ✅
+- [x] FASE 26.b — Informes ✅
 
 ## Criterios de cierre global
 

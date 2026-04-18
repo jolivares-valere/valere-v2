@@ -135,6 +135,7 @@ export interface Oportunidad {
   etapa: EtapaOportunidad
   probabilidad_pct: number
   valor_estimado_eur: number | null
+  ahorro_anual_estimado: number | null
   fecha_cierre_prevista: string | null
   motivo_perdida: string | null
   notas: string | null

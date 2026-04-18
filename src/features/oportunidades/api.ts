@@ -112,16 +112,30 @@ export function useUpdateOportunidad() {
 export function useUpdateEtapa() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, etapa }: { id: string; etapa: EtapaOportunidad }) => {
-      const { error } = await supabase.from('oportunidades').update({ etapa } as never).eq('id', id)
+    mutationFn: async ({
+      id,
+      etapa,
+      probabilidad,
+    }: {
+      id: string
+      etapa: EtapaOportunidad
+      probabilidad?: number
+    }) => {
+      const patch: Record<string, unknown> = { etapa }
+      if (probabilidad !== undefined) patch.probabilidad_pct = probabilidad
+      const { error } = await supabase.from('oportunidades').update(patch as never).eq('id', id)
       if (error) { logError(error, 'useUpdateEtapa'); throw error }
     },
-    onMutate: async ({ id, etapa }) => {
+    onMutate: async ({ id, etapa, probabilidad }) => {
       await qc.cancelQueries({ queryKey: [RESOURCE] })
       const prev = qc.getQueryData<OportunidadConEmpresa[]>([RESOURCE])
       if (prev) {
         qc.setQueryData<OportunidadConEmpresa[]>([RESOURCE], (old) =>
-          (old ?? []).map((o) => (o.id === id ? { ...o, etapa } : o)),
+          (old ?? []).map((o) =>
+            o.id === id
+              ? { ...o, etapa, probabilidad_pct: probabilidad ?? o.probabilidad_pct }
+              : o,
+          ),
         )
       }
       return { prev }

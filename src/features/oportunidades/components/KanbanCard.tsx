@@ -39,9 +39,14 @@ export default function KanbanCard({ op, tareasPendientes, onClick }: Props) {
           👤 {op.contacto.nombre}{op.contacto.apellidos ? ` ${op.contacto.apellidos}` : ''}
         </p>
       )}
-      <p className="mb-2 text-xs text-slate-500">
+      <p className="mb-1 text-xs text-slate-500">
         {op.tipo.replace('_', ' ')} · {formatComision(op.valor_estimado_eur)}
       </p>
+      {op.ahorro_anual_estimado != null && op.ahorro_anual_estimado > 0 && (
+        <p className="mb-2 text-xs font-medium text-emerald-700">
+          Ahorro: {formatComision(op.ahorro_anual_estimado)}/año
+        </p>
+      )}
       {op.tipo === 'renovacion' && op.contrato_origen?.fecha_fin && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-slate-500">{dias}d</span>

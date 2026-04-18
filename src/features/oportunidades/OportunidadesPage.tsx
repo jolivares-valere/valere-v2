@@ -10,15 +10,30 @@ import ExportButton from '../../core/components/ExportButton'
 import { formatDate } from '../../core/utils/dates'
 import type { EtapaOportunidad, OportunidadInsert } from '../../core/types/entities'
 
-const ETAPAS: { etapa: EtapaOportunidad; titulo: string }[] = [
-  { etapa: 'prospecto', titulo: 'Prospecto' },
-  { etapa: 'contactado', titulo: 'Contactado' },
-  { etapa: 'analisis', titulo: 'Análisis' },
-  { etapa: 'propuesta_enviada', titulo: 'Propuesta' },
-  { etapa: 'negociacion', titulo: 'Negociación' },
-  { etapa: 'ganada', titulo: 'Ganada' },
-  { etapa: 'perdida', titulo: 'Perdida' },
+// FASE 21.a — Pipeline con etapas energéticas reales + probabilidades.
+const ETAPAS: { etapa: EtapaOportunidad; titulo: string; probabilidad: number }[] = [
+  { etapa: 'prospecto', titulo: 'Prospecto', probabilidad: 10 },
+  { etapa: 'auditoria_consumo', titulo: 'Auditoría consumo', probabilidad: 25 },
+  { etapa: 'oferta_presentada', titulo: 'Oferta presentada', probabilidad: 50 },
+  { etapa: 'negociacion', titulo: 'Negociación', probabilidad: 70 },
+  { etapa: 'contrato_firmado', titulo: 'Contrato firmado', probabilidad: 90 },
+  { etapa: 'activo', titulo: 'Activo', probabilidad: 100 },
+  { etapa: 'cerrada_ganada', titulo: 'Ganada', probabilidad: 100 },
+  { etapa: 'cerrada_perdida', titulo: 'Perdida', probabilidad: 0 },
 ]
+
+// Mapeo de etapas legacy → canónica energética (no muta BD: solo visualización).
+const LEGACY_MAP: Record<string, EtapaOportunidad> = {
+  contactado: 'auditoria_consumo',
+  analisis: 'auditoria_consumo',
+  propuesta_enviada: 'oferta_presentada',
+  ganada: 'cerrada_ganada',
+  perdida: 'cerrada_perdida',
+  cancelada: 'cerrada_perdida',
+}
+
+const canonicalEtapa = (e: EtapaOportunidad): EtapaOportunidad =>
+  (LEGACY_MAP[e] as EtapaOportunidad) ?? e
 
 type EditingState = OportunidadConEmpresa | 'new' | null
 
@@ -36,10 +51,11 @@ export default function OportunidadesPage() {
     if (!over) return
     const id = String(active.id)
     const etapa = over.id as EtapaOportunidad
-    if (!ETAPAS.some((e) => e.etapa === etapa)) return
+    const columna = ETAPAS.find((c) => c.etapa === etapa)
+    if (!columna) return
     const current = data?.find((o) => o.id === id)
-    if (!current || current.etapa === etapa) return
-    updateEtapa.mutate({ id, etapa })
+    if (!current || canonicalEtapa(current.etapa) === etapa) return
+    updateEtapa.mutate({ id, etapa, probabilidad: columna.probabilidad })
   }
 
   const onSubmit = async (values: OportunidadInsert) => {
@@ -74,6 +90,7 @@ export default function OportunidadesPage() {
               { header: 'Etapa', value: (o) => o.etapa },
               { header: 'Probabilidad (%)', value: (o) => o.probabilidad_pct },
               { header: 'Valor estimado (€)', value: (o) => o.valor_estimado_eur },
+              { header: 'Ahorro anual estimado (€)', value: (o) => o.ahorro_anual_estimado },
               { header: 'Cierre previsto', value: (o) => formatDate(o.fecha_cierre_prevista) },
               { header: 'Motivo pérdida', value: (o) => o.motivo_perdida },
               { header: 'Tags', value: (o) => (o.tags ?? []).join(', ') },
@@ -92,12 +109,13 @@ export default function OportunidadesPage() {
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {ETAPAS.map(({ etapa, titulo }) => (
+          {ETAPAS.map(({ etapa, titulo, probabilidad }) => (
             <KanbanColumn
               key={etapa}
               etapa={etapa}
               titulo={titulo}
-              items={(data ?? []).filter((o) => o.etapa === etapa)}
+              probabilidad={probabilidad}
+              items={(data ?? []).filter((o) => canonicalEtapa(o.etapa) === etapa)}
               tareasPorOportunidad={tareasPendientes.data}
               onCardClick={(op) => setEditing(op)}
             />

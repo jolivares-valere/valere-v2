@@ -4,6 +4,7 @@ import { useContratoById } from './api'
 import EstadoBadge from './components/EstadoBadge'
 import PrioridadBadge from './components/PrioridadBadge'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
+import DocumentosTab from '../documentos/components/DocumentosTab'
 import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../core/utils/energy'
 import { formatDate } from '../../core/utils/dates'
 
@@ -94,6 +95,10 @@ export default function ContratoDetailPage() {
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <ActividadTimeline entidadTipo="contrato" entidadId={contrato.id} />
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <DocumentosTab entidadTipo="contrato" entidadId={contrato.id} />
       </div>
     </div>
   )
