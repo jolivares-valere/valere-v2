@@ -241,7 +241,7 @@ export default function Analysis() {
       best_offer_savings_pct: best.savingsPct,
       included_offers: results,
       comparison_results: results,
-    });
+    } as never);
 
     if (error) {
       toast.error('Error al guardar la propuesta');

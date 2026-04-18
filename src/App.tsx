@@ -11,6 +11,11 @@ import ContratoDetailPage from './features/contratos/ContratoDetailPage'
 import OportunidadesPage from './features/oportunidades/OportunidadesPage'
 import ImportadorPage from './features/importador/ImportadorPage'
 import ActividadesPage from './features/actividades/ActividadesPage'
+import AdminPage from './features/admin/AdminPage'
+import DatosPage from './features/datos/DatosPage'
+import AnalisisPage from './features/analisis/AnalisisPage'
+import PropuestasEnergiaPage from './features/propuestas-energia/PropuestasEnergiaPage'
+import TrackingPage from './features/tracking/TrackingPage'
 
 function LoadingScreen() {
   return (
@@ -64,6 +69,12 @@ export default function App() {
       <Route path="/actividades" element={<AuthGuard><ActividadesPage /></AuthGuard>} />
 
       <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
+
+      <Route path="/admin" element={<AuthGuard><AdminPage /></AuthGuard>} />
+      <Route path="/datos" element={<AuthGuard><DatosPage /></AuthGuard>} />
+      <Route path="/analisis" element={<AuthGuard><AnalisisPage /></AuthGuard>} />
+      <Route path="/propuestas-energia" element={<AuthGuard><PropuestasEnergiaPage /></AuthGuard>} />
+      <Route path="/tracking" element={<AuthGuard><TrackingPage /></AuthGuard>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

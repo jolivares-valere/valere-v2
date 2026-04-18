@@ -1,5 +1,8 @@
 ﻿import { NavLink } from 'react-router-dom'
-import { Activity, Building2, FileText, GitBranch, LayoutDashboard, Upload, Users } from 'lucide-react'
+import {
+  Activity, BarChart3, Building2, FileText, FileUp, GitBranch,
+  LayoutDashboard, Send, ShieldCheck, Upload, Users, Zap
+} from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
 const items = [
@@ -10,6 +13,11 @@ const items = [
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
   { to: '/importador', label: 'Importador', icon: Upload },
+  { to: '/datos', label: 'Datos Energía', icon: FileUp },
+  { to: '/analisis', label: 'Análisis', icon: BarChart3 },
+  { to: '/propuestas-energia', label: 'Propuestas Energía', icon: Zap },
+  { to: '/tracking', label: 'Seguimiento', icon: Send },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck },
 ]
 
 export default function Sidebar() {
