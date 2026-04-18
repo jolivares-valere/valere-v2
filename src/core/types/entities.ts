@@ -244,6 +244,7 @@ export interface Renovacion {
   contrato_id: string
   empresa_id: string
   estado: EstadoRenovacion
+  prioridad: PrioridadRenovacion
   fecha_deteccion: string
   fecha_vencimiento_contrato: string | null
   motivo_perdida: string | null
