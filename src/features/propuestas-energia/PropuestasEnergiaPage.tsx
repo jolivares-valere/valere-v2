@@ -10,9 +10,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import StatCard from '@/components/StatCard';
-import EmptyState from '@/components/EmptyState';
-import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery';
+import StatCard from '@/core/components/StatCard';
+import EmptyState from '@/core/components/EmptyState';
+import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import { formatEur, formatPct, generateCsv, downloadFile } from '@/core/utils/format';
 import { formatDate } from '@/core/utils/dates';
 import type { ProposalWithDetails } from '@/types/database';

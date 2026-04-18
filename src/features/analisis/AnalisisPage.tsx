@@ -5,9 +5,9 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import StatCard from '@/components/StatCard';
-import EmptyState from '@/components/EmptyState';
-import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
+import StatCard from '@/core/components/StatCard';
+import EmptyState from '@/core/components/EmptyState';
+import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery';
 import { calculateSimulatedInvoice, distributeConsumption } from '@/core/energia/calculator';
 import { formatEur, formatPct, safeNum } from '@/core/utils/format';
 import { getTariffConfig } from '@/core/energia/tariffs';

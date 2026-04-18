@@ -6,9 +6,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import StatCard from '@/components/StatCard';
-import EmptyState from '@/components/EmptyState';
-import { useSupabaseQuery } from '@/hooks/useSupabaseQuery';
+import StatCard from '@/core/components/StatCard';
+import EmptyState from '@/core/components/EmptyState';
+import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery';
 import { formatEur, formatPct, generateCsv, downloadFile } from '@/core/utils/format';
 import { formatDate } from '@/core/utils/dates';
 import type { ProposalWithDetails } from '@/types/database';

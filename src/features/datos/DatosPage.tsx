@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import EmptyState from '@/components/EmptyState';
-import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery';
+import EmptyState from '@/core/components/EmptyState';
+import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import type { Client, SupplyPoint, InvoiceHistory } from '@/types/database';
 import { toast } from 'sonner';
 import { getTariffConfig, validateCUPS, validatePowers } from '@/core/energia/tariffs';
