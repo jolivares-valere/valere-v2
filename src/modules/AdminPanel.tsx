@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import EmptyState from '@/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/hooks/useSupabaseQuery';
 import type { UserProfile, Retailer, RetailerOffer, GlobalConfig } from '@/types/database';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
 import { getTariffConfig } from '@/lib/tariffs';
 

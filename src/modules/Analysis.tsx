@@ -15,7 +15,7 @@ import type {
   Client, SupplyPoint, InvoiceHistory, RetailerOffer,
   BoeRegulatedPrice, GlobalConfig, RetailerOfferWithName
 } from '@/types/database';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell

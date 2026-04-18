@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/core/supabase/client';
 import type { UserProfile } from '@/types/database';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -46,9 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
           .select()
           .single();
-        setProfile(newProfile);
+        setProfile(newProfile as unknown as UserProfile);
       } else if (data) {
-        setProfile(data);
+        setProfile(data as unknown as UserProfile);
       }
     } catch (err) {
       console.error('Error fetching profile:', err);

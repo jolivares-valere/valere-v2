@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
 
 interface QueryOptions<T> {
@@ -41,7 +41,7 @@ export function useSupabaseQuery<T>({
       setLoading(true);
       setError(null);
 
-      let query = supabase.from(table).select(select);
+      let query = supabase.from(table as never).select(select);
 
       const parsedFilters = JSON.parse(filtersKey) as typeof filters;
       for (const f of parsedFilters) {
@@ -81,7 +81,7 @@ export function useSupabaseMutation(table: string) {
   const insert = async (row: Record<string, unknown>, successMsg?: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from(table).insert(row as any).select().single();
+      const { data, error } = await supabase.from(table as never).insert(row as never).select().single();
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { data, error: null };
@@ -96,7 +96,7 @@ export function useSupabaseMutation(table: string) {
   const update = async (id: string, row: Record<string, unknown>, successMsg?: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from(table).update(row as any).eq('id', id).select().single();
+      const { data, error } = await supabase.from(table as never).update(row as never).eq('id', id).select().single();
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { data, error: null };
@@ -111,7 +111,7 @@ export function useSupabaseMutation(table: string) {
   const remove = async (id: string, successMsg?: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from(table).delete().eq('id', id);
+      const { error } = await supabase.from(table as never).delete().eq('id', id);
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { error: null };
