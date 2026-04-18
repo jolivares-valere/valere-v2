@@ -1,8 +1,6 @@
 ﻿import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../types/database'
 import { logError } from '../utils/logger'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Database = any
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined

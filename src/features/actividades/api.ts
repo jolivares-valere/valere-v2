@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
@@ -112,7 +112,7 @@ export function useCreateActividad() {
     mutationFn: async (input: ActividadInsert) => {
       const { data, error } = await supabase
         .from('actividades')
-        .insert(input as unknown as Record<string, unknown>)
+        .insert(input as never)
         .select('*')
         .single()
       if (error) { logError(error, 'useCreateActividad'); throw error }
@@ -135,7 +135,7 @@ export function useUpdateActividad() {
     mutationFn: async ({ id, patch }: { id: string; patch: ActividadUpdate }) => {
       const { data, error } = await supabase
         .from('actividades')
-        .update(patch as unknown as Record<string, unknown>)
+        .update(patch as never)
         .eq('id', id)
         .select('*')
         .single()

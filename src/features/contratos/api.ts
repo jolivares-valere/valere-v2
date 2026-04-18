@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
@@ -37,9 +37,9 @@ export function useContratos(options?: QueryOptions) {
         .is('deleted_at', null)
 
       const f = options?.filter ?? {}
-      if (f.estado) q = q.eq('estado', f.estado)
-      if (f.empresa_id) q = q.eq('empresa_id', f.empresa_id)
-      if (f.comercial_id) q = q.eq('comercial_id', f.comercial_id)
+      if (f.estado) q = q.eq('estado', f.estado as never)
+      if (f.empresa_id) q = q.eq('empresa_id', f.empresa_id as string)
+      if (f.comercial_id) q = q.eq('comercial_id', f.comercial_id as string)
       if (f.compania) q = q.ilike('compania', `%${String(f.compania)}%`)
 
       const sortField = options?.sort?.field ?? 'fecha_fin'
@@ -88,7 +88,7 @@ export function useCreateContrato() {
     mutationFn: async (input: ContratoInsert) => {
       const { data, error } = await supabase
         .from('contratos')
-        .insert(input as unknown as Record<string, unknown>)
+        .insert(input as never)
         .select('*')
         .single()
       if (error) { logError(error, 'useCreateContrato'); throw error }
@@ -108,7 +108,7 @@ export function useUpdateContrato() {
     mutationFn: async ({ id, patch }: { id: string; patch: ContratoUpdate }) => {
       const { data, error } = await supabase
         .from('contratos')
-        .update(patch as unknown as Record<string, unknown>)
+        .update(patch as never)
         .eq('id', id)
         .select('*')
         .single()

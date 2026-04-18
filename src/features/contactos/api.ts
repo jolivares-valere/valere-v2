@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
@@ -32,7 +32,7 @@ export function useContactos(options?: QueryOptions) {
         const s = search.trim()
         q = q.or(`nombre.ilike.%${s}%,apellidos.ilike.%${s}%,email.ilike.%${s}%`)
       }
-      if (f.empresa_id) q = q.eq('empresa_id', f.empresa_id)
+      if (f.empresa_id) q = q.eq('empresa_id', f.empresa_id as string)
 
       const sortField = options?.sort?.field ?? 'nombre'
       const sortAsc = options?.sort?.direction !== 'desc'
@@ -97,7 +97,7 @@ export function useCreateContacto() {
     mutationFn: async (input: ContactoInsert) => {
       const { data, error } = await supabase
         .from('contactos')
-        .insert(input as unknown as Record<string, unknown>)
+        .insert(input as never)
         .select('*')
         .single()
       if (error) { logError(error, 'useCreateContacto'); throw error }
@@ -117,7 +117,7 @@ export function useUpdateContacto() {
     mutationFn: async ({ id, patch }: { id: string; patch: ContactoUpdate }) => {
       const { data, error } = await supabase
         .from('contactos')
-        .update(patch as unknown as Record<string, unknown>)
+        .update(patch as never)
         .eq('id', id)
         .select('*')
         .single()

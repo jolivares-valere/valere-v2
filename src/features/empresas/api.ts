@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
@@ -32,10 +32,10 @@ export function useEmpresas(options?: QueryOptions) {
         q = q.or(`nombre.ilike.%${s}%,nif.ilike.%${s}%`)
       }
 
-      if (options?.filter?.tipo) q = q.eq('tipo', options.filter.tipo)
-      if (options?.filter?.segmento) q = q.eq('segmento', options.filter.segmento)
+      if (options?.filter?.tipo) q = q.eq('tipo', options.filter.tipo as never)
+      if (options?.filter?.segmento) q = q.eq('segmento', options.filter.segmento as never)
       if (options?.filter?.comercial_id) {
-        q = q.eq('comercial_id', options.filter.comercial_id)
+        q = q.eq('comercial_id', options.filter.comercial_id as string)
       }
 
       const sortField = options?.sort?.field ?? 'created_at'
@@ -88,7 +88,7 @@ export function useCreateEmpresa() {
     mutationFn: async (input: EmpresaInsert): Promise<Empresa> => {
       const { data, error } = await supabase
         .from('empresas')
-        .insert(input as unknown as Record<string, unknown>)
+        .insert(input as never)
         .select('*')
         .single()
 
@@ -121,7 +121,7 @@ export function useUpdateEmpresa() {
     }): Promise<Empresa> => {
       const { data, error } = await supabase
         .from('empresas')
-        .update(patch as unknown as Record<string, unknown>)
+        .update(patch as never)
         .eq('id', id)
         .select('*')
         .single()

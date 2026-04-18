@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
@@ -30,8 +30,8 @@ export function useOportunidades(options?: QueryOptions) {
         .order('created_at', { ascending: false })
 
       const f = options?.filter ?? {}
-      if (f.comercial_id) q = q.eq('comercial_id', f.comercial_id)
-      if (f.tipo) q = q.eq('tipo', f.tipo)
+      if (f.comercial_id) q = q.eq('comercial_id', f.comercial_id as string)
+      if (f.tipo) q = q.eq('tipo', f.tipo as never)
 
       const { data, error } = await q
       if (error) { logError(error, 'useOportunidades'); throw error }
