@@ -7,11 +7,13 @@ import {
   useUpdateActividad,
   useDeleteActividad,
   useToggleTareaCompletada,
+  fetchActividadesForExport,
   type ActividadConUsuario,
   type ActividadFilter,
 } from './api'
 import ActividadFormFull from './components/ActividadFormFull'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import ExportButton from '../../core/components/ExportButton'
 import { SkeletonRow } from '../../components/ui/Skeleton'
 import { formatDate } from '../../core/utils/dates'
 import type { ActividadInsert, TipoActividad, EntidadTipo } from '../../core/types/entities'
@@ -105,13 +107,33 @@ export default function ActividadesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Actividades</h1>
           <p className="text-sm text-slate-500">{data?.count ?? 0} en total</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setPanel('new')}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" /> Nueva actividad
-        </button>
+        <div className="flex gap-2">
+          <ExportButton<ActividadConUsuario>
+            filename="actividades"
+            fetchRows={() => fetchActividadesForExport(filter)}
+            columns={[
+              { header: 'Fecha', value: (a) => formatDate(a.fecha_actividad) },
+              { header: 'Tipo', value: (a) => a.tipo },
+              { header: 'Título', value: (a) => a.titulo },
+              { header: 'Descripción', value: (a) => a.descripcion },
+              { header: 'Duración (min)', value: (a) => a.duracion_min },
+              { header: 'Resultado', value: (a) => a.resultado },
+              { header: 'Estado tarea', value: (a) => a.estado_tarea },
+              { header: 'Vencimiento', value: (a) => formatDate(a.fecha_vencimiento) },
+              { header: 'Entidad tipo', value: (a) => a.entidad_tipo },
+              { header: 'Entidad ID', value: (a) => a.entidad_id },
+              { header: 'Usuario', value: (a) => a.usuario?.full_name },
+              { header: 'Privada', value: (a) => a.privada ? 'Sí' : 'No' },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={() => setPanel('new')}
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" /> Nueva actividad
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">

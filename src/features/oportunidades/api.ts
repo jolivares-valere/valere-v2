@@ -40,6 +40,25 @@ export function useOportunidades(options?: QueryOptions) {
   })
 }
 
+export async function fetchOportunidadesForExport(filter?: {
+  comercial_id?: string
+  tipo?: string
+  etapa?: string
+}): Promise<OportunidadConEmpresa[]> {
+  let q = supabase
+    .from('oportunidades')
+    .select('*, empresa:empresas(id, nombre), contrato_origen:contratos!oportunidades_contrato_origen_id_fkey(id, fecha_fin, numero_contrato), contacto:contactos(id, nombre, apellidos, cargo)')
+    .is('deleted_at', null)
+
+  if (filter?.comercial_id) q = q.eq('comercial_id', filter.comercial_id)
+  if (filter?.tipo) q = q.eq('tipo', filter.tipo as never)
+  if (filter?.etapa) q = q.eq('etapa', filter.etapa as never)
+
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(10000)
+  if (error) { logError(error, 'fetchOportunidadesForExport'); throw error }
+  return (data ?? []) as unknown as OportunidadConEmpresa[]
+}
+
 export function useOportunidadById(id: string | undefined) {
   return useQuery({
     queryKey: [RESOURCE, 'byId', id],

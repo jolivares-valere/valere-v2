@@ -1,11 +1,13 @@
 ﻿import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
-import { useOportunidades, useUpdateEtapa, useCreateOportunidad, useUpdateOportunidad } from './api'
+import { useOportunidades, useUpdateEtapa, useCreateOportunidad, useUpdateOportunidad, fetchOportunidadesForExport } from './api'
 import type { OportunidadConEmpresa } from './api'
 import { useTareasPendientesPorOportunidad } from '../actividades/api'
 import KanbanColumn from './components/KanbanColumn'
 import OportunidadForm from './components/OportunidadForm'
+import ExportButton from '../../core/components/ExportButton'
+import { formatDate } from '../../core/utils/dates'
 import type { EtapaOportunidad, OportunidadInsert } from '../../core/types/entities'
 
 const ETAPAS: { etapa: EtapaOportunidad; titulo: string }[] = [
@@ -60,13 +62,32 @@ export default function OportunidadesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Pipeline</h1>
           <p className="text-sm text-slate-500">{data?.length ?? 0} oportunidades en el pipeline</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" /> Nueva oportunidad
-        </button>
+        <div className="flex gap-2">
+          <ExportButton<OportunidadConEmpresa>
+            filename="oportunidades"
+            fetchRows={() => fetchOportunidadesForExport()}
+            columns={[
+              { header: 'Nombre', value: (o) => o.nombre },
+              { header: 'Empresa', value: (o) => o.empresa?.nombre },
+              { header: 'Contacto', value: (o) => o.contacto ? `${o.contacto.nombre} ${o.contacto.apellidos ?? ''}`.trim() : '' },
+              { header: 'Tipo', value: (o) => o.tipo },
+              { header: 'Etapa', value: (o) => o.etapa },
+              { header: 'Probabilidad (%)', value: (o) => o.probabilidad_pct },
+              { header: 'Valor estimado (€)', value: (o) => o.valor_estimado_eur },
+              { header: 'Cierre previsto', value: (o) => formatDate(o.fecha_cierre_prevista) },
+              { header: 'Motivo pérdida', value: (o) => o.motivo_perdida },
+              { header: 'Tags', value: (o) => (o.tags ?? []).join(', ') },
+              { header: 'Creada', value: (o) => formatDate(o.created_at) },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" /> Nueva oportunidad
+          </button>
+        </div>
       </div>
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>

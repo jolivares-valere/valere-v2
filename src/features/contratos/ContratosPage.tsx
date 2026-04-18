@@ -1,10 +1,11 @@
 ﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
-import { useContratos, useCreateContrato, useUpdateContrato, useDeleteContrato } from './api'
+import { useContratos, useCreateContrato, useUpdateContrato, useDeleteContrato, fetchContratosForExport } from './api'
 import ContratoForm from './components/ContratoForm'
 import PrioridadBadge from './components/PrioridadBadge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import ExportButton from '../../core/components/ExportButton'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
 import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../core/utils/energy'
 import { formatDate } from '../../core/utils/dates'
@@ -47,13 +48,35 @@ export default function ContratosPage() {
           <h1 className="text-2xl font-bold text-slate-900">Contratos</h1>
           <p className="text-sm text-slate-500">{lista.length} contratos vigentes</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" /> Nuevo contrato
-        </button>
+        <div className="flex gap-2">
+          <ExportButton<ContratoConEmpresa>
+            filename="contratos"
+            fetchRows={() => fetchContratosForExport()}
+            columns={[
+              { header: 'Empresa', value: (c) => c.empresa?.nombre },
+              { header: 'NIF', value: (c) => c.empresa?.nif },
+              { header: 'CUPS', value: (c) => c.cups },
+              { header: 'Tipo punto', value: (c) => c.tipo_punto },
+              { header: 'Compañía', value: (c) => c.compania },
+              { header: 'Tarifa acceso', value: (c) => c.tarifa_acceso },
+              { header: 'Tarifa cliente', value: (c) => c.tarifa_cliente },
+              { header: 'Estado', value: (c) => c.estado },
+              { header: 'Fecha inicio', value: (c) => formatDate(c.fecha_inicio) },
+              { header: 'Fecha fin', value: (c) => formatDate(c.fecha_fin) },
+              { header: 'Número contrato', value: (c) => c.numero_contrato },
+              { header: 'Comisión (€)', value: (c) => c.comision_eur },
+              { header: 'Comercial', value: (c) => c.comercial?.full_name },
+              { header: 'Firmante', value: (c) => c.contacto_firmante ? `${c.contacto_firmante.nombre} ${c.contacto_firmante.apellidos ?? ''}`.trim() : '' },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" /> Nuevo contrato
+          </button>
+        </div>
       </div>
 
       {isLoading ? (

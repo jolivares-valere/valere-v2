@@ -53,6 +53,27 @@ export function useContratos(options?: QueryOptions) {
   })
 }
 
+export async function fetchContratosForExport(filter?: {
+  estado?: string
+  empresa_id?: string
+  comercial_id?: string
+  compania?: string
+}): Promise<ContratoConEmpresa[]> {
+  let q = supabase
+    .from('contratos')
+    .select('*, empresa:empresas!contratos_empresa_id_fkey(id, nombre, nif), comercial:user_profiles!contratos_comercial_id_fkey(id, full_name), contacto_firmante:contactos!contratos_contacto_firmante_id_fkey(id, nombre, apellidos, cargo)')
+    .is('deleted_at', null)
+
+  if (filter?.estado) q = q.eq('estado', filter.estado as never)
+  if (filter?.empresa_id) q = q.eq('empresa_id', filter.empresa_id)
+  if (filter?.comercial_id) q = q.eq('comercial_id', filter.comercial_id)
+  if (filter?.compania) q = q.ilike('compania', `%${filter.compania}%`)
+
+  const { data, error } = await q.order('fecha_fin', { ascending: false, nullsFirst: false }).limit(10000)
+  if (error) { logError(error, 'fetchContratosForExport'); throw error }
+  return (data ?? []) as unknown as ContratoConEmpresa[]
+}
+
 export function useContratoById(id: string | undefined) {
   return useQuery({
     queryKey: [RESOURCE, 'byId', id],

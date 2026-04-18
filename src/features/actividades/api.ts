@@ -106,6 +106,27 @@ export function useActividadesTodas(options?: ActividadQueryOptions) {
   })
 }
 
+export async function fetchActividadesForExport(filter?: ActividadFilter): Promise<ActividadConUsuario[]> {
+  let q = supabase
+    .from('actividades')
+    .select('*, usuario:user_profiles!actividades_usuario_id_fkey(id, full_name)')
+    .is('deleted_at', null)
+
+  const f = filter ?? {}
+  if (f.tipo) q = q.eq('tipo', f.tipo)
+  if (f.entidad_tipo) q = q.eq('entidad_tipo', f.entidad_tipo)
+  if (f.entidad_id) q = q.eq('entidad_id', f.entidad_id)
+  if (f.desde) q = q.gte('fecha_actividad', f.desde)
+  if (f.hasta) q = q.lte('fecha_actividad', f.hasta)
+  if (f.asignado_a) q = q.eq('asignado_a', f.asignado_a)
+  if (f.estado_tarea) q = q.eq('estado_tarea', f.estado_tarea)
+  if (f.solo_pendientes) q = q.eq('tipo', 'tarea').eq('estado_tarea', 'pendiente')
+
+  const { data, error } = await q.order('fecha_actividad', { ascending: false }).limit(10000)
+  if (error) { logError(error, 'fetchActividadesForExport'); throw error }
+  return (data ?? []) as unknown as ActividadConUsuario[]
+}
+
 export function useCreateActividad() {
   const qc = useQueryClient()
   return useMutation({
