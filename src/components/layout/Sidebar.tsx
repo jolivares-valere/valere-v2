@@ -12,6 +12,7 @@ const items = [
   { to: '/actividades', label: 'Actividades', icon: Activity },
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
+  { to: '/informes', label: 'Informes', icon: BarChart3 },
   { to: '/importador', label: 'Importador', icon: Upload },
   { to: '/datos', label: 'Datos Energía', icon: FileUp },
   { to: '/analisis', label: 'Análisis', icon: BarChart3 },
