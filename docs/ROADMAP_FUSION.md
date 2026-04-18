@@ -197,13 +197,159 @@ Añadir KPIs de Calculadora al `DashboardPage.tsx` de CRM: total ahorro identifi
 
 ---
 
-## Checklist final de la fusión
+## FASES 21-26 — Mejoras funcionales post-fusión
 
-- [ ] Todas las FASES 20.0 → 20.10 commiteadas y pusheadas.
-- [ ] PR #1 actualizado con el rango completo.
+Propuestas integradas tras análisis de CRMs del sector energético español. Cada FASE es independiente y se ejecuta tras completar la fusión (20.x). Mantienen la misma metodología: 1 objetivo, 1 commit, TSC = 0.
+
+### FASE 21 — Mejoras UI del CRM existente
+
+Tres sub-fases independientes:
+
+#### FASE 21.a — Pipeline de oportunidades con etapas energéticas
+**Objetivo**: sustituir las etapas genéricas por el flujo real del sector.
+**Cambios**:
+- Actualizar `EtapaOportunidad` en `entities.ts`: `prospecto → auditoria_consumo → oferta_presentada → negociacion → contrato_firmado → activo → cerrada_ganada → cerrada_perdida`.
+- Añadir campo `ahorro_anual_estimado` (numeric, nullable) a tabla `oportunidades` — es el KPI de venta real en energía.
+- Actualizar componente Kanban con probabilidades por etapa (0% → 20% → 40% → 60% → 80% → 100%).
+- Mostrar valor total de ahorro acumulado por etapa en el pipeline.
+- Migración SQL: `supabase/migrations/0XX_pipeline_energetico.sql`.
+**DONE**: pipeline muestra etapas energéticas y ahorro. Commit `feat(fase21a): pipeline oportunidades con etapas energeticas y ahorro estimado`.
+
+#### FASE 21.b — Alertas de vencimiento de contratos mejoradas
+**Objetivo**: semáforo visual de vencimientos + widget en dashboard.
+**Cambios**:
+- En listado de contratos: calcular días restantes, badge con semáforo (rojo <30d, naranja 30-60, amarillo 60-90, verde >90).
+- Añadir campo `penalizacion_salida` (text/numeric, nullable) a tabla `contratos`.
+- Widget en Dashboard: "Contratos que vencen pronto" — top 5 más urgentes, botón "Iniciar renovación" que crea oportunidad de tipo `renovacion`.
+- Migración SQL si hace falta nueva columna.
+**DONE**: alertas visibles en contratos y dashboard. Commit `feat(fase21b): alertas vencimiento con semaforo y widget dashboard`.
+
+#### FASE 21.c — Timeline de actividades en fichas de empresa y contrato
+**Objetivo**: reutilizar `ActividadesTimeline` ya existente en fichas de empresa y contrato.
+**Cambios**:
+- Añadir tab "Actividades" en `EmpresaDetailPage.tsx` con `entidad_tipo='empresa'`.
+- Añadir sección actividades en `ContratoDetailPage.tsx` con `entidad_tipo='contrato'`.
+- Reutilizar componentes existentes de `src/features/actividades/`.
+**DONE**: timeline visible en fichas. Commit `feat(fase21c): timeline actividades en fichas empresa y contrato`.
+
+### FASE 22 — Módulo de Incidencias
+**Objetivo**: gestión de reclamaciones y problemas de clientes con contratos activos.
+**Ubicación**: `src/features/incidencias/`
+**Tabla nueva** — `incidencias`:
+```
+id uuid PK, empresa_id FK, contrato_id FK (nullable), cups text (nullable),
+titulo text NOT NULL, descripcion text, 
+tipo: 'facturacion'|'cambio_comercializadora'|'corte_suministro'|'potencia'|'acceso_red'|'otro',
+estado: 'abierta'|'en_gestion'|'pendiente_cliente'|'pendiente_comercializadora'|'resuelta'|'cerrada',
+prioridad: 'baja'|'media'|'alta'|'critica',
+asignado_a FK user_profiles, fecha_apertura timestamptz DEFAULT now(),
+fecha_limite timestamptz, fecha_resolucion timestamptz,
+importe_reclamado numeric, importe_recuperado numeric,
+created_by FK user_profiles, created_at, updated_at, deleted_at
+```
+**Funcionalidades**:
+- Listado global con filtros (estado/prioridad/tipo/empresa).
+- Kanban por estado o listado con badges de prioridad.
+- Formulario completo. Contador de días abierta (SLA visual).
+- Timeline de actividades con `entidad_tipo='incidencia'`.
+- KPI en Dashboard: "Incidencias abiertas" + "Críticas".
+- Tab "Incidencias" en ficha de empresa.
+- Migración SQL: `supabase/migrations/0XX_incidencias.sql`.
+**DONE**: ruta `/incidencias` funcional. Commit `feat(fase22): modulo incidencias con kanban y SLA`.
+
+### FASE 23 — Módulo de Renovaciones
+**Objetivo**: vista especializada para retención de clientes con contratos próximos a vencer.
+**Ubicación**: `src/features/renovaciones/`
+**Tabla nueva** — `renovaciones`:
+```
+id uuid PK, contrato_id FK, empresa_id FK,
+estado: 'detectada'|'contactado'|'oferta_enviada'|'negociacion'|'renovado'|'perdido',
+fecha_deteccion timestamptz DEFAULT now(), fecha_vencimiento_contrato date,
+motivo_perdida text, nuevo_contrato_id FK (nullable),
+asignado_a FK user_profiles, created_at, updated_at, deleted_at
+```
+**Funcionalidades**:
+- Creación automática cuando contrato entra en zona naranja (≤60 días) si no existe renovación activa.
+- Listado ordenado por urgencia (días restantes ASC).
+- Kanban simple con etapas.
+- Métricas: tasa de renovación, tiempo medio de cierre, contratos en riesgo por comercial.
+- KPI en Dashboard: "Renovaciones pendientes".
+- Al marcar como "Renovado" → vincular al nuevo contrato.
+- Migración SQL: `supabase/migrations/0XX_renovaciones.sql`.
+**DONE**: ruta `/renovaciones` funcional. Commit `feat(fase23): modulo renovaciones con deteccion automatica`.
+
+### FASE 24 — Documentos/Adjuntos con Supabase Storage
+**Objetivo**: subida y gestión de ficheros vinculados a entidades.
+**Prerrequisito**: crear bucket `valere-docs` en Supabase Storage.
+**Tabla existente** — `documentos` (ya existe, 0 filas):
+- Añadir campos si faltan: `tamanio bigint`, `mime_type text`.
+- Tipos habituales: `factura`, `oferta`, `contrato_firmado`, `certificado`, `autorizacion`, `otro`.
+**Funcionalidades**:
+- Subida de ficheros con `react-dropzone` (ya en deps) en fichas de empresa, contrato, incidencia.
+- Visor inline para PDF, descarga directa para otros tipos.
+- Listado de documentos por entidad.
+- Supabase Storage policies: solo users autenticados, max 10MB por fichero.
+**DONE**: subida y listado funcional en fichas. Commit `feat(fase24): documentos adjuntos con Supabase Storage`.
+
+### FASE 25 — Notificaciones in-app
+**Objetivo**: alertas automáticas y badge con contador en sidebar.
+**Tabla existente** — `notificaciones` (ya existe en schema):
+- Verificar campos y añadir los que falten.
+**Triggers de notificación**:
+- Tarea vencida (actividad tipo=tarea, estado=pendiente, fecha_vencimiento < now()).
+- Contrato en zona roja (<30 días).
+- Incidencia crítica asignada (si FASE 22 completada).
+- Oportunidad sin actividad en 15 días.
+**Funcionalidades**:
+- Badge con contador en sidebar (icono campana).
+- Panel desplegable al hacer click.
+- Marcar como leída individual o todas.
+- Generación de notificaciones: función SQL o cron job vía pg_cron o desde frontend al cargar dashboard.
+**DONE**: notificaciones visibles y funcionales. Commit `feat(fase25): notificaciones in-app con badge en sidebar`.
+
+### FASE 26 — Exportaciones e Informes
+**Objetivo**: exportación CSV/Excel + informes predefinidos.
+**Ubicación**: `src/features/informes/`
+**Dependencia**: librería `xlsx` (SheetJS) — añadir a `package.json`.
+
+#### FASE 26.a — Exportación CSV/Excel en todos los listados
+Botón "Exportar" en listados de empresas, contactos, contratos, actividades, oportunidades, incidencias. Exporta los datos con el filtro aplicado.
+**DONE**: botón exportar funcional en todos los listados. Commit `feat(fase26a): exportacion CSV/Excel en listados`.
+
+#### FASE 26.b — Informes predefinidos
+Dos informes iniciales:
+1. **Informe comercial mensual**: actividades por comercial, oportunidades creadas/cerradas, contratos firmados, tasa de conversión. Filtro por mes y comercial.
+2. **Cartera activa**: empresas con contrato activo, CUPS gestionados, consumo total (kWh), ahorro generado. Exportable a Excel.
+**DONE**: ruta `/informes` funcional. Commit `feat(fase26b): informes comercial mensual y cartera activa`.
+
+---
+
+## Checklist — Fusión (20.x)
+
+- [x] FASE 20.0 — Documentación ✅
+- [x] FASE 20.0.1 — invoice_history columnas ✅
+- [x] FASE 20.1 — Tipos Supabase reales ✅
+- [x] FASE 20.2 — Merge main ✅
+- [ ] FASE 20.3 — Unificar useAuth (⏳ bloqueada por Cowork)
+- [ ] FASE 20.4 → 20.10
+
+## Checklist — Mejoras post-fusión (21-26)
+
+- [ ] FASE 21.a — Pipeline energético
+- [ ] FASE 21.b — Alertas vencimiento
+- [ ] FASE 21.c — Timeline en fichas
+- [ ] FASE 22 — Incidencias
+- [ ] FASE 23 — Renovaciones
+- [ ] FASE 24 — Documentos/Storage
+- [ ] FASE 25 — Notificaciones
+- [ ] FASE 26.a — Exportación CSV/Excel
+- [ ] FASE 26.b — Informes
+
+## Criterios de cierre global
+
 - [ ] `npx tsc --noEmit` = 0.
 - [ ] `npm run build` OK.
-- [ ] `npm run dev`: login → dashboard → navegar por las 11+ rutas → funciona todo.
+- [ ] `npm run dev`: login → dashboard → navegar por todas las rutas → funciona todo.
 - [ ] Schema Supabase sin tablas duplicadas.
 - [ ] API keys Gemini fuera del cliente.
 - [ ] RLS granular probado con 2 roles.
