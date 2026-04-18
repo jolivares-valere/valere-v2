@@ -53,7 +53,7 @@ export default function DataCapture() {
     setSpForm({
       client_id: selectedClientId,
       tariff: '2.0TD',
-      powers: { p1: 0, p2: 0 },
+      powers: { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0 },
     });
     setSpErrors({});
     setSpDialogOpen(true);
@@ -89,7 +89,7 @@ export default function DataCapture() {
     // Validate powers
     const powersError = validatePowers(
       spForm.tariff || '2.0TD',
-      (spForm.powers as Record<string, number>) || {}
+      (spForm.powers as unknown as Record<string, number>) || {}
     );
     if (powersError) errors.powers = powersError;
 
