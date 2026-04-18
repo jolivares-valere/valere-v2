@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  FileUp, Plus, Search, Loader2, Trash2, Save, Building2, Zap, Calendar, AlertCircle
+  FileUp, Plus, Search, Loader2, Trash2, Save, Building2, Zap, Calendar, AlertCircle, Edit2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,6 +40,8 @@ export default function DataCapture() {
 
   // --- Supply Point Dialog ---
   const [spDialogOpen, setSpDialogOpen] = useState(false);
+  const [isEditingSP, setIsEditingSP] = useState(false);
+  const [editingSPId, setEditingSPId] = useState<string | null>(null);
   const [spForm, setSpForm] = useState<Partial<SupplyPoint>>({});
   const [spErrors, setSpErrors] = useState<Record<string, string>>({});
 
@@ -56,6 +58,24 @@ export default function DataCapture() {
       powers: { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0 },
     });
     setSpErrors({});
+    setIsEditingSP(false);
+    setEditingSPId(null);
+    setSpDialogOpen(true);
+  };
+
+  const startEditSP = (sp: SupplyPoint) => {
+    setSpForm({
+      client_id: sp.client_id,
+      cups: sp.cups,
+      tariff: sp.tariff || '2.0TD',
+      powers: sp.powers || { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0 },
+      supply_address: sp.supply_address || '',
+      current_retailer: sp.current_retailer || '',
+      pv_power_kwp: sp.pv_power_kwp || 0,
+    });
+    setSpErrors({});
+    setIsEditingSP(true);
+    setEditingSPId(sp.id);
     setSpDialogOpen(true);
   };
 
@@ -101,13 +121,22 @@ export default function DataCapture() {
     }
 
     setSpErrors({});
-    await spMutation.insert(spForm as any, 'Punto de suministro creado');
+    if (isEditingSP && editingSPId) {
+      const { id, created_at, client_id, ...updateData } = spForm as any;
+      await spMutation.update(editingSPId, updateData, 'Punto de suministro actualizado');
+    } else {
+      await spMutation.insert(spForm as any, 'Punto de suministro creado');
+    }
     setSpDialogOpen(false);
+    setIsEditingSP(false);
+    setEditingSPId(null);
     refetchSP();
   };
 
   // --- Invoice Dialog ---
   const [invDialogOpen, setInvDialogOpen] = useState(false);
+  const [isEditingInv, setIsEditingInv] = useState(false);
+  const [editingInvId, setEditingInvId] = useState<string | null>(null);
   const [invForm, setInvForm] = useState<Partial<InvoiceHistory>>({});
   // Per-period consumption and surplus arrays
   const [invConsumptionPeriods, setInvConsumptionPeriods] = useState<number[]>([]);
@@ -136,6 +165,31 @@ export default function DataCapture() {
       consumption_kwh: 0,
       surplus_kwh: 0,
     });
+    setIsEditingInv(false);
+    setEditingInvId(null);
+    setInvDialogOpen(true);
+  };
+
+  const startEditInv = (inv: InvoiceHistory) => {
+    const numPeriods = invTariffConfig.energia;
+    setInvConsumptionPeriods(
+      Array.from({ length: numPeriods }, (_, i) => (inv as any)[`consumption_p${i + 1}`] || 0)
+    );
+    setInvSurplusPeriods(
+      Array.from({ length: numPeriods }, (_, i) => (inv as any)[`surplus_p${i + 1}`] || 0)
+    );
+    setInvForm({
+      supply_point_id: inv.supply_point_id,
+      month: inv.month,
+      year: inv.year,
+      billed_days: inv.billed_days || 30,
+      consumption_kwh: inv.consumption_kwh || 0,
+      surplus_kwh: inv.surplus_kwh || 0,
+      total_amount_eur: inv.total_amount_eur || 0,
+      retailer: inv.retailer || '',
+    });
+    setIsEditingInv(true);
+    setEditingInvId(inv.id);
     setInvDialogOpen(true);
   };
 
@@ -176,8 +230,15 @@ export default function DataCapture() {
       consumption_kwh: totalConsumption,
       surplus_kwh: totalSurplus,
     };
-    await invMutation.insert(payload as any, 'Factura registrada');
+    if (isEditingInv && editingInvId) {
+      const { id, created_at, supply_point_id, ...updateData } = payload as any;
+      await invMutation.update(editingInvId, updateData, 'Factura actualizada');
+    } else {
+      await invMutation.insert(payload as any, 'Factura registrada');
+    }
     setInvDialogOpen(false);
+    setIsEditingInv(false);
+    setEditingInvId(null);
     refetchInv();
   };
 
@@ -234,6 +295,18 @@ export default function DataCapture() {
                       <option key={sp.id} value={sp.id}>{sp.cups} ({sp.tariff})</option>
                     ))}
                   </select>
+                  {selectedSPId && (() => {
+                    const sp = supplyPoints.find(s => s.id === selectedSPId);
+                    return sp ? (
+                      <button
+                        onClick={() => startEditSP(sp)}
+                        className="px-3 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 transition-colors flex items-center gap-1.5 shrink-0"
+                        title="Editar punto de suministro"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    ) : null;
+                  })()}
                   <button
                     onClick={openNewSP}
                     className="px-4 py-2.5 bg-valere-blue-dark text-white rounded-xl text-sm hover:bg-valere-blue-medium transition-colors flex items-center gap-1.5 shrink-0"
@@ -303,7 +376,13 @@ export default function DataCapture() {
                         {(inv.total_amount_eur || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
                       </TableCell>
                       <TableCell>{inv.billed_days || 30}</TableCell>
-                      <TableCell className="text-right pr-6">
+                      <TableCell className="text-right pr-6 space-x-1">
+                        <button
+                          onClick={() => startEditInv(inv)}
+                          className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => deleteInv(inv.id)}
                           className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
@@ -340,7 +419,7 @@ export default function DataCapture() {
       <Dialog open={spDialogOpen} onOpenChange={setSpDialogOpen}>
         <DialogContent className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display text-valere-blue-dark">Nuevo Punto de Suministro</DialogTitle>
+            <DialogTitle className="font-display text-valere-blue-dark">{isEditingSP ? 'Editar Punto de Suministro' : 'Nuevo Punto de Suministro'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             {/* CUPS with validation */}
@@ -471,7 +550,7 @@ export default function DataCapture() {
               className="px-5 py-2 bg-valere-blue-dark text-white rounded-xl text-sm font-medium hover:bg-valere-blue-medium transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {spMutation.loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Crear Punto
+              {isEditingSP ? 'Guardar' : 'Crear Punto'}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -481,7 +560,7 @@ export default function DataCapture() {
       <Dialog open={invDialogOpen} onOpenChange={setInvDialogOpen}>
         <DialogContent className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display text-valere-blue-dark">Nueva Factura</DialogTitle>
+            <DialogTitle className="font-display text-valere-blue-dark">{isEditingInv ? 'Editar Factura' : 'Nueva Factura'}</DialogTitle>
             {selectedSP && (
               <p className="text-xs text-valere-ink/40 mt-1">
                 Tarifa: {selectedSP.tariff} — {invTariffConfig.energia} periodos de energía
@@ -608,7 +687,7 @@ export default function DataCapture() {
               className="px-5 py-2 bg-valere-green-dark text-white rounded-xl text-sm font-medium hover:bg-valere-green-medium transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {invMutation.loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Guardar Factura
+              {isEditingInv ? 'Guardar' : 'Guardar Factura'}
             </button>
           </DialogFooter>
         </DialogContent>

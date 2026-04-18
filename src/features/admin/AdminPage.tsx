@@ -269,6 +269,8 @@ function OffersTab() {
   const mutation = useSupabaseMutation('retailer_offers');
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const defaultTariff = '2.0TD';
   const defaultCfg = getTariffConfig(defaultTariff);
   const [form, setForm] = useState<any>({
@@ -280,9 +282,36 @@ function OffersTab() {
 
   const save = async () => {
     if (!form.retailer_id) { toast.error('Selecciona una comercializadora'); return; }
-    await mutation.insert(form, 'Oferta creada');
+    if (isEditing && editingId) {
+      const { id, created_at, retailers, ...updateData } = form;
+      await mutation.update(editingId, updateData, 'Oferta actualizada');
+    } else {
+      await mutation.insert(form, 'Oferta creada');
+    }
     setDialogOpen(false);
+    setIsEditing(false);
+    setEditingId(null);
     refetch();
+  };
+
+  const startEditOffer = (o: any) => {
+    const cfg = getTariffConfig(o.access_rate || '2.0TD');
+    setForm({
+      retailer_id: o.retailer_id ?? '',
+      product_name: o.product_name ?? '',
+      access_rate: o.access_rate ?? '2.0TD',
+      surplus_model: o.surplus_model ?? 'compensacion_simple',
+      energy_prices: o.energy_prices ?? Array(cfg.energia).fill(0),
+      power_prices: o.power_prices ?? Array(cfg.potencia).fill(0),
+      surplus_price_per_kwh: o.surplus_price_per_kwh ?? 0,
+      battery_fee_per_kwp_eur: o.battery_fee_per_kwp_eur ?? 0,
+      tender_fee_pct: o.tender_fee_pct ?? 0,
+      allow_zero_invoice: o.allow_zero_invoice ?? false,
+      include_in_comparison: o.include_in_comparison ?? true,
+    });
+    setIsEditing(true);
+    setEditingId(o.id);
+    setDialogOpen(true);
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>;
@@ -301,6 +330,8 @@ function OffersTab() {
                 surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
                 allow_zero_invoice: false, include_in_comparison: true,
               });
+              setIsEditing(false);
+              setEditingId(null);
               setDialogOpen(true);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-valere-blue-dark text-white rounded-xl text-sm hover:bg-valere-blue-medium"
@@ -335,7 +366,10 @@ function OffersTab() {
                         {o.include_in_comparison ? 'Sí' : 'No'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right pr-6">
+                    <TableCell className="text-right pr-6 space-x-1">
+                      <button onClick={() => startEditOffer(o)} className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       <button onClick={async () => { await mutation.remove(o.id, 'Oferta eliminada'); refetch(); }} className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -351,7 +385,7 @@ function OffersTab() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl rounded-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display text-valere-blue-dark">Nueva Oferta</DialogTitle>
+            <DialogTitle className="font-display text-valere-blue-dark">{isEditing ? 'Editar Oferta' : 'Nueva Oferta'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div>
@@ -469,7 +503,7 @@ function OffersTab() {
           <DialogFooter>
             <button onClick={() => setDialogOpen(false)} className="px-4 py-2 text-sm text-valere-ink/60">Cancelar</button>
             <button onClick={save} disabled={mutation.loading} className="px-5 py-2 bg-valere-blue-dark text-white rounded-xl text-sm font-medium hover:bg-valere-blue-medium disabled:opacity-50 flex items-center gap-2">
-              {mutation.loading && <Loader2 className="w-4 h-4 animate-spin" />} Crear Oferta
+              {mutation.loading && <Loader2 className="w-4 h-4 animate-spin" />} {isEditing ? 'Guardar' : 'Crear Oferta'}
             </button>
           </DialogFooter>
         </DialogContent>
