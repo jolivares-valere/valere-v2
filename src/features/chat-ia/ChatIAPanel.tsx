@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Send, Loader2, Sparkles, User } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
+import { supabase } from '@/core/supabase/client';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -40,39 +40,22 @@ export default function ConsultantChat() {
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-      if (!apiKey) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'El Consultor IA no está configurado. Añade `VITE_GEMINI_API_KEY` en el archivo `.env` para activar esta funcionalidad.'
-        }]);
-        setIsLoading(false);
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [
-          ...messages.map(m => ({
-            role: m.role === 'user' ? 'user' as const : 'model' as const,
-            parts: [{ text: m.content }]
-          })),
-          { role: 'user' as const, parts: [{ text: userMessage }] }
-        ],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-        }
+      const { data, error } = await supabase.functions.invoke('chat-consultor', {
+        body: {
+          messages: [...messages, { role: 'user', content: userMessage }],
+          systemPrompt: SYSTEM_PROMPT,
+        },
       });
 
-      const aiResponse = response.text || 'Lo siento, no he podido procesar tu solicitud.';
+      if (error) throw error;
+
+      const aiResponse = (data?.text as string) || 'Lo siento, no he podido procesar tu solicitud.';
       setMessages(prev => [...prev, { role: 'assistant', content: aiResponse }]);
     } catch (error) {
-      console.error('Error calling Gemini:', error);
+      console.error('Error invoking chat-consultor:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Ha ocurrido un error técnico. Por favor, inténtalo de nuevo.'
+        content: 'El Consultor IA no está disponible. Verifica que la Edge Function `chat-consultor` esté desplegada y que el secret `GEMINI_API_KEY` esté configurado.'
       }]);
     } finally {
       setIsLoading(false);
