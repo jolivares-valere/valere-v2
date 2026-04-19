@@ -56,6 +56,7 @@ export interface Powers {
 export interface InvoiceHistory {
   id: string;
   supply_point_id: string;
+  cups_id: string | null;
   month: number;
   year: number;
   consumption_kwh: number;
@@ -110,6 +111,7 @@ export interface Proposal {
   id: string;
   created_at: string;
   supply_point_id: string;
+  cups_id: string | null;
   current_annual_cost_eur: number;
   best_offer_annual_cost_eur: number;
   best_offer_retailer: string;
@@ -161,11 +163,17 @@ export interface SupplyPointWithClient extends SupplyPoint {
 }
 
 export interface ProposalWithDetails extends Proposal {
-  supply_points: {
+  supply_points?: {
     cups: string;
     alias?: string;
     clients: {
       company_name: string;
+    };
+  };
+  cups_rel?: {
+    codigo_cups: string;
+    empresas: {
+      nombre: string;
     };
   };
 }

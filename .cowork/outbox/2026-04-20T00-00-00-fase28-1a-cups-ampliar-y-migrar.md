@@ -18,14 +18,18 @@ Preparar la tabla `cups` para absorber a `supply_points` de forma que las 4 feat
 
 ## Tareas (en este orden, todas en una sola sesión)
 
-### 1. Aplicar DDL
+### 1. Aplicar DDL (2 ficheros)
 
-El fichero ya está en el repo:
+Los ficheros ya están en el repo:
 ```
 supabase/migrations/20260419_fase28_1a_cups_technical_columns.sql
+supabase/migrations/20260419_fase28_1b_cups_id_fk.sql
 ```
 
-Aplícalo contra el proyecto vivo (Supabase SQL Editor o `supabase db push` según prefieras).
+Aplica AMBOS contra el proyecto vivo (Supabase SQL Editor o `supabase db push` según prefieras).
+
+**Fichero 1** amplía `cups` con columnas técnicas.
+**Fichero 2** añade `cups_id uuid REFERENCES cups(id)` a `invoice_history` y `proposals`, con índices. Esto permite al frontend leer facturas/propuestas por CUPS directamente.
 
 Añade a `cups`:
 - `tarifa_acceso`, `tarifa_manual`, `potencias_contratadas` (jsonb), `comercializadora_actual`
@@ -40,7 +44,7 @@ SELECT column_name FROM information_schema.columns
 WHERE table_name = 'cups' AND table_schema = 'public'
 ORDER BY ordinal_position;
 ```
-Debe listar las 18 columnas nuevas.
+Debe listar las 18 columnas nuevas en `cups`, y `cups_id` en `invoice_history` y `proposals`.
 
 ---
 
@@ -146,6 +150,38 @@ WHERE c.id IS NULL;
 ```
 
 > **No borres `supply_points` todavía.** Lo dejamos vivo como fallback hasta que el refactor de frontend esté en producción.
+
+---
+
+### 3.5. Poblar `cups_id` en `invoice_history` y `proposals`
+
+Ahora que cada `supply_points.cups` tiene su correspondiente `cups.codigo_cups`, enlaza las tablas:
+
+```sql
+-- invoice_history: poblar cups_id a partir de supply_point_id → supply_points.cups → cups.codigo_cups
+UPDATE public.invoice_history ih SET
+  cups_id = c.id
+FROM public.supply_points sp
+JOIN public.cups c ON c.codigo_cups = sp.cups
+WHERE ih.supply_point_id = sp.id
+  AND ih.cups_id IS NULL;
+
+-- proposals: poblar cups_id
+UPDATE public.proposals p SET
+  cups_id = c.id
+FROM public.supply_points sp
+JOIN public.cups c ON c.codigo_cups = sp.cups
+WHERE p.supply_point_id = sp.id
+  AND p.cups_id IS NULL;
+```
+
+Verifica:
+```sql
+SELECT
+  (SELECT count(*) FROM invoice_history WHERE cups_id IS NULL AND supply_point_id IS NOT NULL) AS inv_sin_cups_id,
+  (SELECT count(*) FROM proposals WHERE cups_id IS NULL AND supply_point_id IS NOT NULL) AS prop_sin_cups_id;
+-- Esperado: ambos 0
+```
 
 ---
 

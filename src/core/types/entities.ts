@@ -120,6 +120,23 @@ export interface Cups {
   direccion_suministro: string | null
   distribuidor: string | null
   estado: EstadoCups
+  tarifa_acceso: string | null
+  tarifa_manual: string | null
+  potencias_contratadas: Record<string, number> | null
+  comercializadora_actual: string | null
+  modelo_autoconsumo: string | null
+  modelo_autoconsumo_manual: string | null
+  potencia_fv_kwp: number | null
+  coste_instalacion_fv_eur: number | null
+  potencia_inversor_kw: number | null
+  fecha_instalacion_fv: string | null
+  marca_inversor: string | null
+  energia_p1_kwh: number | null
+  energia_p2_kwh: number | null
+  energia_p3_kwh: number | null
+  energia_p4_kwh: number | null
+  energia_p5_kwh: number | null
+  energia_p6_kwh: number | null
   deleted_at: string | null
   created_at: string
 }
