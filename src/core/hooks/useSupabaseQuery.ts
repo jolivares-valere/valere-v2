@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
+import { logError } from '@/core/utils/logger';
 
 interface QueryOptions<T> {
   table: string;
@@ -59,7 +60,7 @@ export function useSupabaseQuery<T>({
       setData(rows);
       onSuccessRef.current?.(rows);
     } catch (err) {
-      console.error(`Error in useSupabaseQuery(${table}):`, err);
+      logError(err, `useSupabaseQuery(${table})`);
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

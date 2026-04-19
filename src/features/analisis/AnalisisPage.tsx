@@ -17,6 +17,7 @@ import type {
 } from '@/types/database';
 import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
+import { logError } from '@/core/utils/logger';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
@@ -221,7 +222,7 @@ export default function Analysis() {
       setResults(compResults);
       toast.success(`Análisis completado: ${compResults.length} oferta${compResults.length !== 1 ? 's' : ''} comparada${compResults.length !== 1 ? 's' : ''} para tarifa ${selectedSP.tariff}`);
     } catch (error) {
-      console.error('Analysis error:', error);
+      logError(error, 'AnalisisPage.runAnalysis');
       toast.error('Error inesperado al ejecutar el análisis. Revisa la consola para más detalles.');
     } finally {
       setRunning(false);

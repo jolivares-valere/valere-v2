@@ -46,7 +46,8 @@ export function useUploadDocumento() {
       entidadId: string
       descripcion?: string
     }) => {
-      const ext = file.name.split('.').pop() ?? 'bin'
+      const rawExt = file.name.split('.').pop() ?? 'bin'
+      const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) || 'bin'
       const path = `${entidadTipo}/${entidadId}/${crypto.randomUUID()}.${ext}`
 
       const { error: uploadError } = await supabase.storage

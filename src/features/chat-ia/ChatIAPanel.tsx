@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Send, Loader2, Sparkles, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/core/supabase/client';
+import { logError } from '@/core/utils/logger';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -52,7 +53,7 @@ export default function ConsultantChat() {
       const aiResponse = (data?.text as string) || 'Lo siento, no he podido procesar tu solicitud.';
       setMessages(prev => [...prev, { role: 'assistant', content: aiResponse }]);
     } catch (error) {
-      console.error('Error invoking chat-consultor:', error);
+      logError(error, 'ChatIAPanel.invoke');
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'El Consultor IA no está disponible. Verifica que la Edge Function `chat-consultor` esté desplegada y que el secret `GEMINI_API_KEY` esté configurado.'
