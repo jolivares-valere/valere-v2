@@ -334,9 +334,9 @@ Dos informes iniciales:
 - [x] FASE 20.4 — Mover src/lib → core/energia + core/utils ✅
 - [x] FASE 20.5 — Migrar módulos Calc a features/ ✅
 - [x] FASE 20.6 — Eliminar estructura legacy flat ✅
-- [ ] FASE 20.7 — Unificar schema Supabase (prompt en `.cowork/outbox/` 2026-04-18T19-15)
-- [ ] FASE 20.8 — Chat Gemini → Edge Function (prompt en `.cowork/outbox/` 2026-04-18T19-45)
-- [ ] FASE 20.9 — RLS granular (prompt en `.cowork/outbox/` 2026-04-18T19-30)
+- [x] FASE 20.7 — Unificar schema Supabase ✅ (20.7.a-d completados por Cowork 2026-04-19)
+- [x] FASE 20.8 — Chat Gemini → Edge Function ✅ (archivo creado; deploy pendiente CLI: `supabase functions deploy`)
+- [x] FASE 20.9 — RLS granular ✅ (SQL creado; aplicación pendiente EXPLAIN ANALYZE en producción)
 - [x] FASE 20.10 — Pendientes menores del audit ✅ (ediciones + autoprefixer + shadcn)
 
 ## Checklist — Mejoras post-fusión (21-26)
