@@ -8,35 +8,45 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import EmptyState from '@/core/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
-import type { Client, SupplyPoint, InvoiceHistory } from '@/types/database';
+import type { SupplyPoint, InvoiceHistory } from '@/types/database';
+import type { Cups, Empresa } from '@/core/types/entities';
+import { cupsToSupplyPoint, supplyPointFormToCupsPayload } from '@/core/energia/adapters';
 import { toast } from 'sonner';
 import { getTariffConfig, validateCUPS, validatePowers } from '@/core/energia/tariffs';
 
 export default function DataCapture() {
-  const { data: clients } = useSupabaseQuery<Client>({
-    table: 'clients',
-    order: { column: 'company_name', ascending: true },
+  const { data: empresas } = useSupabaseQuery<Empresa>({
+    table: 'empresas',
+    filters: [{ column: 'deleted_at', op: 'eq', value: null }],
+    order: { column: 'nombre', ascending: true },
   });
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
 
-  const { data: supplyPoints, loading: loadingSP, refetch: refetchSP } = useSupabaseQuery<SupplyPoint>({
-    table: 'supply_points',
-    filters: selectedClientId ? [{ column: 'client_id', op: 'eq', value: selectedClientId }] : [],
+  const { data: cupsRows, loading: loadingSP, refetch: refetchSP } = useSupabaseQuery<Cups>({
+    table: 'cups',
+    filters: selectedClientId
+      ? [
+          { column: 'empresa_id', op: 'eq', value: selectedClientId },
+          { column: 'deleted_at', op: 'eq', value: null },
+        ]
+      : [],
     enabled: !!selectedClientId,
   });
+
+  const supplyPoints = useMemo(() => cupsRows.map(cupsToSupplyPoint), [cupsRows]);
 
   const [selectedSPId, setSelectedSPId] = useState<string>('');
 
   const { data: invoices, loading: loadingInv, refetch: refetchInv } = useSupabaseQuery<InvoiceHistory>({
-    table: 'invoice_history',
-    filters: selectedSPId ? [{ column: 'supply_point_id', op: 'eq', value: selectedSPId }] : [],
+    table: 'facturas',
+    filters: selectedSPId ? [{ column: 'cups_id', op: 'eq', value: selectedSPId }] : [],
     order: { column: 'year', ascending: false },
     enabled: !!selectedSPId,
   });
 
-  const spMutation = useSupabaseMutation('supply_points');
-  const invMutation = useSupabaseMutation('invoice_history');
+  const spMutation = useSupabaseMutation('cups');
+  const invMutation = useSupabaseMutation('facturas');
 
   // --- Supply Point Dialog ---
   const [spDialogOpen, setSpDialogOpen] = useState(false);
@@ -121,11 +131,13 @@ export default function DataCapture() {
     }
 
     setSpErrors({});
+    const payload = supplyPointFormToCupsPayload(spForm, selectedClientId);
     if (isEditingSP && editingSPId) {
-      const { id, created_at, client_id, ...updateData } = spForm as any;
-      await spMutation.update(editingSPId, updateData, 'Punto de suministro actualizado');
+      const { empresa_id: _empresaId, ...updateData } = payload;
+      void _empresaId;
+      await spMutation.update(editingSPId, updateData as never, 'Punto de suministro actualizado');
     } else {
-      await spMutation.insert(spForm as any, 'Punto de suministro creado');
+      await spMutation.insert(payload as never, 'Punto de suministro creado');
     }
     setSpDialogOpen(false);
     setIsEditingSP(false);
@@ -158,7 +170,7 @@ export default function DataCapture() {
     setInvConsumptionPeriods(new Array(numPeriods).fill(0));
     setInvSurplusPeriods(new Array(numPeriods).fill(0));
     setInvForm({
-      supply_point_id: selectedSPId,
+      cups_id: selectedSPId,
       month: new Date().getMonth() + 1,
       year: new Date().getFullYear(),
       billed_days: 30,
@@ -179,7 +191,7 @@ export default function DataCapture() {
       Array.from({ length: numPeriods }, (_, i) => (inv as any)[`surplus_p${i + 1}`] || 0)
     );
     setInvForm({
-      supply_point_id: inv.supply_point_id,
+      cups_id: inv.cups_id ?? selectedSPId,
       month: inv.month,
       year: inv.year,
       billed_days: inv.billed_days || 30,
@@ -231,7 +243,8 @@ export default function DataCapture() {
       surplus_kwh: totalSurplus,
     };
     if (isEditingInv && editingInvId) {
-      const { id, created_at, supply_point_id, ...updateData } = payload as any;
+      const { id, created_at, cups_id, supply_point_id, ...updateData } = payload as any;
+      void id; void created_at; void cups_id; void supply_point_id;
       await invMutation.update(editingInvId, updateData, 'Factura actualizada');
     } else {
       await invMutation.insert(payload as any, 'Factura registrada');
@@ -273,8 +286,8 @@ export default function DataCapture() {
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-valere-blue-medium/30 bg-white"
               >
                 <option value="">— Elige un cliente —</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.company_name}</option>
+                {empresas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nombre}</option>
                 ))}
               </select>
             </div>

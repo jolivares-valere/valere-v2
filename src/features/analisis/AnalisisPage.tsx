@@ -9,12 +9,13 @@ import StatCard from '@/core/components/StatCard';
 import EmptyState from '@/core/components/EmptyState';
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery';
 import { calculateSimulatedInvoice, distributeConsumption } from '@/core/energia/calculator';
+import { cupsToSupplyPoint } from '@/core/energia/adapters';
 import { formatEur, formatPct, safeNum } from '@/core/utils/format';
 import { getTariffConfig } from '@/core/energia/tariffs';
 import type {
-  Client, SupplyPoint, InvoiceHistory, RetailerOffer,
-  BoeRegulatedPrice, GlobalConfig, RetailerOfferWithName
+  InvoiceHistory, BoeRegulatedPrice, RetailerOfferWithName
 } from '@/types/database';
+import type { Cups, Empresa } from '@/core/types/entities';
 import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
 import { logError } from '@/core/utils/logger';
@@ -32,22 +33,33 @@ interface ComparisonResult {
 }
 
 export default function Analysis() {
-  const { data: clients } = useSupabaseQuery<Client>({ table: 'clients', order: { column: 'company_name', ascending: true } });
+  const { data: empresas } = useSupabaseQuery<Empresa>({
+    table: 'empresas',
+    filters: [{ column: 'deleted_at', op: 'eq', value: null }],
+    order: { column: 'nombre', ascending: true },
+  });
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedSPId, setSelectedSPId] = useState('');
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<ComparisonResult[]>([]);
   const [historicalCost, setHistoricalCost] = useState(0);
 
-  const { data: supplyPoints } = useSupabaseQuery<SupplyPoint>({
-    table: 'supply_points',
-    filters: selectedClientId ? [{ column: 'client_id', op: 'eq', value: selectedClientId }] : [],
+  const { data: cupsRows } = useSupabaseQuery<Cups>({
+    table: 'cups',
+    filters: selectedClientId
+      ? [
+          { column: 'empresa_id', op: 'eq', value: selectedClientId },
+          { column: 'deleted_at', op: 'eq', value: null },
+        ]
+      : [],
     enabled: !!selectedClientId,
   });
 
+  const supplyPoints = useMemo(() => cupsRows.map(cupsToSupplyPoint), [cupsRows]);
+
   const { data: invoices } = useSupabaseQuery<InvoiceHistory>({
-    table: 'invoice_history',
-    filters: selectedSPId ? [{ column: 'supply_point_id', op: 'eq', value: selectedSPId }] : [],
+    table: 'facturas',
+    filters: selectedSPId ? [{ column: 'cups_id', op: 'eq', value: selectedSPId }] : [],
     enabled: !!selectedSPId,
   });
 
@@ -234,7 +246,7 @@ export default function Analysis() {
     const best = results[0];
 
     const { error } = await supabase.from('proposals').insert({
-      supply_point_id: selectedSPId,
+      cups_id: selectedSPId,
       current_annual_cost_eur: historicalCost,
       best_offer_annual_cost_eur: best.annualCost,
       best_offer_retailer: best.retailerName,
@@ -294,7 +306,7 @@ export default function Analysis() {
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-valere-blue-medium/30"
               >
                 <option value="">— Seleccionar —</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+                {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
               </select>
             </div>
             <div className="flex-1">

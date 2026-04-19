@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 export default function Proposals() {
   const { data: proposals, loading, refetch } = useSupabaseQuery<ProposalWithDetails>({
     table: 'proposals',
-    select: '*, supply_points(cups, clients(company_name))',
+    select: '*, cups_rel:cups!proposals_cups_id_fkey(codigo_cups, empresas(nombre))',
     order: { column: 'created_at', ascending: false },
     errorMessage: 'Error al cargar propuestas',
   });
@@ -31,9 +31,14 @@ export default function Proposals() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<ProposalWithDetails | null>(null);
 
+  const clienteOf = (p: ProposalWithDetails) =>
+    p.cups_rel?.empresas?.nombre || p.supply_points?.clients?.company_name || '';
+  const cupsOf = (p: ProposalWithDetails) =>
+    p.cups_rel?.codigo_cups || p.supply_points?.cups || '';
+
   const filtered = proposals.filter(p => {
-    const name = p.supply_points?.clients?.company_name || '';
-    const cups = p.supply_points?.cups || '';
+    const name = clienteOf(p);
+    const cups = cupsOf(p);
     const retailer = p.best_offer_retailer || '';
     return [name, cups, retailer].some(s => s.toLowerCase().includes(search.toLowerCase()));
   });
@@ -48,8 +53,8 @@ export default function Proposals() {
     const csv = generateCsv(
       ['CUPS', 'Cliente', 'Comercializadora', 'Coste Actual €', 'Mejor Oferta €', 'Ahorro €', 'Ahorro %', 'Fecha'],
       proposals.map(p => [
-        p.supply_points?.cups || '',
-        p.supply_points?.clients?.company_name || '',
+        cupsOf(p),
+        clienteOf(p),
         p.best_offer_retailer || '',
         (p.current_annual_cost_eur || 0).toFixed(2),
         (p.best_offer_annual_cost_eur || 0).toFixed(2),
@@ -158,10 +163,10 @@ export default function Proposals() {
                 {filtered.map(p => (
                   <TableRow key={p.id} className="border-slate-50 hover:bg-slate-50/30 transition-colors">
                     <TableCell className="pl-6 font-mono text-xs text-valere-ink/50">
-                      {p.supply_points?.cups || '—'}
+                      {cupsOf(p) || '—'}
                     </TableCell>
                     <TableCell className="font-semibold text-valere-blue-dark">
-                      {p.supply_points?.clients?.company_name || '—'}
+                      {clienteOf(p) || '—'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-valere-blue-medium/5 text-valere-blue-dark border-valere-blue-medium/10">
@@ -218,13 +223,13 @@ export default function Proposals() {
                 <div className="bg-slate-50 rounded-xl p-4">
                   <p className="text-[10px] font-bold text-valere-ink/40 uppercase tracking-wider">Cliente</p>
                   <p className="text-sm font-semibold text-valere-blue-dark mt-1">
-                    {selectedProposal.supply_points?.clients?.company_name}
+                    {clienteOf(selectedProposal)}
                   </p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-4">
                   <p className="text-[10px] font-bold text-valere-ink/40 uppercase tracking-wider">CUPS</p>
                   <p className="text-sm font-mono text-valere-ink/60 mt-1">
-                    {selectedProposal.supply_points?.cups}
+                    {cupsOf(selectedProposal)}
                   </p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-4">

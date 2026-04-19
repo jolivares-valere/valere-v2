@@ -17,16 +17,21 @@ import { toast } from 'sonner';
 export default function Tracking() {
   const { data: proposals, loading } = useSupabaseQuery<ProposalWithDetails>({
     table: 'proposals',
-    select: '*, supply_points(cups, clients(company_name))',
+    select: '*, cups_rel:cups!proposals_cups_id_fkey(codigo_cups, empresas(nombre))',
     order: { column: 'created_at', ascending: false },
     errorMessage: 'Error al cargar análisis',
   });
 
   const [search, setSearch] = useState('');
 
+  const clienteOf = (p: ProposalWithDetails) =>
+    p.cups_rel?.empresas?.nombre || p.supply_points?.clients?.company_name || '';
+  const cupsOf = (p: ProposalWithDetails) =>
+    p.cups_rel?.codigo_cups || p.supply_points?.cups || '';
+
   const filtered = proposals.filter(p => {
-    const name = p.supply_points?.clients?.company_name || '';
-    const cups = p.supply_points?.cups || '';
+    const name = clienteOf(p);
+    const cups = cupsOf(p);
     return [name, cups].some(s => s.toLowerCase().includes(search.toLowerCase()));
   });
 
@@ -40,8 +45,8 @@ export default function Tracking() {
     const csv = generateCsv(
       ['CUPS', 'Cliente', 'Comercializadora', 'Ahorro (€)', 'Ahorro (%)', 'Fecha'],
       proposals.map(p => [
-        p.supply_points?.cups || '',
-        p.supply_points?.clients?.company_name || '',
+        cupsOf(p),
+        clienteOf(p),
         p.best_offer_retailer || '',
         (p.best_offer_savings_eur || 0).toFixed(2),
         (p.best_offer_savings_pct || 0).toFixed(1),
@@ -138,8 +143,8 @@ export default function Tracking() {
               <TableBody>
                 {filtered.map(p => (
                   <TableRow key={p.id} className="border-slate-50 hover:bg-slate-50/30 transition-colors">
-                    <TableCell className="pl-6 font-mono text-xs text-valere-ink/50">{p.supply_points?.cups}</TableCell>
-                    <TableCell className="font-semibold text-valere-blue-dark">{p.supply_points?.clients?.company_name}</TableCell>
+                    <TableCell className="pl-6 font-mono text-xs text-valere-ink/50">{cupsOf(p)}</TableCell>
+                    <TableCell className="font-semibold text-valere-blue-dark">{clienteOf(p)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-valere-blue-medium/5 text-valere-blue-dark border-valere-blue-medium/10">
                         {p.best_offer_retailer}
@@ -182,7 +187,7 @@ export default function Tracking() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-valere-blue-dark truncate">
-                        Análisis para {p.supply_points?.clients?.company_name}
+                        Análisis para {clienteOf(p)}
                       </p>
                       <p className="text-xs text-valere-ink/40 truncate">
                         Ahorro de {formatEur(p.best_offer_savings_eur)} con {p.best_offer_retailer || 'N/A'}
@@ -210,7 +215,7 @@ export default function Tracking() {
                     Generar PDF
                   </div>
                   <p className="text-xs text-valere-ink/50 leading-relaxed">
-                    {p.supply_points?.clients?.company_name} — ahorro potencial del {formatPct(p.best_offer_savings_pct)}.
+                    {clienteOf(p)} — ahorro potencial del {formatPct(p.best_offer_savings_pct)}.
                   </p>
                 </div>
               ))
