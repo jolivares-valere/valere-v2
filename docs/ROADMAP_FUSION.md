@@ -350,6 +350,12 @@ Dos informes iniciales:
 - [x] FASE 25 — Notificaciones ✅
 - [x] FASE 26.a — Exportación CSV/Excel ✅
 - [x] FASE 26.b — Informes ✅
+- [x] FASE 27 — Calendario/Agenda con tabla `eventos` ✅ (vista mes + form CRUD)
+
+## Mejoras de plataforma (post-roadmap)
+
+- [x] Code-splitting con `React.lazy()` por rutas + `manualChunks` para vendors (main bundle 1515 kB → 253 kB)
+- [x] Vitest + React Testing Library + tests de humo en `core/utils` (16 tests)
 
 ## Criterios de cierre global
 

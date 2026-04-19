@@ -99,6 +99,7 @@ Al final de sesion, decir:
 | 2026-04-19T09 | Cowork manana | Fix cups 20.7.c, documentacion |
 | 2026-04-19 | Cowork | Backup maestro + protocolo diario |
 | 2026-04-19 | Claude Code | Sync con Cowork, limpieza ESTADO.md, backup script, ROADMAP 20.7-20.9 ✅ |
+| 2026-04-19 tarde | Claude Code | FASE 27 Calendario, code-splitting, Vitest+16 tests, bundle 1515→253kB |
 
 > Actualizar esta tabla al final de cada sesion.
 

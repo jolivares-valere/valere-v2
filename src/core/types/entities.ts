@@ -317,3 +317,28 @@ export type RenovacionInsert = Insert<Renovacion>
 export type RenovacionUpdate = Update<Renovacion>
 export type DocumentoInsert = Insert<Documento>
 export type DocumentoUpdate = Update<Documento>
+
+export type TipoEvento = 'reunion' | 'llamada' | 'visita' | 'tarea' | 'vencimiento' | 'otro'
+export type EntidadEvento = 'empresa' | 'contacto' | 'contrato' | 'oportunidad' | 'incidencia' | 'renovacion'
+
+export interface Evento {
+  id: string
+  titulo: string
+  descripcion: string | null
+  tipo: TipoEvento
+  fecha_inicio: string
+  fecha_fin: string | null
+  todo_el_dia: boolean
+  ubicacion: string | null
+  color: string | null
+  entidad_tipo: EntidadEvento | null
+  entidad_id: string | null
+  asignado_a: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type EventoInsert = Insert<Evento>
+export type EventoUpdate = Update<Evento>

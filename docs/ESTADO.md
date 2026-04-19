@@ -28,6 +28,8 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | 25 | Notificaciones in-app con badge en header | Feature |
 | 26.a | Exportación CSV en todos los listados | Feature |
 | 26.b | Informes predefinidos (comercial mensual + cartera activa) | Feature |
+| 27 | Calendario/Agenda: tabla eventos + vista mes + CRUD | Feature + SQL ✅ |
+| Plataforma | Code-splitting React.lazy + Vitest + 16 tests | Calidad |
 
 ## Tareas de deploy pendientes (requieren acceso externo)
 

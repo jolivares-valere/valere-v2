@@ -1,6 +1,6 @@
 ﻿import { NavLink } from 'react-router-dom'
 import {
-  Activity, AlertTriangle, BarChart3, Building2, FileText, FileUp, GitBranch,
+  Activity, AlertTriangle, BarChart3, Building2, Calendar, FileText, FileUp, GitBranch,
   LayoutDashboard, RefreshCw, Send, ShieldCheck, Upload, Users, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
@@ -10,6 +10,7 @@ const items = [
   { to: '/empresas', label: 'Empresas', icon: Building2 },
   { to: '/contactos', label: 'Contactos', icon: Users },
   { to: '/actividades', label: 'Actividades', icon: Activity },
+  { to: '/calendario', label: 'Calendario', icon: Calendar },
   { to: '/contratos', label: 'Contratos', icon: FileText },
   { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
   { to: '/informes', label: 'Informes', icon: BarChart3 },

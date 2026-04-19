@@ -1,24 +1,27 @@
-﻿import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './core/hooks/useAuth'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
-import DashboardPage from './features/dashboard/DashboardPage'
-import EmpresasPage from './features/empresas/EmpresasPage'
-import EmpresaDetailPage from './features/empresas/EmpresaDetailPage'
-import ContactosPage from './features/contactos/ContactosPage'
-import ContratosPage from './features/contratos/ContratosPage'
-import ContratoDetailPage from './features/contratos/ContratoDetailPage'
-import OportunidadesPage from './features/oportunidades/OportunidadesPage'
-import ImportadorPage from './features/importador/ImportadorPage'
-import ActividadesPage from './features/actividades/ActividadesPage'
-import AdminPage from './features/admin/AdminPage'
-import DatosPage from './features/datos/DatosPage'
-import AnalisisPage from './features/analisis/AnalisisPage'
-import PropuestasEnergiaPage from './features/propuestas-energia/PropuestasEnergiaPage'
-import TrackingPage from './features/tracking/TrackingPage'
-import InformesPage from './features/informes/InformesPage'
-import IncidenciasPage from './features/incidencias/IncidenciasPage'
-import RenovacionesPage from './features/renovaciones/RenovacionesPage'
+
+const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage'))
+const EmpresasPage = lazy(() => import('./features/empresas/EmpresasPage'))
+const EmpresaDetailPage = lazy(() => import('./features/empresas/EmpresaDetailPage'))
+const ContactosPage = lazy(() => import('./features/contactos/ContactosPage'))
+const ContratosPage = lazy(() => import('./features/contratos/ContratosPage'))
+const ContratoDetailPage = lazy(() => import('./features/contratos/ContratoDetailPage'))
+const OportunidadesPage = lazy(() => import('./features/oportunidades/OportunidadesPage'))
+const ImportadorPage = lazy(() => import('./features/importador/ImportadorPage'))
+const ActividadesPage = lazy(() => import('./features/actividades/ActividadesPage'))
+const AdminPage = lazy(() => import('./features/admin/AdminPage'))
+const DatosPage = lazy(() => import('./features/datos/DatosPage'))
+const AnalisisPage = lazy(() => import('./features/analisis/AnalisisPage'))
+const PropuestasEnergiaPage = lazy(() => import('./features/propuestas-energia/PropuestasEnergiaPage'))
+const TrackingPage = lazy(() => import('./features/tracking/TrackingPage'))
+const InformesPage = lazy(() => import('./features/informes/InformesPage'))
+const IncidenciasPage = lazy(() => import('./features/incidencias/IncidenciasPage'))
+const RenovacionesPage = lazy(() => import('./features/renovaciones/RenovacionesPage'))
+const CalendarioPage = lazy(() => import('./features/calendario/CalendarioPage'))
 
 function LoadingScreen() {
   return (
@@ -36,7 +39,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!session || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
-  return <AppShell>{children}</AppShell>
+  return (
+    <AppShell>
+      <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
+    </AppShell>
+  )
 }
 
 function LoginRoute() {
@@ -70,6 +77,8 @@ export default function App() {
       <Route path="/oportunidades" element={<AuthGuard><OportunidadesPage /></AuthGuard>} />
 
       <Route path="/actividades" element={<AuthGuard><ActividadesPage /></AuthGuard>} />
+
+      <Route path="/calendario" element={<AuthGuard><CalendarioPage /></AuthGuard>} />
 
       <Route path="/informes" element={<AuthGuard><InformesPage /></AuthGuard>} />
 
