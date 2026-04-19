@@ -114,7 +114,7 @@ export interface Contrato {
 
 export interface Cups {
   id: string
-  contrato_id: string
+  contrato_id: string | null
   empresa_id: string
   codigo_cups: string
   direccion_suministro: string | null

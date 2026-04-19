@@ -125,3 +125,36 @@ supabase gen types typescript --project-id <PROJECT_REF> > src/core/types/databa
 ## Roadmap
 
 Ver [`docs/ROADMAP_FUSION.md`](docs/ROADMAP_FUSION.md) para el plan detallado de la fusión (FASE 20.1 → 20.9).
+
+## Memoria persistente entre sesiones
+
+### Archivos de estado
+- **`docs/ESTADO.md`**: estado actual del proyecto (qué está hecho, qué falta, tareas pendientes). Actualizar al final de cada sesión.
+- **`docs/ROADMAP_FUSION.md`**: roadmap detallado con checklists ✅.
+- **`docs/SESIONES/`**: log de sesiones anteriores (JSONL raw + resumen legible).
+- **`.cowork/inbox/` y `.cowork/outbox/`**: bus de mensajes entre agentes Claude.
+
+### Arranque de sesión nueva
+
+**Claude Code (CLI/Desktop):**
+```bash
+cd ~/valere-v2 && claude -c   # continuar última sesión
+# O sesión nueva:
+# "Lee CLAUDE.md, docs/ESTADO.md y git log --oneline -10. Continúa."
+```
+
+**Claude Cowork (Web — claude.ai/code):**
+```
+Trabajas en valere-v2, rama claude/valere-crm-architecture-2vvEV.
+Ejecuta:
+  git pull origin claude/valere-crm-architecture-2vvEV
+  cat CLAUDE.md docs/ESTADO.md docs/ROADMAP_FUSION.md
+  ls .cowork/outbox/ .cowork/inbox/
+  git log --oneline -10
+Lee todo y dime dónde nos quedamos.
+```
+
+### Al cerrar sesión
+1. Actualizar `docs/ESTADO.md` con lo que se hizo y lo que queda.
+2. Si la sesión fue larga, añadir entrada en `docs/SESIONES/`.
+3. Commit + push.
