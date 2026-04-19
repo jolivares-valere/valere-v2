@@ -16,7 +16,7 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | 20.7.b | clients → empresas (1 fila: PAZ Y BIEN 5002AP) | SQL ✅ |
 | 20.7.c | supply_points → cups (1 fila migrada, contrato_id nullable) | SQL ✅ |
 | 20.7.d | invoice_history → facturas (rename) | SQL ✅ |
-| 20.8 | Edge Function chat-consultor (archivo creado) | SQL ✅ |
+| 20.8 | Edge Function chat-consultor + refactor ChatIAPanel (API key fuera del cliente) | Feature + SQL ✅ |
 | 20.9 | RLS granular multitenant (SQL creado, no aplicado) | SQL ✅ |
 | 20.10 | Pendientes audit: ediciones, autoprefixer, shadcn config | Limpieza |
 | 21.a | Pipeline energético: Kanban 8 etapas, ahorro anual, probabilidades | Feature + SQL ✅ |
@@ -33,7 +33,7 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 
 | Tarea | Bloqueador |
 |---|---|
-| Deploy Edge Function chat-consultor | Supabase CLI + `supabase secrets set GEMINI_API_KEY` |
+| Deploy Edge Function chat-consultor | Supabase CLI + `supabase secrets set GEMINI_API_KEY` + `supabase functions deploy chat-consultor` |
 | Aplicar RLS granular | EXPLAIN ANALYZE antes de activar en producción |
 | Crear bucket Storage `documentos` | Supabase Dashboard |
 | DROP tablas legacy (clients, supply_points) | Confirmación manual |
