@@ -104,7 +104,16 @@ export function useDeleteDocumento() {
   })
 }
 
-export function getDocumentoUrl(rutaStorage: string): string {
-  const { data } = supabase.storage.from('documentos').getPublicUrl(rutaStorage)
-  return data.publicUrl
+export async function getDocumentoSignedUrl(
+  rutaStorage: string,
+  expiresInSec = 60,
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('documentos')
+    .createSignedUrl(rutaStorage, expiresInSec)
+  if (error || !data?.signedUrl) {
+    logError(error, 'getDocumentoSignedUrl')
+    throw error ?? new Error('No se pudo generar la URL firmada')
+  }
+  return data.signedUrl
 }

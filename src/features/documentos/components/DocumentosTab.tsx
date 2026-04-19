@@ -1,6 +1,12 @@
 import { useRef, useState } from 'react'
 import { Upload, FileText, Trash2, Download } from 'lucide-react'
-import { useDocumentosPorEntidad, useUploadDocumento, useDeleteDocumento, getDocumentoUrl } from '../api'
+import { toast } from 'sonner'
+import {
+  useDocumentosPorEntidad,
+  useUploadDocumento,
+  useDeleteDocumento,
+  getDocumentoSignedUrl,
+} from '../api'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import type { EntidadTipo } from '../../../core/types/entities'
 
@@ -34,6 +40,17 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
     if (!confirmDelete) return
     await deleteMut.mutateAsync({ id: confirmDelete.id, rutaStorage: confirmDelete.ruta })
     setConfirmDelete(null)
+  }
+
+  const handleDownload = async (ruta: string) => {
+    try {
+      const url = await getDocumentoSignedUrl(ruta)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      toast.error('No se pudo generar el enlace de descarga', {
+        description: (e as Error).message,
+      })
+    }
   }
 
   return (
@@ -76,15 +93,14 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
                 </p>
               </div>
               <div className="ml-3 flex shrink-0 gap-1">
-                <a
-                  href={getDocumentoUrl(doc.ruta_storage)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => handleDownload(doc.ruta_storage)}
                   className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                   aria-label="Descargar"
                 >
                   <Download className="h-4 w-4" />
-                </a>
+                </button>
                 <button
                   type="button"
                   onClick={() => setConfirmDelete({ id: doc.id, ruta: doc.ruta_storage, nombre: doc.nombre })}

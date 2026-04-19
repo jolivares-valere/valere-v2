@@ -1,5 +1,5 @@
-﻿import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+﻿import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
@@ -15,6 +15,7 @@ type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' 
 
 export default function EmpresaDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { data: empresa, isLoading } = useEmpresaById(id)
   const updateMut = useUpdateEmpresa()
   const deleteMut = useDeleteEmpresa()
@@ -33,7 +34,7 @@ export default function EmpresaDetailPage() {
   const onDeleteConfirmed = async () => {
     await deleteMut.mutateAsync(empresa.id)
     setConfirmDelete(false)
-    window.location.href = '/empresas'
+    navigate('/empresas')
   }
 
   return (
@@ -179,6 +180,15 @@ function ContactosSection({ empresaId }: { empresaId: string }) {
   const createMut = useCreateContacto()
   const [adding, setAdding] = useState(false)
 
+  useEffect(() => {
+    if (!adding) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAdding(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [adding])
+
   const onSubmit = async (values: ContactoInsert) => {
     await createMut.mutateAsync({ ...values, empresa_id: empresaId })
     setAdding(false)
@@ -252,7 +262,7 @@ function ContactosSection({ empresaId }: { empresaId: string }) {
       {adding && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setAdding(false)} />
-          <div className="fixed right-0 top-0 z-50 h-full w-full max-w-xl overflow-y-auto bg-white shadow-xl">
+          <div role="dialog" aria-modal="true" aria-label="Nuevo contacto" className="fixed right-0 top-0 z-50 h-full w-full max-w-xl overflow-y-auto bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 p-4">
               <h2 className="text-lg font-semibold text-slate-900">Nuevo contacto</h2>
               <button type="button" onClick={() => setAdding(false)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100">

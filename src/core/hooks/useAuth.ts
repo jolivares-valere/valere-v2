@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { supabase } from '../supabase/client'
 import { useAuthStore } from '../stores/authStore'
-import { logError } from '../utils/logger'
+import { logError, logInfo } from '../utils/logger'
 import type { Session } from '@supabase/supabase-js'
 import type { UserProfile } from '../types/entities'
 
@@ -49,16 +49,17 @@ function bootstrapFromSession(session: Session): UserProfile {
   }
 }
 
-let initialized = false
+// Mantener una sola suscripción global entre renders/StrictMode double-invoke.
+let authSubscription: { unsubscribe: () => void } | null = null
+let inFlightProfile: Promise<UserProfile | null> | null = null
 
 function ensureAuthInitialized() {
-  if (initialized) return
-  initialized = true
+  if (authSubscription) return
 
-  console.log('[useAuth] ensureAuthInitialized - suscribiendo onAuthStateChange')
+  logInfo('[useAuth] suscribiendo onAuthStateChange')
 
-  supabase.auth.onAuthStateChange((event, session) => {
-    console.log('[useAuth] onAuthStateChange:', event, 'session:', !!session)
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    logInfo('[useAuth] onAuthStateChange', { event, hasSession: !!session })
 
     const store = useAuthStore.getState()
     store.setSession(session)
@@ -71,14 +72,26 @@ function ensureAuthInitialized() {
 
     store.setLoading(false)
 
-    if (session?.user) {
-      fetchProfile(session.user.id)
+    if (session?.user && !inFlightProfile) {
+      const userId = session.user.id
+      inFlightProfile = fetchProfile(userId)
         .then((profile) => {
-          if (profile) useAuthStore.getState().setUser(profile)
+          if (profile && useAuthStore.getState().session?.user.id === userId) {
+            useAuthStore.getState().setUser(profile)
+          }
+          return profile
         })
-        .catch((err) => console.error('[useAuth] fetchProfile bg:', err))
+        .catch((err) => {
+          logError(err, 'useAuth.fetchProfile.bg')
+          return null
+        })
+        .finally(() => {
+          inFlightProfile = null
+        })
     }
   })
+
+  authSubscription = data.subscription
 }
 
 export function useAuth() {

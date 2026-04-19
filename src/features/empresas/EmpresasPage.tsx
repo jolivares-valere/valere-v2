@@ -15,7 +15,7 @@ export default function EmpresasPage() {
   const tipo = params.get('tipo') ?? ''
   const [showForm, setShowForm] = useState(false)
 
-  const { data, isLoading, error } = useEmpresas({
+  const { data, isLoading, error, refetch, isFetching } = useEmpresas({
     page,
     pageSize,
     filter: { search, tipo: tipo || undefined },
@@ -82,11 +82,13 @@ export default function EmpresasPage() {
             setTimeout(() => updateParam('q', v), 300)
           }}
           placeholder="Buscar por nombre o NIF…"
+          aria-label="Buscar empresas por nombre o NIF"
           className="w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
         <select
           value={tipo}
           onChange={(e) => updateParam('tipo', e.target.value)}
+          aria-label="Filtrar por tipo de empresa"
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
         >
           <option value="">Todos los tipos</option>
@@ -126,7 +128,21 @@ export default function EmpresasPage() {
               <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Cargando…</td></tr>
             )}
             {error && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-red-600">Error al cargar</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center">
+                  <div className="inline-flex flex-col items-center gap-2 text-red-600">
+                    <span>Error al cargar empresas: {(error as Error).message}</span>
+                    <button
+                      type="button"
+                      onClick={() => refetch()}
+                      disabled={isFetching}
+                      className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {isFetching ? 'Reintentando…' : 'Reintentar'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
             )}
             {!isLoading && data?.data.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Sin resultados</td></tr>
