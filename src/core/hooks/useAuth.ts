@@ -74,6 +74,7 @@ function ensureAuthInitialized() {
 
     if (session?.user && !inFlightProfile) {
       const userId = session.user.id
+      useAuthStore.getState().setProfileLoaded(false)
       inFlightProfile = fetchProfile(userId)
         .then((profile) => {
           if (profile && useAuthStore.getState().session?.user.id === userId) {
@@ -86,8 +87,11 @@ function ensureAuthInitialized() {
           return null
         })
         .finally(() => {
+          useAuthStore.getState().setProfileLoaded(true)
           inFlightProfile = null
         })
+    } else if (!session?.user) {
+      useAuthStore.getState().setProfileLoaded(true)
     }
   })
 
@@ -98,6 +102,7 @@ export function useAuth() {
   const user = useAuthStore((s) => s.user)
   const session = useAuthStore((s) => s.session)
   const loading = useAuthStore((s) => s.loading)
+  const profileLoaded = useAuthStore((s) => s.profileLoaded)
   const logout = useAuthStore((s) => s.logout)
 
   useEffect(() => {
@@ -122,6 +127,7 @@ export function useAuth() {
     user,
     session,
     loading,
+    profileLoaded,
     signIn,
     signOut,
     getCurrentUserProfile: () =>

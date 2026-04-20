@@ -77,6 +77,7 @@ export default function CustomFieldsManager() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CustomFieldSchema | null>(null)
   const [form, setForm] = useState<FieldForm>(emptyForm())
+  const [slugManualmenteEditado, setSlugManualmenteEditado] = useState(false)
 
   const fields = allFields.filter(f => f.entidad_tipo === activeTab)
 
@@ -84,6 +85,7 @@ export default function CustomFieldsManager() {
     const maxOrden = fields.reduce((m, f) => Math.max(m, f.orden), 0)
     setEditing(null)
     setForm({ ...emptyForm(), orden: maxOrden + 10 })
+    setSlugManualmenteEditado(false)
     setDialogOpen(true)
   }
 
@@ -97,6 +99,7 @@ export default function CustomFieldsManager() {
       obligatorio: f.obligatorio,
       orden: f.orden,
     })
+    setSlugManualmenteEditado(true)
     setDialogOpen(true)
   }
 
@@ -292,7 +295,7 @@ export default function CustomFieldsManager() {
                   setForm(f => ({
                     ...f,
                     etiqueta: et,
-                    nombre_campo: f.nombre_campo || slugify(et),
+                    nombre_campo: slugManualmenteEditado ? f.nombre_campo : slugify(et),
                   }))
                 }}
                 placeholder="Ej: Tarifa habitual"
@@ -305,11 +308,14 @@ export default function CustomFieldsManager() {
               <input
                 type="text"
                 value={form.nombre_campo}
-                onChange={e => setForm(f => ({ ...f, nombre_campo: slugify(e.target.value) }))}
+                onChange={e => {
+                  setSlugManualmenteEditado(true)
+                  setForm(f => ({ ...f, nombre_campo: slugify(e.target.value) }))
+                }}
                 placeholder="Ej: tarifa_habitual (auto)"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-valere-blue-medium/30"
               />
-              <p className="mt-0.5 text-[11px] text-slate-400">Sin espacios. Se genera automáticamente.</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">Sin espacios. Se genera automáticamente desde la etiqueta.</p>
             </label>
 
             <label className="block">

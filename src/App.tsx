@@ -32,13 +32,17 @@ function LoadingScreen() {
 }
 
 function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
-  const { user, session, loading } = useAuth()
+  const { user, session, loading, profileLoaded } = useAuth()
   const location = useLocation()
 
   if (loading) return <LoadingScreen />
   if (!session || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
+  // Cuando la ruta depende del rol, esperamos a que el perfil real se haya cargado
+  // (bootstrapFromSession mete role='client' por defecto; sin esta espera un master
+  // sería redirigido en el primer render).
+  if (roles && !profileLoaded) return <LoadingScreen />
   if (roles && (!user.role || !roles.includes(user.role))) {
     return <Navigate to="/dashboard" replace />
   }

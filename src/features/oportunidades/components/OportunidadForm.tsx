@@ -19,12 +19,12 @@ const optNum = z.preprocess(
 const schema = z.object({
   empresa_id: z.string().uuid('Empresa obligatoria'),
   contacto_id: z.string().uuid().or(z.literal('')).transform((v) => v || null),
-  nombre: z.string().min(2, 'MÃ­nimo 2 caracteres'),
+  nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   tipo: z.enum(TIPOS),
   etapa: z.enum(ETAPAS),
   probabilidad_pct: optNum.refine((v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 100), 'Entre 0 y 100'),
-  valor_estimado_eur: optNum.refine((v) => v === null || v >= 0, 'Importe invÃ¡lido'),
-  ahorro_anual_estimado: optNum.refine((v) => v === null || v >= 0, 'Importe invÃ¡lido'),
+  valor_estimado_eur: optNum.refine((v) => v === null || v >= 0, 'Importe inválido'),
+  ahorro_anual_estimado: optNum.refine((v) => v === null || v >= 0, 'Importe inválido'),
   fecha_cierre_prevista: z.string().optional().transform((v) => v || null),
   notas: z.string().optional().transform((v) => v || null),
 })
@@ -132,7 +132,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
             })}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
-            <option value="">â€” Selecciona empresa â€”</option>
+            <option value="">— Selecciona empresa —</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
           {form.formState.errors.empresa_id && (
@@ -146,10 +146,10 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
             disabled={!empresaIdWatched}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
-            <option value="">â€” Sin contacto â€”</option>
+            <option value="">— Sin contacto —</option>
             {contactos.data?.map((c) => {
               const nombre = `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`
-              const cargo = c.cargo ? ` â€” ${c.cargo}` : ''
+              const cargo = c.cargo ? ` — ${c.cargo}` : ''
               const decisor = c.es_decisor ? ' â­' : ''
               return (
                 <option key={c.id} value={c.id}>{`${nombre}${cargo}${decisor}`}</option>
@@ -157,7 +157,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
             })}
           </select>
           {empresaIdWatched && contactos.data && contactos.data.length === 0 && (
-            <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene contactos aÃºn.</span>
+            <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene contactos aún.</span>
           )}
         </label>
         {field('nombre', 'Nombre *')}
@@ -165,9 +165,9 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo *</span>
           <select {...form.register('tipo')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
             <option value="nueva_venta">Nueva venta</option>
-            <option value="renovacion">RenovaciÃ³n</option>
-            <option value="ampliacion">AmpliaciÃ³n</option>
-            <option value="recuperacion">RecuperaciÃ³n</option>
+            <option value="renovacion">Renovación</option>
+            <option value="ampliacion">Ampliación</option>
+            <option value="recuperacion">Recuperación</option>
           </select>
         </label>
         <label className="block">
