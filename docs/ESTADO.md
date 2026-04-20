@@ -1,6 +1,6 @@
 # Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-20 por Claude Code (FASE 28 completa — Eje 1, 2, 3 + hardening)
+> Última actualización: 2026-04-20 (tarde) por Claude Code — FASE 28 completa + re-test Cowork + bugs residuales corregidos
 
 ## Rama de desarrollo
 
@@ -21,6 +21,9 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | `f28d9a3` | FASE 28 Eje 1 — Custom fields (useCustomFields, CustomFieldsPanel, CustomFieldsManager, tab "campos" en empresas y oportunidades) |
 | `abff85a` | FASE 28 Eje 3 — Automatizaciones (oportunidad ganada → borrador contrato; contrato activado → tarea 30d) |
 | `f51bfc8` | Hardening: role gating /admin, focus trap ConfirmDialog, CSP meta tag |
+| `be8585b` | FASE 28.2 fixes post-test: slug custom fields, profileLoaded flag (fix BUG 5 /admin directo), encoding â€" → —, migration SQL con RLS policies + recrear FKs a user_profiles |
+| `2df6d7e` | FASE 28.3: fix automatización ganada→contrato con canonicalEtapa (el form ofrecía dos 'Ganada' y solo disparaba con la canónica), logger con serializeError (elimina [object Object]), +11 tests (17→28) |
+| `29d2eff` | FASE 28.4: eliminar etapas legacy del form de oportunidades; normalizarEtapa() convierte legacy→canónica al cargar |
 
 ## Fases completadas (27/27 + FASE 28)
 
@@ -57,12 +60,42 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 
 | Tarea | Bloqueador | Urgencia |
 |-------|-----------|---------|
+| **Aplicar SQL 20260420_fase28_2_fixes_rls_fks.sql** en Supabase | Requiere SQL Editor del dashboard | Alta — desbloquea empresas/contratos |
+| Re-testear automatización ganada→contrato | Cowork el 2026-04-20 no pudo (drag&drop en viewport 533px); fix aplicado vía onSubmit en 2df6d7e | Alta |
+| Retirar policies duplicadas `cfs_admin/cfv_admin` (conviven con las nuevas `*_authenticated`) | Limpieza | Baja |
 | DROP `clients` + `supply_points` en Supabase | Cowork verifica `facturas.cups_id IS NULL = 0` primero | Baja |
 | Eliminar fallback `supply_points` en `ProposalWithDetails` | Tras DROP confirmado | Baja |
 | Regenerar tipos TypeScript (`supabase gen types`) | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
 | Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` | Media |
 | Secrets Supabase (GEMINI_API_KEY, ALLOWED_ORIGIN) | Acceso al proyecto Supabase | Media |
 | Testar CSP en dev (`npm run dev`) | Si algo falla: aflojar `connect-src` o `script-src` | Baja |
+
+## Re-test Cowork 2026-04-20 (tras aplicar fase28.2 SQL)
+
+| Bloque | Estado |
+|--------|--------|
+| A — Custom fields (crear/editar/guardar/toggle) | ✅ PASA (tras fix RLS adicional: get_user_rol() mapea master/manager → 'admin') |
+| B — Automatización ganada→contrato | ⚠️ Pendiente re-test tras commit 2df6d7e (canonicalEtapa fix) |
+| B — Automatización contrato activo→tarea | ⚠️ Pendiente (depende de B.1) |
+| C — Dashboard badge vista global/personal | ✅ PASA |
+| D — /admin directo URL | ✅ PASA (tras commit be8585b profileLoaded) |
+| D — CSP sin errores en consola | ✅ PASA |
+| Extra — BUG 2 slug autogenera `sector_empresa` | ✅ PASA |
+| Extra — encoding placeholders `—` en lugar de `â€"` | ✅ PASA |
+
+### Fix RLS aplicado por Cowork (PERMANENTE, excelente)
+
+```sql
+-- Hace que master/manager hereden permisos de admin en las 20 policies existentes
+-- sin tocarlas una a una. También beneficia a policies futuras.
+CREATE OR REPLACE FUNCTION public.get_user_rol() RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT CASE
+    WHEN (SELECT role FROM user_profiles WHERE id = auth.uid()) IN ('master', 'manager') THEN 'admin'
+    ELSE (SELECT role FROM user_profiles WHERE id = auth.uid())
+  END;
+$$;
+```
 
 ## Estado de las tablas
 
