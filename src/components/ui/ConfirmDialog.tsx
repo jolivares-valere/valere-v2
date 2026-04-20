@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react'
+﻿import { useEffect, useRef } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 
 type Variant = 'danger' | 'warning' | 'info'
@@ -38,13 +38,37 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const confirmRef = useRef<HTMLButtonElement | null>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
+
   useEffect(() => {
     if (!isOpen) return
+    previouslyFocused.current = document.activeElement as HTMLElement | null
+    confirmRef.current?.focus()
+
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) onCancel()
+      if (e.key === 'Escape' && !submitting) { onCancel(); return }
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector),
+      ).filter((el) => !el.hasAttribute('disabled') && el.tabIndex !== -1)
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
     }
+
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      previouslyFocused.current?.focus?.()
+    }
   }, [isOpen, submitting, onCancel])
 
   if (!isOpen) return null
@@ -57,6 +81,7 @@ export default function ConfirmDialog({
         aria-hidden
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
@@ -90,6 +115,7 @@ export default function ConfirmDialog({
             {cancelLabel}
           </button>
           <button
+            ref={confirmRef}
             type="button"
             onClick={() => void onConfirm()}
             disabled={submitting}

@@ -5,7 +5,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
-const items = [
+type Item = { to: string; label: string; icon: typeof LayoutDashboard; roles?: string[] }
+
+const items: Item[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/empresas', label: 'Empresas', icon: Building2 },
   { to: '/contactos', label: 'Contactos', icon: Users },
@@ -21,11 +23,12 @@ const items = [
   { to: '/analisis', label: 'Análisis', icon: BarChart3 },
   { to: '/propuestas-energia', label: 'Propuestas Energía', icon: Zap },
   { to: '/tracking', label: 'Seguimiento', icon: Send },
-  { to: '/admin', label: 'Admin', icon: ShieldCheck },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck, roles: ['master', 'manager'] },
 ]
 
 export default function Sidebar() {
   const { user, signOut } = useAuth()
+  const visibleItems = items.filter(it => !it.roles || (user?.role && it.roles.includes(user.role)))
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-slate-200 bg-white">
       <div className="px-5 pb-3 pt-6">
@@ -35,7 +38,7 @@ export default function Sidebar() {
         </p>
       </div>
       <nav className="flex-1 space-y-1 px-3">
-        {items.map(({ to, label, icon: Icon }) => (
+        {visibleItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

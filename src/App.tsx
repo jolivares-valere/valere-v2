@@ -31,13 +31,16 @@ function LoadingScreen() {
   )
 }
 
-function AuthGuard({ children }: { children: React.ReactNode }) {
+function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { user, session, loading } = useAuth()
   const location = useLocation()
 
   if (loading) return <LoadingScreen />
   if (!session || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+  if (roles && (!user.role || !roles.includes(user.role))) {
+    return <Navigate to="/dashboard" replace />
   }
   return (
     <AppShell>
@@ -88,7 +91,7 @@ export default function App() {
 
       <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
 
-      <Route path="/admin" element={<AuthGuard><AdminPage /></AuthGuard>} />
+      <Route path="/admin" element={<AuthGuard roles={['master', 'manager']}><AdminPage /></AuthGuard>} />
       <Route path="/datos" element={<AuthGuard><DatosPage /></AuthGuard>} />
       <Route path="/analisis" element={<AuthGuard><AnalisisPage /></AuthGuard>} />
       <Route path="/propuestas-energia" element={<AuthGuard><PropuestasEnergiaPage /></AuthGuard>} />
