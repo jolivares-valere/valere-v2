@@ -135,6 +135,22 @@ BEGIN
 END $$;
 
 -- =====================================================================
+-- PARTE 3 — get_user_rol() mapea master/manager → admin (aplicado por Cowork)
+-- =====================================================================
+-- Razón: ~20 policies existentes usan `get_user_rol() = ANY (ARRAY['admin', ...])`.
+-- Ninguna incluía 'master' ni 'manager'. En vez de parchear las 20 una a una,
+-- hacemos que master/manager hereden los permisos de admin en la función base.
+-- Cualquier policy nueva que use get_user_rol() también se beneficia.
+
+CREATE OR REPLACE FUNCTION public.get_user_rol() RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT CASE
+    WHEN (SELECT role FROM public.user_profiles WHERE id = auth.uid()) IN ('master', 'manager') THEN 'admin'
+    ELSE (SELECT role FROM public.user_profiles WHERE id = auth.uid())
+  END;
+$$;
+
+-- =====================================================================
 -- Forzar reload del schema cache de PostgREST (para que vea los nuevos FK)
 -- =====================================================================
 NOTIFY pgrst, 'reload schema';
