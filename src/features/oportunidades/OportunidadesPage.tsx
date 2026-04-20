@@ -79,9 +79,10 @@ export default function OportunidadesPage() {
 
   const onSubmit = async (values: OportunidadInsert) => {
     if (editing && editing !== 'new') {
-      const prevEtapa = editing.etapa
+      const prevCanonical = canonicalEtapa(editing.etapa)
+      const newCanonical = canonicalEtapa(values.etapa)
       await updateMut.mutateAsync({ id: editing.id, patch: values as Partial<OportunidadInsert> })
-      if (prevEtapa !== 'cerrada_ganada' && values.etapa === 'cerrada_ganada') {
+      if (prevCanonical !== 'cerrada_ganada' && newCanonical === 'cerrada_ganada') {
         dispararAutoContrato({ ...editing, ...values })
       }
     } else {
