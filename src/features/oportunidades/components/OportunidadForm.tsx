@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../core/supabase/client'
 import { useContactosPorEmpresa } from '../../contactos/api'
+import CustomFieldsPanel from '../../../core/components/CustomFieldsPanel'
 import type { Oportunidad, OportunidadInsert } from '../../../core/types/entities'
 
 const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
@@ -206,9 +207,15 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
           <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
         )}
         <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
-          {submitting ? 'Guardandoâ€¦' : 'Guardar'}
+          {submitting ? 'Guardando…' : 'Guardar'}
         </button>
       </div>
+
+      {defaultValues?.id && (
+        <div className="border-t border-slate-100 pt-4">
+          <CustomFieldsPanel entidad_tipo="oportunidad" entidad_id={defaultValues.id} />
+        </div>
+      )}
     </form>
   )
 }

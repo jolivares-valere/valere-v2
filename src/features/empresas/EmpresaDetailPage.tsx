@@ -9,9 +9,10 @@ import { useContactosPorEmpresa, useCreateContacto } from '../contactos/api'
 import ContactoForm from '../contactos/components/ContactoForm'
 import { formatDate } from '../../core/utils/dates'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import CustomFieldsPanel from '../../core/components/CustomFieldsPanel'
 import type { EmpresaUpdate, ContactoInsert } from '../../core/types/entities'
 
-type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' | 'propuestas'
+type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos'
 
 export default function EmpresaDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -89,6 +90,7 @@ export default function EmpresaDetailPage() {
                 )}
                 {tab === 'contactos' && <ContactosSection empresaId={empresa.id} />}
                 {tab === 'documentos' && <DocumentosTab entidadTipo="empresa" entidadId={empresa.id} />}
+                {tab === 'campos' && <CustomFieldsPanel entidad_tipo="empresa" entidad_id={empresa.id} />}
                 {(tab === 'contratos' || tab === 'propuestas') && (
                   <p className="text-sm text-slate-500">
                     Sección "{tab}" — próximas iteraciones.
@@ -125,7 +127,7 @@ export default function EmpresaDetailPage() {
 }
 
 function TabsNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const tabs: Tab[] = ['resumen', 'contactos', 'contratos', 'actividades', 'documentos', 'propuestas']
+  const tabs: Tab[] = ['resumen', 'contactos', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos']
   return (
     <div className="mb-4 flex gap-1 border-b border-slate-200">
       {tabs.map((t) => (
