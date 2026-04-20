@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom'
-import { Building2, FileText, Clock, AlertTriangle, TrendingUp, Percent, Timer, ChevronRight, Flame } from 'lucide-react'
+import { Building2, FileText, Clock, AlertTriangle, TrendingUp, Percent, Timer, ChevronRight, Flame, User, Users } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 import {
   useDashboardKPIs,
@@ -9,6 +9,7 @@ import {
   useKPIsAvanzados,
   useAlertasVencimiento,
   useOportunidadesEstancadas,
+  useDashboardScope,
   type AlertaVencimiento,
   type OportunidadEstancada,
 } from './api'
@@ -43,14 +44,16 @@ function colorDias(dias: number): string {
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const kpis = useDashboardKPIs()
-  const kpisAv = useKPIsAvanzados()
-  const huerfanos = useContratosHuerfanos()
+  const scope = useDashboardScope()
+  const scopeId = scope.pending ? undefined : scope.comercialId
+  const kpis = useDashboardKPIs(scopeId)
+  const kpisAv = useKPIsAvanzados(scopeId)
+  const huerfanos = useContratosHuerfanos(scopeId)
   const tareas = useMisTareas(user?.id)
-  const opKPI = useOportunidadesKPI()
-  const alertasVenc = useAlertasVencimiento()
-  const opEstancadas = useOportunidadesEstancadas()
-  const resumenVenc = useResumenVencimientos()
+  const opKPI = useOportunidadesKPI(scopeId)
+  const alertasVenc = useAlertasVencimiento(scopeId)
+  const opEstancadas = useOportunidadesEstancadas(scopeId)
+  const resumenVenc = useResumenVencimientos(scopeId ?? null)
 
   const totalOps = opKPI.data?.reduce((s, r) => s + r.count, 0) ?? 0
   const totalValor = opKPI.data?.reduce((s, r) => s + r.valor_total, 0) ?? 0
@@ -58,9 +61,24 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Hola, {user?.full_name ?? 'equipo'}</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500">Hola, {user?.full_name ?? 'equipo'}</p>
+        </div>
+        {!scope.pending && (
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+              scope.viewAll
+                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200'
+            }`}
+            title={scope.viewAll ? 'Ves los datos de todo el equipo' : 'Ves solo tus propios datos'}
+          >
+            {scope.viewAll ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+            {scope.viewAll ? 'Vista global' : 'Vista personal'}
+          </span>
+        )}
       </div>
 
       {/* Tira de alertas de vencimiento */}

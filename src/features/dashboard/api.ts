@@ -2,6 +2,31 @@
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 import type { Actividad } from '../../core/types/entities'
+import { useAuth } from '../../core/hooks/useAuth'
+
+/**
+ * Ámbito del dashboard según el rol del usuario autenticado.
+ *   - master/manager → vista global (comercialId=undefined, todos los registros).
+ *   - resto (client, sin rol)  → vista personal (filtra por comercial_id = user.id).
+ *
+ * Si `loading` es true, scope queda `pending` y los hooks esperan (enabled=false).
+ */
+export interface DashboardScope {
+  viewAll: boolean
+  comercialId: string | undefined
+  pending: boolean
+}
+
+export function useDashboardScope(): DashboardScope {
+  const { user, loading } = useAuth()
+  if (loading) return { viewAll: false, comercialId: undefined, pending: true }
+  const viewAll = user?.role === 'master' || user?.role === 'manager'
+  return {
+    viewAll,
+    comercialId: viewAll ? undefined : user?.id,
+    pending: false,
+  }
+}
 
 export interface DashboardKPIs {
   empresas_activas: number
@@ -10,20 +35,28 @@ export interface DashboardKPIs {
   vencen_60d: number
 }
 
-export function useDashboardKPIs() {
+export function useDashboardKPIs(comercialId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'kpis'],
+    queryKey: ['dashboard', 'kpis', comercialId ?? null],
     queryFn: async (): Promise<DashboardKPIs> => {
       const hoy = new Date()
       const in30 = new Date(hoy.getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
       const in60 = new Date(hoy.getTime() + 60 * 86_400_000).toISOString().slice(0, 10)
       const hoyISO = hoy.toISOString().slice(0, 10)
-      const [empresas, contratos, v30, v60] = await Promise.all([
-        supabase.from('empresas').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-        supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null),
-        supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null).gte('fecha_fin', hoyISO).lte('fecha_fin', in30),
-        supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null).gte('fecha_fin', hoyISO).lte('fecha_fin', in60),
-      ])
+
+      let empresasQ = supabase.from('empresas').select('id', { count: 'exact', head: true }).is('deleted_at', null)
+      if (comercialId) empresasQ = empresasQ.eq('comercial_id', comercialId)
+
+      let contratosQ = supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null)
+      if (comercialId) contratosQ = contratosQ.eq('comercial_id', comercialId)
+
+      let v30Q = supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null).gte('fecha_fin', hoyISO).lte('fecha_fin', in30)
+      if (comercialId) v30Q = v30Q.eq('comercial_id', comercialId)
+
+      let v60Q = supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null).gte('fecha_fin', hoyISO).lte('fecha_fin', in60)
+      if (comercialId) v60Q = v60Q.eq('comercial_id', comercialId)
+
+      const [empresas, contratos, v30, v60] = await Promise.all([empresasQ, contratosQ, v30Q, v60Q])
       if (empresas.error) logError(empresas.error, 'kpis.empresas')
       if (contratos.error) logError(contratos.error, 'kpis.contratos')
       return {
@@ -45,9 +78,9 @@ export interface KPIsAvanzados {
   perdidas_6m: number
 }
 
-export function useKPIsAvanzados() {
+export function useKPIsAvanzados(comercialId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'kpis-avanzados'],
+    queryKey: ['dashboard', 'kpis-avanzados', comercialId ?? null],
     queryFn: async (): Promise<KPIsAvanzados> => {
       const hoy = new Date()
       const hoyISO = hoy.toISOString().slice(0, 10)
@@ -55,20 +88,31 @@ export function useKPIsAvanzados() {
       const hace30 = new Date(hoy.getTime() - 30 * 86_400_000).toISOString()
       const hace180 = new Date(hoy.getTime() - 180 * 86_400_000).toISOString()
 
+      let v90Q = supabase.from('contratos').select('id', { count: 'exact', head: true })
+        .eq('estado', 'activo').is('deleted_at', null)
+        .gte('fecha_fin', hoyISO).lte('fecha_fin', in90)
+      if (comercialId) v90Q = v90Q.eq('comercial_id', comercialId)
+
+      let incidenciaQ = supabase.from('contratos').select('id', { count: 'exact', head: true })
+        .eq('estado', 'incidencia').is('deleted_at', null)
+      if (comercialId) incidenciaQ = incidenciaQ.eq('comercial_id', comercialId)
+
+      let estancadasQ = supabase.from('oportunidades').select('id', { count: 'exact', head: true })
+        .is('deleted_at', null)
+        .not('etapa', 'in', '(ganada,perdida,cancelada)')
+        .lt('updated_at', hace30)
+      if (comercialId) estancadasQ = estancadasQ.eq('comercial_id', comercialId)
+
+      let ganadasQ = supabase.from('oportunidades').select('id', { count: 'exact', head: true })
+        .is('deleted_at', null).eq('etapa', 'ganada').gte('updated_at', hace180)
+      if (comercialId) ganadasQ = ganadasQ.eq('comercial_id', comercialId)
+
+      let perdidasQ = supabase.from('oportunidades').select('id', { count: 'exact', head: true })
+        .is('deleted_at', null).eq('etapa', 'perdida').gte('updated_at', hace180)
+      if (comercialId) perdidasQ = perdidasQ.eq('comercial_id', comercialId)
+
       const [v90, incidencia, estancadas, ganadas, perdidas] = await Promise.all([
-        supabase.from('contratos').select('id', { count: 'exact', head: true })
-          .eq('estado', 'activo').is('deleted_at', null)
-          .gte('fecha_fin', hoyISO).lte('fecha_fin', in90),
-        supabase.from('contratos').select('id', { count: 'exact', head: true })
-          .eq('estado', 'incidencia').is('deleted_at', null),
-        supabase.from('oportunidades').select('id', { count: 'exact', head: true })
-          .is('deleted_at', null)
-          .not('etapa', 'in', '(ganada,perdida,cancelada)')
-          .lt('updated_at', hace30),
-        supabase.from('oportunidades').select('id', { count: 'exact', head: true })
-          .is('deleted_at', null).eq('etapa', 'ganada').gte('updated_at', hace180),
-        supabase.from('oportunidades').select('id', { count: 'exact', head: true })
-          .is('deleted_at', null).eq('etapa', 'perdida').gte('updated_at', hace180),
+        v90Q, incidenciaQ, estancadasQ, ganadasQ, perdidasQ,
       ])
       if (v90.error) logError(v90.error, 'kpis-avanzados.v90')
       if (incidencia.error) logError(incidencia.error, 'kpis-avanzados.incidencia')
@@ -97,15 +141,17 @@ export interface OportunidadKPI {
   valor_total: number
 }
 
-export function useOportunidadesKPI() {
+export function useOportunidadesKPI(comercialId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'oportunidades-kpi'],
+    queryKey: ['dashboard', 'oportunidades-kpi', comercialId ?? null],
     queryFn: async (): Promise<OportunidadKPI[]> => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('oportunidades')
         .select('etapa, valor_estimado_eur')
         .is('deleted_at', null)
         .not('etapa', 'in', '(ganada,perdida)')
+      if (comercialId) q = q.eq('comercial_id', comercialId)
+      const { data, error } = await q
       if (error) { logError(error, 'useOportunidadesKPI'); throw error }
       const byEtapa: Record<string, OportunidadKPI> = {}
       for (const row of data ?? []) {
@@ -129,15 +175,17 @@ export interface ContratoHuerfano {
   prioridad_renovacion: string
 }
 
-export function useContratosHuerfanos() {
+export function useContratosHuerfanos(comercialId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'huerfanos'],
+    queryKey: ['dashboard', 'huerfanos', comercialId ?? null],
     queryFn: async (): Promise<ContratoHuerfano[]> => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('v_oportunidades_huerfanas')
-        .select('id, numero_contrato, empresa_nombre, fecha_fin, dias_para_vencimiento, prioridad_renovacion')
+        .select('id, numero_contrato, empresa_nombre, fecha_fin, dias_para_vencimiento, prioridad_renovacion, comercial_id')
         .order('fecha_fin', { ascending: true })
         .limit(20)
+      if (comercialId) q = q.eq('comercial_id', comercialId)
+      const { data, error } = await q
       if (error) { logError(error, 'useContratosHuerfanos'); throw error }
       return (data ?? []) as unknown as ContratoHuerfano[]
     },
@@ -152,14 +200,14 @@ export interface AlertaVencimiento {
   dias_restantes: number
 }
 
-export function useAlertasVencimiento() {
+export function useAlertasVencimiento(comercialId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'alertas-vencimiento'],
+    queryKey: ['dashboard', 'alertas-vencimiento', comercialId ?? null],
     queryFn: async (): Promise<AlertaVencimiento[]> => {
       const hoy = new Date()
       const hoyISO = hoy.toISOString().slice(0, 10)
       const in90 = new Date(hoy.getTime() + 90 * 86_400_000).toISOString().slice(0, 10)
-      const { data, error } = await supabase
+      let q = supabase
         .from('contratos')
         .select('id, compania, fecha_fin, empresa:empresas!contratos_empresa_id_fkey(nombre)')
         .eq('estado', 'activo')
@@ -168,6 +216,8 @@ export function useAlertasVencimiento() {
         .lte('fecha_fin', in90)
         .order('fecha_fin', { ascending: true })
         .limit(20)
+      if (comercialId) q = q.eq('comercial_id', comercialId)
+      const { data, error } = await q
       if (error) { logError(error, 'useAlertasVencimiento'); throw error }
       const today = hoy.getTime()
       return (data ?? []).map((r) => {
@@ -195,13 +245,13 @@ export interface OportunidadEstancada {
   updated_at: string
 }
 
-export function useOportunidadesEstancadas() {
+export function useOportunidadesEstancadas(comercialId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'oportunidades-estancadas'],
+    queryKey: ['dashboard', 'oportunidades-estancadas', comercialId ?? null],
     queryFn: async (): Promise<OportunidadEstancada[]> => {
       const hoy = new Date()
       const hace30 = new Date(hoy.getTime() - 30 * 86_400_000).toISOString()
-      const { data, error } = await supabase
+      let q = supabase
         .from('oportunidades')
         .select('id, nombre, etapa, updated_at, empresa:empresas(nombre)')
         .is('deleted_at', null)
@@ -209,6 +259,8 @@ export function useOportunidadesEstancadas() {
         .lt('updated_at', hace30)
         .order('updated_at', { ascending: true })
         .limit(20)
+      if (comercialId) q = q.eq('comercial_id', comercialId)
+      const { data, error } = await q
       if (error) { logError(error, 'useOportunidadesEstancadas'); throw error }
       const today = hoy.getTime()
       return (data ?? []).map((r) => {
