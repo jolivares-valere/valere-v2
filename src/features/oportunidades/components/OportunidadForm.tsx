@@ -11,6 +11,22 @@ import type { Oportunidad, OportunidadInsert } from '../../../core/types/entitie
 const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
 const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida', 'cancelada', 'auditoria_consumo', 'oferta_presentada', 'contrato_firmado', 'activo', 'cerrada_ganada', 'cerrada_perdida'] as const
 
+// Mapeo de etapas legacy → canónica. Al cargar una oportunidad con etapa
+// legacy, el form la normaliza para que al guardar se quede en canónica.
+const LEGACY_TO_CANONICAL: Record<string, typeof ETAPAS[number]> = {
+  contactado: 'auditoria_consumo',
+  analisis: 'auditoria_consumo',
+  propuesta_enviada: 'oferta_presentada',
+  ganada: 'cerrada_ganada',
+  perdida: 'cerrada_perdida',
+  cancelada: 'cerrada_perdida',
+}
+
+function normalizarEtapa(e: string | undefined | null): typeof ETAPAS[number] {
+  if (!e) return 'prospecto'
+  return LEGACY_TO_CANONICAL[e] ?? (e as typeof ETAPAS[number])
+}
+
 const optNum = z.preprocess(
   (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
   z.number().nullable(),
@@ -55,7 +71,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       contacto_id: defaultValues?.contacto_id ?? '',
       nombre: defaultValues?.nombre ?? '',
       tipo: defaultValues?.tipo ?? 'nueva_venta',
-      etapa: defaultValues?.etapa ?? 'prospecto',
+      etapa: normalizarEtapa(defaultValues?.etapa),
       probabilidad_pct: defaultValues?.probabilidad_pct?.toString() ?? '',
       valor_estimado_eur: defaultValues?.valor_estimado_eur?.toString() ?? '',
       ahorro_anual_estimado: defaultValues?.ahorro_anual_estimado?.toString() ?? '',
@@ -173,24 +189,14 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Etapa *</span>
           <select {...form.register('etapa')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-            <optgroup label="Pipeline energético">
-              <option value="prospecto">Prospecto</option>
-              <option value="auditoria_consumo">Auditoría consumo</option>
-              <option value="oferta_presentada">Oferta presentada</option>
-              <option value="negociacion">Negociación</option>
-              <option value="contrato_firmado">Contrato firmado</option>
-              <option value="activo">Activo</option>
-              <option value="cerrada_ganada">Ganada</option>
-              <option value="cerrada_perdida">Perdida</option>
-            </optgroup>
-            <optgroup label="Legacy">
-              <option value="contactado">Contactado</option>
-              <option value="analisis">Análisis</option>
-              <option value="propuesta_enviada">Propuesta enviada</option>
-              <option value="ganada">Ganada (legacy)</option>
-              <option value="perdida">Perdida (legacy)</option>
-              <option value="cancelada">Cancelada</option>
-            </optgroup>
+            <option value="prospecto">Prospecto</option>
+            <option value="auditoria_consumo">Auditoría consumo</option>
+            <option value="oferta_presentada">Oferta presentada</option>
+            <option value="negociacion">Negociación</option>
+            <option value="contrato_firmado">Contrato firmado</option>
+            <option value="activo">Activo</option>
+            <option value="cerrada_ganada">Ganada</option>
+            <option value="cerrada_perdida">Perdida</option>
           </select>
         </label>
         {field('probabilidad_pct', 'Probabilidad (%)', 'number')}
