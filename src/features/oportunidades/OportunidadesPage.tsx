@@ -8,6 +8,7 @@ import KanbanColumn from './components/KanbanColumn'
 import OportunidadForm from './components/OportunidadForm'
 import ExportButton from '../../core/components/ExportButton'
 import { formatDate } from '../../core/utils/dates'
+import { useCrearContratoDesdeOportunidad } from '../../core/hooks/useAutomatizaciones'
 import type { EtapaOportunidad, OportunidadInsert } from '../../core/types/entities'
 
 // FASE 21.a — Pipeline con etapas energéticas reales + probabilidades.
@@ -43,8 +44,19 @@ export default function OportunidadesPage() {
   const updateEtapa = useUpdateEtapa()
   const createMut = useCreateOportunidad()
   const updateMut = useUpdateOportunidad()
+  const crearContrato = useCrearContratoDesdeOportunidad()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [editing, setEditing] = useState<EditingState>(null)
+
+  const dispararAutoContrato = (op: OportunidadConEmpresa) => {
+    crearContrato.mutate({
+      id: op.id,
+      nombre: op.nombre,
+      empresa_id: op.empresa_id,
+      comercial_id: op.comercial_id ?? null,
+      empresa: op.empresa ?? null,
+    })
+  }
 
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
@@ -55,12 +67,23 @@ export default function OportunidadesPage() {
     if (!columna) return
     const current = data?.find((o) => o.id === id)
     if (!current || canonicalEtapa(current.etapa) === etapa) return
-    updateEtapa.mutate({ id, etapa, probabilidad: columna.probabilidad })
+    updateEtapa.mutate(
+      { id, etapa, probabilidad: columna.probabilidad },
+      {
+        onSuccess: () => {
+          if (etapa === 'cerrada_ganada') dispararAutoContrato(current)
+        },
+      },
+    )
   }
 
   const onSubmit = async (values: OportunidadInsert) => {
     if (editing && editing !== 'new') {
+      const prevEtapa = editing.etapa
       await updateMut.mutateAsync({ id: editing.id, patch: values as Partial<OportunidadInsert> })
+      if (prevEtapa !== 'cerrada_ganada' && values.etapa === 'cerrada_ganada') {
+        dispararAutoContrato({ ...editing, ...values })
+      }
     } else {
       await createMut.mutateAsync(values)
     }

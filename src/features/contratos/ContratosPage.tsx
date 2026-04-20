@@ -10,6 +10,7 @@ import {
   useContratosPorVencer,
   useResumenVencimientos,
 } from './api'
+import { useCrearTareaDesdeContrato } from '../../core/hooks/useAutomatizaciones'
 import ContratoForm from './components/ContratoForm'
 import PrioridadBadge from './components/PrioridadBadge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -32,6 +33,7 @@ export default function ContratosPage() {
   const createMut = useCreateContrato()
   const updateMut = useUpdateContrato()
   const deleteMut = useDeleteContrato()
+  const crearTarea = useCrearTareaDesdeContrato()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -44,7 +46,17 @@ export default function ContratosPage() {
 
   const onSubmit = async (values: ContratoInsert) => {
     if (editing && editing !== 'new') {
+      const prevEstado = editing.estado
       await updateMut.mutateAsync({ id: editing.id, patch: values })
+      if (prevEstado !== 'activo' && values.estado === 'activo') {
+        crearTarea.mutate({
+          id: editing.id,
+          compania: values.compania,
+          empresa_id: values.empresa_id,
+          comercial_id: values.comercial_id ?? null,
+          empresa: editing.empresa ?? null,
+        })
+      }
     } else {
       await createMut.mutateAsync(values)
     }
