@@ -1,6 +1,105 @@
 # Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-19 por Cowork (bucket documentos + FASE 28.1 decidida)
+> Última actualización: 2026-04-20 por Claude Code (FASE 28 completa — Eje 1, 2, 3 + hardening)
+
+## Rama de desarrollo
+
+`claude/valere-crm-architecture-2vvEV` — PR #1 abierto → main.
+
+## Resumen ejecutivo
+
+CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). **27 fases del roadmap completadas + FASE 28 completada (3 ejes)**. TSC 0 errores · 17/17 tests · build OK.
+
+**Audit completo 2026-04-19:** 0 P0 pendientes · 0 P1 pendientes. Consolidado en `docs/AUDIT_2026-04-19.md`.
+
+## Commits FASE 28 (esta sesión 2026-04-20)
+
+| Commit | Qué hace |
+|--------|----------|
+| `a29ac79` | FASE 28.1 — Refactor 4 features Calculadora → cups/empresas/facturas (adapter pattern) |
+| `4aaf82f` | FASE 28 Eje 2 — Dashboards por rol (useDashboardScope + badge visual) |
+| `f28d9a3` | FASE 28 Eje 1 — Custom fields (useCustomFields, CustomFieldsPanel, CustomFieldsManager, tab "campos" en empresas y oportunidades) |
+| `abff85a` | FASE 28 Eje 3 — Automatizaciones (oportunidad ganada → borrador contrato; contrato activado → tarea 30d) |
+| `f51bfc8` | Hardening: role gating /admin, focus trap ConfirmDialog, CSP meta tag |
+
+## Fases completadas (27/27 + FASE 28)
+
+*(FASE 20–27 igual que antes)*
+
+### FASE 28 — Personalización ✅
+
+| Eje | Descripción | Estado |
+|-----|-------------|--------|
+| **28.1** | Refactor 4 features Calculadora → `cups/empresas/facturas` | ✅ |
+| **Eje 2** | Dashboards por rol: `useDashboardScope` filtra por `comercial_id`; master/manager ven todo; badge visual en header | ✅ |
+| **Eje 1** | Custom fields: admin define campos por entidad (empresa/oportunidad/contacto/contrato); comerciales rellenan en la ficha | ✅ |
+| **Eje 3** | Automatizaciones: oportunidad `cerrada_ganada` → auto-borrador contrato; contrato `activo` → auto-tarea seguimiento 30d | ✅ |
+
+## Hardening aplicado (2026-04-20)
+
+| Mejora | Archivo | Estado |
+|--------|---------|--------|
+| Role gating `/admin` — solo `master`/`manager` | `App.tsx`, `Sidebar.tsx` | ✅ |
+| Focus trap en ConfirmDialog (Tab cíclico, restore foco) | `ConfirmDialog.tsx` | ✅ |
+| CSP meta tag (default-src 'self', Supabase WSS, Fonts, Gemini) | `index.html` | ✅ |
+
+## Archivos clave nuevos (FASE 28)
+
+| Archivo | Propósito |
+|---------|-----------|
+| `src/core/hooks/useCustomFields.ts` | CRUD hooks para custom_fields_schema + values |
+| `src/core/hooks/useAutomatizaciones.ts` | useCrearContratoDesdeOportunidad + useCrearTareaDesdeContrato |
+| `src/core/components/CustomFieldsPanel.tsx` | Render/edit genérico para valores de campos personalizados |
+| `src/features/admin/components/CustomFieldsManager.tsx` | UI admin para definir campos personalizados por entidad |
+| `src/core/energia/adapters.ts` | cupsToSupplyPoint, supplyPointFormToCupsPayload, empresaToClient |
+
+## Pendientes (NO bloqueantes)
+
+| Tarea | Bloqueador | Urgencia |
+|-------|-----------|---------|
+| DROP `clients` + `supply_points` en Supabase | Cowork verifica `facturas.cups_id IS NULL = 0` primero | Baja |
+| Eliminar fallback `supply_points` en `ProposalWithDetails` | Tras DROP confirmado | Baja |
+| Regenerar tipos TypeScript (`supabase gen types`) | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
+| Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` | Media |
+| Secrets Supabase (GEMINI_API_KEY, ALLOWED_ORIGIN) | Acceso al proyecto Supabase | Media |
+| Testar CSP en dev (`npm run dev`) | Si algo falla: aflojar `connect-src` o `script-src` | Baja |
+
+## Estado de las tablas
+
+| Tabla | Estado | Notas |
+|-------|--------|-------|
+| `user_profiles` | ✅ activa | Canónica |
+| `empresas` | ✅ activa | |
+| `cups` | ✅ activa | |
+| `facturas` | ✅ activa | Renombrada de invoice_history |
+| `clients` | ⚠️ legacy | DROP pendiente de confirmación Cowork |
+| `supply_points` | ⚠️ legacy | DROP pendiente de confirmación Cowork |
+| `custom_fields_schema` | ✅ activa | UI implementada en admin |
+| `custom_fields_values` | ✅ activa | UI implementada en fichas |
+| `contratos` | ✅ activa | |
+| `oportunidades` | ✅ activa | |
+| `incidencias` | ✅ activa | |
+| `renovaciones` | ✅ activa | |
+| `actividades` | ✅ activa | |
+| `documentos` (tabla + bucket) | ✅ activa | |
+| `eventos` | ✅ activa | |
+
+## Cómo arrancar una nueva sesión
+
+### Claude Code (CLI/Desktop)
+```bash
+cd ~/valere-v2 && claude -c
+```
+
+### Claude Cowork (Web — claude.ai/code)
+```
+Trabajas en valere-v2, rama claude/valere-crm-architecture-2vvEV.
+git pull origin claude/valere-crm-architecture-2vvEV
+cat CLAUDE.md docs/ESTADO.md
+ls .cowork/outbox/ .cowork/inbox/
+git log --oneline -10
+```
+
 
 ## Rama de desarrollo
 
