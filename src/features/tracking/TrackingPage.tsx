@@ -25,9 +25,9 @@ export default function Tracking() {
   const [search, setSearch] = useState('');
 
   const clienteOf = (p: ProposalWithDetails) =>
-    p.cups_rel?.empresas?.nombre || p.supply_points?.clients?.company_name || '';
+    p.cups_rel?.empresas?.nombre || '';
   const cupsOf = (p: ProposalWithDetails) =>
-    p.cups_rel?.codigo_cups || p.supply_points?.cups || '';
+    p.cups_rel?.codigo_cups || '';
 
   const filtered = proposals.filter(p => {
     const name = clienteOf(p);

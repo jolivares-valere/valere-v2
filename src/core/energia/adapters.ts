@@ -1,5 +1,5 @@
-import type { Cups, CupsInsert, Empresa } from '@/core/types/entities'
-import type { SupplyPoint, Powers, Client } from '@/types/database'
+import type { Cups, CupsInsert } from '@/core/types/entities'
+import type { SupplyPoint, Powers } from '@/types/database'
 
 const EMPTY_POWERS: Powers = { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0 }
 
@@ -55,24 +55,6 @@ export function supplyPointFormToCupsPayload(
     energia_p4_kwh: sp.e4_kwh ?? null,
     energia_p5_kwh: sp.e5_kwh ?? null,
     energia_p6_kwh: sp.e6_kwh ?? null,
-  }
-}
-
-export function empresaToClient(e: Empresa): Client {
-  return {
-    id: e.id,
-    company_name: e.nombre,
-    nif: e.nif ?? '',
-    fiscal_address: e.direccion ?? '',
-    contact_person: '',
-    contact_email: e.email_principal ?? '',
-    contact_phone: e.telefono_principal ?? '',
-    fiscal_city: e.ciudad ?? '',
-    fiscal_zip: e.cp ?? '',
-    fiscal_province: e.provincia ?? '',
-    notes: e.notas ?? '',
-    consultor_asignado: e.comercial_id ?? '',
-    created_at: e.created_at,
   }
 }
 

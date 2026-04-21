@@ -158,18 +158,7 @@ export interface UserProfile {
 // JOINED / VIEW TYPES (for queries with relations)
 // ============================================================
 
-export interface SupplyPointWithClient extends SupplyPoint {
-  clients: Pick<Client, 'company_name'>;
-}
-
 export interface ProposalWithDetails extends Proposal {
-  supply_points?: {
-    cups: string;
-    alias?: string;
-    clients: {
-      company_name: string;
-    };
-  };
   cups_rel?: {
     codigo_cups: string;
     empresas: {

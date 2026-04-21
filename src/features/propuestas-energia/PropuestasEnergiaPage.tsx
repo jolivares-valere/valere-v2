@@ -34,9 +34,9 @@ export default function Proposals() {
   const [toDelete, setToDelete] = useState<ProposalWithDetails | null>(null);
 
   const clienteOf = (p: ProposalWithDetails) =>
-    p.cups_rel?.empresas?.nombre || p.supply_points?.clients?.company_name || '';
+    p.cups_rel?.empresas?.nombre || '';
   const cupsOf = (p: ProposalWithDetails) =>
-    p.cups_rel?.codigo_cups || p.supply_points?.cups || '';
+    p.cups_rel?.codigo_cups || '';
 
   const filtered = proposals.filter(p => {
     const name = clienteOf(p);
@@ -280,7 +280,7 @@ export default function Proposals() {
       <ConfirmDialog
         isOpen={!!toDelete}
         title="Eliminar propuesta"
-        message={toDelete ? `¿Eliminar la propuesta para ${toDelete.cups_rel?.empresas?.nombre ?? toDelete.supply_points?.clients?.company_name ?? 'este cliente'}? No se podrá recuperar.` : ''}
+        message={toDelete ? `¿Eliminar la propuesta para ${toDelete.cups_rel?.empresas?.nombre ?? 'este cliente'}? No se podrá recuperar.` : ''}
         confirmLabel="Eliminar"
         variant="danger"
         onConfirm={confirmDelete}
