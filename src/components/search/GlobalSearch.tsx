@@ -75,7 +75,7 @@ export default function GlobalSearch() {
           onFocus={() => setOpen(true)}
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           placeholder="Buscar empresas, contactos, contratos, oportunidades…"
-          className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm focus:border-slate-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm focus:border-slate-500 focus:outline-none"
         />
         {query && (
           <button type="button" onClick={() => { setQuery(''); setOpen(false) }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100" aria-label="Limpiar">
@@ -84,7 +84,7 @@ export default function GlobalSearch() {
         )}
       </div>
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
           {isFetching && <p className="p-4 text-xs text-slate-500">Buscando…</p>}
           {!isFetching && total === 0 && <p className="p-4 text-xs text-slate-500">Sin resultados para "{trimmed}"</p>}
           {!isFetching && total > 0 && data && (

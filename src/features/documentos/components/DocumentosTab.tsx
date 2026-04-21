@@ -57,7 +57,7 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900">Documentos</h3>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800">
           <Upload className="h-3.5 w-3.5" />
           {uploadMut.isPending ? 'Subiendo…' : 'Subir archivo'}
           <input
@@ -77,7 +77,7 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
           ))}
         </div>
       ) : !docs?.length ? (
-        <div className="rounded-md border border-dashed border-slate-300 p-6 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
           <FileText className="mx-auto mb-2 h-8 w-8 text-slate-300" />
           <p className="text-xs text-slate-500">Sin documentos adjuntos</p>
         </div>

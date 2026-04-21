@@ -49,7 +49,7 @@ export default function ExportButton<T>({ filename, fetchRows, columns }: Props<
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
       Exportar CSV

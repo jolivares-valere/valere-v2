@@ -43,7 +43,7 @@ export default function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+              `flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${
                 isActive
                   ? 'bg-slate-900 text-white'
                   : 'text-slate-700 hover:bg-slate-100'
@@ -59,7 +59,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-100"
+          className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-100"
         >
           Cerrar sesión
         </button>

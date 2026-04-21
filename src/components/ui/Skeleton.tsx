@@ -10,7 +10,7 @@ export default function Skeleton({ className = '', variant = 'rect', width, heig
   const shape =
     variant === 'circle' ? 'rounded-full' :
     variant === 'line' ? 'rounded h-3' :
-    'rounded-md'
+    'rounded-xl'
   const style: React.CSSProperties = {}
   if (width !== undefined) style.width = typeof width === 'number' ? `${width}px` : width
   if (height !== undefined) style.height = typeof height === 'number' ? `${height}px` : height
