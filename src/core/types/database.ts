@@ -133,54 +133,6 @@ export type Database = {
         }
         Relationships: []
       }
-      clients: {
-        Row: {
-          company_name: string
-          consultor_asignado: string | null
-          contact_email: string | null
-          contact_person: string | null
-          contact_phone: string | null
-          created_at: string | null
-          fiscal_address: string | null
-          fiscal_city: string | null
-          fiscal_province: string | null
-          fiscal_zip: string | null
-          id: string
-          nif: string | null
-          notes: string | null
-        }
-        Insert: {
-          company_name: string
-          consultor_asignado?: string | null
-          contact_email?: string | null
-          contact_person?: string | null
-          contact_phone?: string | null
-          created_at?: string | null
-          fiscal_address?: string | null
-          fiscal_city?: string | null
-          fiscal_province?: string | null
-          fiscal_zip?: string | null
-          id?: string
-          nif?: string | null
-          notes?: string | null
-        }
-        Update: {
-          company_name?: string
-          consultor_asignado?: string | null
-          contact_email?: string | null
-          contact_person?: string | null
-          contact_phone?: string | null
-          created_at?: string | null
-          fiscal_address?: string | null
-          fiscal_city?: string | null
-          fiscal_province?: string | null
-          fiscal_zip?: string | null
-          id?: string
-          nif?: string | null
-          notes?: string | null
-        }
-        Relationships: []
-      }
       contactos: {
         Row: {
           apellidos: string | null
@@ -920,13 +872,6 @@ export type Database = {
             referencedRelation: "cups"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "invoice_history_supply_point_id_fkey"
-            columns: ["supply_point_id"]
-            isOneToOne: false
-            referencedRelation: "supply_points"
-            referencedColumns: ["id"]
-          },
         ]
       }
       global_config: {
@@ -1337,13 +1282,6 @@ export type Database = {
             referencedRelation: "cups"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "proposals_supply_point_id_fkey"
-            columns: ["supply_point_id"]
-            isOneToOne: false
-            referencedRelation: "supply_points"
-            referencedColumns: ["id"]
-          },
         ]
       }
       propuestas: {
@@ -1679,89 +1617,6 @@ export type Database = {
           notes?: string | null
         }
         Relationships: []
-      }
-      supply_points: {
-        Row: {
-          autoconsumption_model: string | null
-          client_id: string | null
-          created_at: string | null
-          cups: string
-          current_retailer: string | null
-          e1_kwh: number | null
-          e2_kwh: number | null
-          e3_kwh: number | null
-          e4_kwh: number | null
-          e5_kwh: number | null
-          e6_kwh: number | null
-          fv_installation_cost_eur: number | null
-          id: string
-          installation_date: string | null
-          inverter_brand: string | null
-          inverter_power_kw: number | null
-          manual_autoconsumption_model: string | null
-          manual_tariff: string | null
-          powers: Json | null
-          pv_power_kwp: number | null
-          supply_address: string | null
-          tariff: string | null
-        }
-        Insert: {
-          autoconsumption_model?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          cups: string
-          current_retailer?: string | null
-          e1_kwh?: number | null
-          e2_kwh?: number | null
-          e3_kwh?: number | null
-          e4_kwh?: number | null
-          e5_kwh?: number | null
-          e6_kwh?: number | null
-          fv_installation_cost_eur?: number | null
-          id?: string
-          installation_date?: string | null
-          inverter_brand?: string | null
-          inverter_power_kw?: number | null
-          manual_autoconsumption_model?: string | null
-          manual_tariff?: string | null
-          powers?: Json | null
-          pv_power_kwp?: number | null
-          supply_address?: string | null
-          tariff?: string | null
-        }
-        Update: {
-          autoconsumption_model?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          cups?: string
-          current_retailer?: string | null
-          e1_kwh?: number | null
-          e2_kwh?: number | null
-          e3_kwh?: number | null
-          e4_kwh?: number | null
-          e5_kwh?: number | null
-          e6_kwh?: number | null
-          fv_installation_cost_eur?: number | null
-          id?: string
-          installation_date?: string | null
-          inverter_brand?: string | null
-          inverter_power_kw?: number | null
-          manual_autoconsumption_model?: string | null
-          manual_tariff?: string | null
-          powers?: Json | null
-          pv_power_kwp?: number | null
-          supply_address?: string | null
-          tariff?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supply_points_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       user_profiles: {
         Row: {
