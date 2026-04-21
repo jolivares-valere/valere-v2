@@ -70,7 +70,7 @@ export default function DashboardPage() {
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
               scope.viewAll
-                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                ? 'bg-valere-blue-medium/10 text-valere-blue-dark ring-1 ring-valere-blue-medium/20'
                 : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200'
             }`}
             title={scope.viewAll ? 'Ves los datos de todo el equipo' : 'Ves solo tus propios datos'}
@@ -159,7 +159,7 @@ export default function DashboardPage() {
       {/* Pipeline visual */}
       <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
-          <TrendingUp className="h-4 w-4 text-blue-500" />
+          <TrendingUp className="h-4 w-4 text-valere-blue-medium" />
           Pipeline por etapa
           {totalValor > 0 && (
             <span className="ml-auto text-xs font-normal text-slate-500">
