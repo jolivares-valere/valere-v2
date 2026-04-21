@@ -119,7 +119,8 @@ export default function ConsultantChat() {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="w-10 h-10 bg-valere-blue-dark text-white rounded-xl flex items-center justify-center hover:bg-valere-green-dark transition-colors disabled:opacity-40 shrink-0"
+            aria-label="Enviar mensaje"
+            className="w-10 h-10 bg-valere-blue-dark text-white rounded-xl flex items-center justify-center hover:bg-valere-green-dark transition-colors disabled:opacity-40 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-valere-blue-medium/40"
           >
             <Send className="w-4 h-4" />
           </button>

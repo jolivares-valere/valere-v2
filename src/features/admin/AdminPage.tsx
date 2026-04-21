@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import EmptyState from '@/core/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import type { UserProfile, Retailer, RetailerOffer, GlobalConfig } from '@/types/database';
@@ -146,6 +147,7 @@ function RetailersTab() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Retailer>>({ name: '', is_active: true, model: '', notes: '' });
+  const [toDelete, setToDelete] = useState<Retailer | null>(null);
 
   const save = async () => {
     if (!form.name?.trim()) { toast.error('Nombre es obligatorio'); return; }
@@ -168,9 +170,10 @@ function RetailersTab() {
     setDialogOpen(true);
   };
 
-  const remove = async (id: string) => {
-    if (!confirm('¿Eliminar?')) return;
-    await mutation.remove(id, 'Eliminada');
+  const confirmRemove = async () => {
+    if (!toDelete) return;
+    await mutation.remove(toDelete.id, 'Eliminada');
+    setToDelete(null);
     refetch();
   };
 
@@ -212,10 +215,10 @@ function RetailersTab() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right pr-6 space-x-1">
-                      <button onClick={() => startEdit(r)} className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50">
+                      <button onClick={() => startEdit(r)} aria-label={`Editar ${r.name}`} className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-valere-blue-medium/40">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => remove(r.id)} className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50">
+                      <button onClick={() => setToDelete(r)} aria-label={`Eliminar ${r.name}`} className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </TableCell>
@@ -260,6 +263,17 @@ function RetailersTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={!!toDelete}
+        title="Eliminar comercializadora"
+        message={toDelete ? `¿Seguro que quieres eliminar "${toDelete.name}"? Esta acción no se puede deshacer.` : ''}
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={mutation.loading}
+        onConfirm={confirmRemove}
+        onCancel={() => setToDelete(null)}
+      />
     </>
   );
 }
@@ -276,6 +290,7 @@ function OffersTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [offerToDelete, setOfferToDelete] = useState<any | null>(null);
   const defaultTariff = '2.0TD';
   const defaultCfg = getTariffConfig(defaultTariff);
   const [form, setForm] = useState<any>({
@@ -372,10 +387,10 @@ function OffersTab() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right pr-6 space-x-1">
-                      <button onClick={() => startEditOffer(o)} className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50">
+                      <button onClick={() => startEditOffer(o)} aria-label={`Editar oferta ${o.product_name}`} className="p-1.5 text-valere-ink/30 hover:text-valere-blue-dark rounded-lg hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-valere-blue-medium/40">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={async () => { await mutation.remove(o.id, 'Oferta eliminada'); refetch(); }} className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50">
+                      <button onClick={() => setOfferToDelete(o)} aria-label={`Eliminar oferta ${o.product_name}`} className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </TableCell>
@@ -513,6 +528,22 @@ function OffersTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={!!offerToDelete}
+        title="Eliminar oferta"
+        message={offerToDelete ? `¿Seguro que quieres eliminar la oferta "${offerToDelete.product_name}"? Esta acción no se puede deshacer.` : ''}
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={mutation.loading}
+        onConfirm={async () => {
+          if (!offerToDelete) return;
+          await mutation.remove(offerToDelete.id, 'Oferta eliminada');
+          setOfferToDelete(null);
+          refetch();
+        }}
+        onCancel={() => setOfferToDelete(null)}
+      />
     </>
   );
 }

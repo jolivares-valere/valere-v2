@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import EmptyState from '@/core/components/EmptyState'
 import {
   useCustomFieldsSchemaAdmin,
@@ -78,6 +79,7 @@ export default function CustomFieldsManager() {
   const [editing, setEditing] = useState<CustomFieldSchema | null>(null)
   const [form, setForm] = useState<FieldForm>(emptyForm())
   const [slugManualmenteEditado, setSlugManualmenteEditado] = useState(false)
+  const [toDelete, setToDelete] = useState<CustomFieldSchema | null>(null)
 
   const fields = allFields.filter(f => f.entidad_tipo === activeTab)
 
@@ -150,11 +152,12 @@ export default function CustomFieldsManager() {
     }
   }
 
-  const handleDelete = async (f: CustomFieldSchema) => {
-    if (!confirm(`¿Eliminar el campo "${f.etiqueta}"? Se perderán todos los valores guardados.`)) return
+  const confirmDelete = async () => {
+    if (!toDelete) return
     try {
-      await deleteMutation.mutateAsync(f.id)
+      await deleteMutation.mutateAsync(toDelete.id)
       toast.success('Campo eliminado')
+      setToDelete(null)
     } catch {
       toast.error('Error eliminando campo')
     }
@@ -256,13 +259,15 @@ export default function CustomFieldsManager() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => openEdit(f)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                        aria-label={`Editar campo ${f.etiqueta}`}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-valere-blue-medium/40"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(f)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                        onClick={() => setToDelete(f)}
+                        aria-label={`Eliminar campo ${f.etiqueta}`}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -382,6 +387,17 @@ export default function CustomFieldsManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={!!toDelete}
+        title="Eliminar campo personalizado"
+        message={toDelete ? `¿Eliminar el campo "${toDelete.etiqueta}"? Se perderán todos los valores guardados en fichas de empresas, oportunidades, contactos o contratos.` : ''}
+        confirmLabel="Eliminar campo"
+        variant="danger"
+        submitting={deleteMutation.isPending}
+        onConfirm={confirmDelete}
+        onCancel={() => setToDelete(null)}
+      />
     </Card>
   )
 }

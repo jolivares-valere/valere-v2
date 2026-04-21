@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import EmptyState from '@/core/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import type { SupplyPoint, InvoiceHistory } from '@/types/database';
@@ -54,6 +55,7 @@ export default function DataCapture() {
   const [editingSPId, setEditingSPId] = useState<string | null>(null);
   const [spForm, setSpForm] = useState<Partial<SupplyPoint>>({});
   const [spErrors, setSpErrors] = useState<Record<string, string>>({});
+  const [invToDelete, setInvToDelete] = useState<string | null>(null);
 
   // Dynamic tariff config for SP form
   const spTariffConfig = useMemo(
@@ -255,9 +257,10 @@ export default function DataCapture() {
     refetchInv();
   };
 
-  const deleteInv = async (id: string) => {
-    if (!confirm('¿Eliminar esta factura?')) return;
-    await invMutation.remove(id, 'Factura eliminada');
+  const confirmDeleteInv = async () => {
+    if (!invToDelete) return;
+    await invMutation.remove(invToDelete, 'Factura eliminada');
+    setInvToDelete(null);
     refetchInv();
   };
 
@@ -397,8 +400,9 @@ export default function DataCapture() {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => deleteInv(inv.id)}
-                          className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                          onClick={() => setInvToDelete(inv.id)}
+                          aria-label="Eliminar factura"
+                          className="p-1.5 text-valere-ink/30 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -705,6 +709,17 @@ export default function DataCapture() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={!!invToDelete}
+        title="Eliminar factura"
+        message="¿Eliminar esta factura? No se podrá recuperar."
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={invMutation.loading}
+        onConfirm={confirmDeleteInv}
+        onCancel={() => setInvToDelete(null)}
+      />
     </div>
   );
 }

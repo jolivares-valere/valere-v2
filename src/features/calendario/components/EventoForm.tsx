@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Evento, EventoInsert, TipoEvento } from '../../../core/types/entities'
 import { useCreateEvento, useUpdateEvento, useDeleteEvento } from '../api'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 
 const TIPOS: { value: TipoEvento; label: string }[] = [
   { value: 'reunion', label: 'Reunión' },
@@ -33,6 +34,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
   const [fechaFin, setFechaFin] = useState(evento?.fecha_fin?.slice(0, 16) ?? '')
   const [todoElDia, setTodoElDia] = useState(evento?.todo_el_dia ?? false)
   const [ubicacion, setUbicacion] = useState(evento?.ubicacion ?? '')
+  const [askDelete, setAskDelete] = useState(false)
 
   useEffect(() => {
     if (evento) {
@@ -71,10 +73,10 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
     onClose()
   }
 
-  const handleDelete = async () => {
+  const confirmDelete = async () => {
     if (!evento) return
-    if (!confirm(`¿Eliminar evento "${evento.titulo}"?`)) return
     await remove.mutateAsync(evento.id)
+    setAskDelete(false)
     onClose()
   }
 
@@ -154,8 +156,8 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
         {evento ? (
           <button
             type="button"
-            onClick={handleDelete}
-            className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+            onClick={() => setAskDelete(true)}
+            className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
           >
             Eliminar
           </button>
@@ -177,6 +179,17 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={askDelete}
+        title="Eliminar evento"
+        message={evento ? `¿Eliminar el evento "${evento.titulo}"? Esta acción no se puede deshacer.` : ''}
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={remove.isPending}
+        onConfirm={confirmDelete}
+        onCancel={() => setAskDelete(false)}
+      />
     </form>
   )
 }

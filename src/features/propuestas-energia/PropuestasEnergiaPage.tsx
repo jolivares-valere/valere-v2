@@ -10,6 +10,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import StatCard from '@/core/components/StatCard';
 import EmptyState from '@/core/components/EmptyState';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
@@ -30,6 +31,7 @@ export default function Proposals() {
   const [search, setSearch] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<ProposalWithDetails | null>(null);
+  const [toDelete, setToDelete] = useState<ProposalWithDetails | null>(null);
 
   const clienteOf = (p: ProposalWithDetails) =>
     p.cups_rel?.empresas?.nombre || p.supply_points?.clients?.company_name || '';
@@ -67,9 +69,10 @@ export default function Proposals() {
     toast.success('Informe exportado');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta propuesta?')) return;
-    await mutation.remove(id, 'Propuesta eliminada');
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    await mutation.remove(toDelete.id, 'Propuesta eliminada');
+    setToDelete(null);
     refetch();
   };
 
@@ -183,10 +186,8 @@ export default function Proposals() {
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <button className="p-2 hover:bg-slate-50 rounded-xl text-valere-ink/40 hover:text-valere-blue-dark transition-colors">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
+                        <DropdownMenuTrigger aria-label="Opciones de la propuesta" className="p-2 hover:bg-slate-50 rounded-xl text-valere-ink/40 hover:text-valere-blue-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-valere-blue-medium/40">
+                          <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl w-44">
                           <DropdownMenuItem onClick={() => viewDetail(p)} className="gap-2">
@@ -197,7 +198,7 @@ export default function Proposals() {
                               <Download className="w-4 h-4" /> Descargar PDF
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => handleDelete(p.id)} className="gap-2 text-red-500 focus:text-red-500">
+                          <DropdownMenuItem onClick={() => setToDelete(p)} className="gap-2 text-red-500 focus:text-red-500">
                             <Trash2 className="w-4 h-4" /> Eliminar
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -275,6 +276,16 @@ export default function Proposals() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={!!toDelete}
+        title="Eliminar propuesta"
+        message={toDelete ? `¿Eliminar la propuesta para ${toDelete.cups_rel?.empresas?.nombre ?? toDelete.supply_points?.clients?.company_name ?? 'este cliente'}? No se podrá recuperar.` : ''}
+        confirmLabel="Eliminar"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setToDelete(null)}
+      />
     </div>
   );
 }
