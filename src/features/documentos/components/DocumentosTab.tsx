@@ -97,7 +97,7 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
                   type="button"
                   onClick={() => handleDownload(doc.ruta_storage)}
                   className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                  aria-label="Descargar"
+                  aria-label={`Descargar ${doc.nombre}`}
                 >
                   <Download className="h-4 w-4" />
                 </button>
@@ -105,7 +105,7 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
                   type="button"
                   onClick={() => setConfirmDelete({ id: doc.id, ruta: doc.ruta_storage, nombre: doc.nombre })}
                   className="rounded p-1.5 text-red-600 hover:bg-red-50"
-                  aria-label="Eliminar"
+                  aria-label={`Eliminar ${doc.nombre}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

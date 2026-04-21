@@ -138,10 +138,10 @@ export default function ContactosPage() {
                       <td className="px-4 py-3 text-slate-600">{phones || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
-                          <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label="Editar">
+                          <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label={`Editar contacto ${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`}>
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label="Eliminar">
+                          <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar contacto ${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -176,10 +176,10 @@ export default function ContactosPage() {
                       )}
                     </div>
                     <div className="flex shrink-0 gap-1">
-                      <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Editar">
+                      <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Editar contacto ${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`}>
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label="Eliminar">
+                      <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar contacto ${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`}>
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>

@@ -213,7 +213,16 @@ export default function ActividadesPage() {
                   <td className="px-4 py-3 text-xs text-slate-500">
                     {a.entidad_tipo}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{formatDate(a.fecha_actividad)}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {isTarea && a.fecha_vencimiento ? (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-wide text-slate-400">Vence</span>
+                        <span className="font-medium">{formatDate(a.fecha_vencimiento)}</span>
+                      </div>
+                    ) : (
+                      formatDate(a.fecha_actividad)
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-600">
                     {isTarea && a.estado_tarea && (
                       <span className={`rounded px-2 py-0.5 text-xs ${

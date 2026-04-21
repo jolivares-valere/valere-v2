@@ -94,7 +94,9 @@ export default function NotificationBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-        aria-label="Notificaciones"
+        aria-label={count > 0 ? `Notificaciones (${count} sin leer)` : 'Notificaciones'}
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         <Bell className="h-5 w-5" />
         {count > 0 && (

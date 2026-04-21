@@ -224,13 +224,13 @@ export default function ContratosPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
-                          <Link to={`/contratos/${c.id}`} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Ver">
+                          <Link to={`/contratos/${c.id}`} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Ver contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
                             Ver
                           </Link>
-                          <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label="Editar">
+                          <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label={`Editar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label="Eliminar">
+                          <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -260,10 +260,10 @@ export default function ContratosPage() {
                       <div className="mt-2"><PrioridadBadge prioridad={prioridad} /></div>
                     </div>
                     <div className="flex shrink-0 gap-1">
-                      <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Editar">
+                      <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Editar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label="Eliminar">
+                      <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
