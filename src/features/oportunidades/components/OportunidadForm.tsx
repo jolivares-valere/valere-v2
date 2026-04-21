@@ -130,7 +130,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
   const field = (name: keyof OportunidadFormValues, label: string, type = 'text') => (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      <input type={type} {...form.register(name)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none" />
+      <input type={type} {...form.register(name)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none" />
       {form.formState.errors[name] && (
         <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors[name]?.message)}</span>
       )}
@@ -146,7 +146,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
             {...form.register('empresa_id', {
               onChange: () => form.setValue('contacto_id', ''),
             })}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">— Selecciona empresa —</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
@@ -160,7 +160,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
           <select
             {...form.register('contacto_id')}
             disabled={!empresaIdWatched}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
             <option value="">— Sin contacto —</option>
             {contactos.data?.map((c) => {
@@ -179,7 +179,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
         {field('nombre', 'Nombre *')}
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo *</span>
-          <select {...form.register('tipo')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('tipo')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="nueva_venta">Nueva venta</option>
             <option value="renovacion">Renovación</option>
             <option value="ampliacion">Ampliación</option>
@@ -188,7 +188,7 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Etapa *</span>
-          <select {...form.register('etapa')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('etapa')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="prospecto">Prospecto</option>
             <option value="auditoria_consumo">Auditoría consumo</option>
             <option value="oferta_presentada">Oferta presentada</option>
@@ -206,13 +206,13 @@ export default function OportunidadForm({ defaultValues, onSubmit, onCancel, sub
       </div>
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">Notas</span>
-        <textarea {...form.register('notas')} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        <textarea {...form.register('notas')} rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
       </label>
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+          <button type="button" onClick={onCancel} className="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
         )}
-        <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
           {submitting ? 'Guardando…' : 'Guardar'}
         </button>
       </div>

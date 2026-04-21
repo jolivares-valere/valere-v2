@@ -27,7 +27,7 @@ export default function ContratoDetailPage() {
 
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">
             {contrato.empresa?.nombre ?? '—'}
           </h1>
           <p className="text-sm text-slate-500">
@@ -41,7 +41,7 @@ export default function ContratoDetailPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-sm font-semibold text-slate-900">Datos del contrato</h3>
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <Row k="Tarifa acceso" v={contrato.tarifa_acceso ?? '—'} />
@@ -59,7 +59,7 @@ export default function ContratoDetailPage() {
           </dl>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-sm font-semibold text-slate-900">CUPS ({cups.length})</h3>
           {cups.length === 0 ? (
             <p className="text-sm text-slate-500">Este contrato no tiene CUPS registrados.</p>
@@ -87,17 +87,17 @@ export default function ContratoDetailPage() {
       </div>
 
       {contrato.observaciones && (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-2 text-sm font-semibold text-slate-900">Observaciones</h3>
           <p className="whitespace-pre-wrap text-sm text-slate-700">{contrato.observaciones}</p>
         </div>
       )}
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <ActividadTimeline entidadTipo="contrato" entidadId={contrato.id} />
       </div>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <DocumentosTab entidadTipo="contrato" entidadId={contrato.id} />
       </div>
     </div>

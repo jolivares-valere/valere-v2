@@ -99,7 +99,7 @@ export default function OportunidadesPage() {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Pipeline</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Pipeline</h1>
           <p className="text-sm text-slate-500">{data?.length ?? 0} oportunidades en el pipeline</p>
         </div>
         <div className="flex gap-2">
@@ -124,7 +124,7 @@ export default function OportunidadesPage() {
           <button
             type="button"
             onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Nueva oportunidad
           </button>

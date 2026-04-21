@@ -18,7 +18,7 @@ export default function CsvDropzone<T>({ label, onParsed }: Props<T>) {
     })
   }
   return (
-    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-white p-12 text-slate-500 hover:border-slate-400">
+    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white p-12 text-slate-500 hover:border-slate-400">
       <Upload className="h-10 w-10" />
       <span className="text-sm">{label ?? 'Selecciona o arrastra un CSV (separador ; o ,)'}</span>
       <input

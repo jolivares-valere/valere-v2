@@ -46,16 +46,16 @@ export default function EmpresaDetailPage() {
 
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{empresa.nombre}</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">{empresa.nombre}</h1>
           <p className="text-sm text-slate-500">
             {empresa.nif ?? 'Sin NIF'} · {empresa.tipo ?? 'Sin tipo'}
           </p>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+          <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
             <Pencil className="h-3.5 w-3.5" /> {editing ? 'Cancelar' : 'Editar'}
           </button>
-          <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
+          <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
             <Trash2 className="h-3.5 w-3.5" /> Eliminar
           </button>
         </div>
@@ -64,7 +64,7 @@ export default function EmpresaDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div>
           {editing ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <EmpresaForm
                 defaultValues={empresa}
                 onSubmit={onSave}
@@ -75,7 +75,7 @@ export default function EmpresaDetailPage() {
           ) : (
             <>
               <TabsNav tab={tab} setTab={setTab} />
-              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                 {tab === 'resumen' && <Resumen empresa={empresa} />}
                 {tab === 'actividades' && (
                   <div className="space-y-4">
@@ -161,7 +161,7 @@ function Resumen({ empresa }: { empresa: NonNullable<ReturnType<typeof useEmpres
 
 function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">{title}</h3>
       <dl className="space-y-2 text-sm">{children}</dl>
     </div>
@@ -206,7 +206,7 @@ function ContactosSection({ empresaId }: { empresaId: string }) {
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
           >
             <Plus className="h-3.5 w-3.5" /> Añadir contacto
           </button>
@@ -216,12 +216,12 @@ function ContactosSection({ empresaId }: { empresaId: string }) {
       {contactos.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
 
       {!contactos.isLoading && lista.length === 0 && (
-        <div className="rounded-md border border-dashed border-slate-300 p-6 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
           <p className="mb-3 text-sm text-slate-500">Sin contactos registrados</p>
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
           >
             <Plus className="h-3.5 w-3.5" /> Añadir el primero
           </button>

@@ -94,7 +94,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
         <label className="block text-xs font-medium text-slate-600">Empresa *</label>
         <select
           {...register('empresa_id')}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         >
           <option value="">— Seleccionar —</option>
           {(empresas.data?.data ?? []).map((e) => (
@@ -108,7 +108,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
         <label className="block text-xs font-medium text-slate-600">Título *</label>
         <input
           {...register('titulo')}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
         {errors.titulo && <p className="mt-1 text-xs text-red-600">{errors.titulo.message}</p>}
       </div>
@@ -118,26 +118,26 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
         <textarea
           {...register('descripcion')}
           rows={3}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-600">Tipo</label>
-          <select {...register('tipo')} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...register('tipo')} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-600">Estado</label>
-          <select {...register('estado')} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...register('estado')} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-600">Prioridad</label>
-          <select {...register('prioridad')} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...register('prioridad')} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
@@ -148,7 +148,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
           <label className="block text-xs font-medium text-slate-600">CUPS</label>
           <input
             {...register('cups')}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono"
             placeholder="ES0021..."
           />
         </div>
@@ -157,7 +157,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
           <input
             type="date"
             {...register('fecha_limite')}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -169,7 +169,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
             type="number"
             step="0.01"
             {...register('importe_reclamado')}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
         <div>
@@ -178,7 +178,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
             type="number"
             step="0.01"
             {...register('importe_recuperado')}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -188,7 +188,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
         <textarea
           {...register('notas_resolucion')}
           rows={2}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
 
@@ -197,7 +197,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
             Cancelar
           </button>
@@ -205,7 +205,7 @@ export default function IncidenciaForm({ defaultValues, onSubmit, onCancel, subm
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
         >
           {submitting ? 'Guardando…' : 'Guardar'}
         </button>

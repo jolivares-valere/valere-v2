@@ -45,7 +45,7 @@ export default function ActividadTimeline({ entidadTipo, entidadId, showForm = t
           <button
             type="button"
             onClick={() => setFormOpen((v) => !v)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
+            className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
           >
             {formOpen ? 'Cancelar' : 'Nueva'}
           </button>
@@ -53,7 +53,7 @@ export default function ActividadTimeline({ entidadTipo, entidadId, showForm = t
       </div>
 
       {formOpen && showForm && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <ActividadForm
             entidadTipo={entidadTipo}
             entidadId={entidadId}

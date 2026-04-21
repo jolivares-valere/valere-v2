@@ -38,7 +38,7 @@ export default function InformeCarteraActiva() {
             id="comercial-cartera"
             value={comercialId}
             onChange={(e) => setComercialId(e.target.value)}
-            className="mt-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+            className="mt-1 rounded-xl border border-slate-300 px-3 py-1.5 text-sm"
           >
             <option value="">Todos</option>
             {(comerciales.data ?? []).map((c) => (
@@ -66,19 +66,19 @@ export default function InformeCarteraActiva() {
 
       {!isLoading && filas.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
             <p className="text-xs uppercase text-slate-500">Empresas</p>
             <p className="text-xl font-bold text-slate-900">{filas.length}</p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
             <p className="text-xs uppercase text-slate-500">Contratos activos</p>
             <p className="text-xl font-bold text-slate-900">{formatInt(totales.contratos)}</p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
             <p className="text-xs uppercase text-slate-500">Consumo total</p>
             <p className="text-xl font-bold text-slate-900">{formatInt(totales.consumo)} kWh</p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
             <p className="text-xs uppercase text-slate-500">Comisión total</p>
             <p className="text-xl font-bold text-slate-900">{formatEur(totales.comision)}</p>
           </div>
@@ -86,16 +86,16 @@ export default function InformeCarteraActiva() {
       )}
 
       {isLoading && <div className="py-12 text-center text-sm text-slate-500">Cargando cartera…</div>}
-      {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">Error al cargar: {(error as Error).message}</div>}
+      {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">Error al cargar: {(error as Error).message}</div>}
 
       {!isLoading && filas.length === 0 && (
-        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
           No hay empresas con contratos activos para este comercial.
         </div>
       )}
 
       {!isLoading && filas.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>

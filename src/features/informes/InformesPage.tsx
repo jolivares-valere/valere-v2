@@ -11,7 +11,7 @@ export default function InformesPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Informes</h1>
+        <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Informes</h1>
         <p className="text-sm text-slate-500">Métricas agregadas de actividad y cartera.</p>
       </div>
 

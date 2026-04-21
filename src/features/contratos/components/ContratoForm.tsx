@@ -120,7 +120,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
       <input
         type={type}
         {...form.register(name)}
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
       />
       {form.formState.errors[name] && (
         <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors[name]?.message)}</span>
@@ -133,7 +133,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium text-slate-700">Empresa *</span>
-          <select {...form.register('empresa_id')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('empresa_id')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="">— Selecciona empresa —</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
@@ -147,7 +147,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Estado *</span>
-          <select {...form.register('estado')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('estado')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="tramite">En trámite</option>
             <option value="activo">Activo</option>
             <option value="vencido">Vencido</option>
@@ -160,7 +160,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo energía</span>
-          <select {...form.register('tipo_energia')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('tipo_energia')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="">—</option>
             <option value="electrica">Luz</option>
             <option value="gas">Gas</option>
@@ -170,7 +170,7 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo precio</span>
-          <select {...form.register('tipo_precio')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('tipo_precio')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="">—</option>
             <option value="fijo">Fijo</option>
             <option value="indexado">Indexado</option>
@@ -185,14 +185,14 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
 
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">Notas</span>
-        <textarea {...form.register('observaciones')} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        <textarea {...form.register('observaciones')} rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
       </label>
 
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+          <button type="button" onClick={onCancel} className="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
         )}
-        <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
           {submitting ? 'Guardando…' : 'Guardar'}
         </button>
       </div>

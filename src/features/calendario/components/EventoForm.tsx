@@ -88,7 +88,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           required
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
 
@@ -98,7 +98,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value as TipoEvento)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           >
             {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
@@ -119,7 +119,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
             value={fechaInicio}
             onChange={(e) => setFechaInicio(e.target.value)}
             required
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
         <div>
@@ -128,7 +128,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
             type="datetime-local"
             value={fechaFin}
             onChange={(e) => setFechaFin(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -138,7 +138,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
         <input
           value={ubicacion}
           onChange={(e) => setUbicacion(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
 
@@ -148,7 +148,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
           rows={3}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
 
@@ -157,7 +157,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
           <button
             type="button"
             onClick={() => setAskDelete(true)}
-            className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
+            className="rounded-xl bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
           >
             Eliminar
           </button>
@@ -166,14 +166,14 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={create.isPending || update.isPending}
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-60"
+            className="rounded-xl bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-60"
           >
             {evento ? 'Guardar' : 'Crear'}
           </button>

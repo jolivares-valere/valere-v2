@@ -14,18 +14,19 @@ import RenovacionForm from './components/RenovacionForm'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ExportButton from '../../core/components/ExportButton'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
+import StatusBadge, { type StatusVariant } from '../../core/components/StatusBadge'
 import { formatDate } from '../../core/utils/dates'
 import type { RenovacionInsert, EstadoRenovacion, PrioridadRenovacion } from '../../core/types/entities'
 
 type EditingState = RenovacionConRelaciones | 'new' | null
 
-const ESTADO_BADGE: Record<EstadoRenovacion, string> = {
-  detectada: 'bg-blue-100 text-blue-800',
-  contactado: 'bg-indigo-100 text-indigo-800',
-  oferta_enviada: 'bg-amber-100 text-amber-800',
-  negociacion: 'bg-orange-100 text-orange-800',
-  renovado: 'bg-green-100 text-green-800',
-  perdido: 'bg-red-100 text-red-800',
+const ESTADO_VARIANT: Record<EstadoRenovacion, StatusVariant> = {
+  detectada: 'info',
+  contactado: 'accent',
+  oferta_enviada: 'warning',
+  negociacion: 'alert',
+  renovado: 'success',
+  perdido: 'danger',
 }
 
 const ESTADO_LABEL: Record<EstadoRenovacion, string> = {
@@ -37,12 +38,12 @@ const ESTADO_LABEL: Record<EstadoRenovacion, string> = {
   perdido: 'Perdido',
 }
 
-const PRIORIDAD_BADGE: Record<PrioridadRenovacion, string> = {
-  critica: 'bg-red-100 text-red-800',
-  alta: 'bg-orange-100 text-orange-800',
-  media: 'bg-blue-100 text-blue-700',
-  baja: 'bg-slate-100 text-slate-700',
-  ok: 'bg-green-100 text-green-700',
+const PRIORIDAD_VARIANT: Record<PrioridadRenovacion, StatusVariant> = {
+  critica: 'danger',
+  alta: 'alert',
+  media: 'info',
+  baja: 'neutral',
+  ok: 'success',
 }
 
 const PRIORIDAD_LABEL: Record<PrioridadRenovacion, string> = {
@@ -99,7 +100,7 @@ export default function RenovacionesPage() {
     <div className="p-4 md:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Renovaciones</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Renovaciones</h1>
           <p className="text-sm text-slate-500">{lista.length} registros</p>
         </div>
         <div className="flex gap-2">
@@ -120,7 +121,7 @@ export default function RenovacionesPage() {
           <button
             type="button"
             onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Nueva renovación
           </button>
@@ -140,7 +141,7 @@ export default function RenovacionesPage() {
         <select
           value={filterEstado ?? ''}
           onChange={(e) => setFilter('estado', e.target.value || null)}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+          className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs"
         >
           <option value="">Todos los estados</option>
           {(Object.keys(ESTADO_LABEL) as EstadoRenovacion[]).map((e) => (
@@ -150,7 +151,7 @@ export default function RenovacionesPage() {
         <select
           value={filterPrioridad ?? ''}
           onChange={(e) => setFilter('prioridad', e.target.value || null)}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs"
+          className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs"
         >
           <option value="">Todas las prioridades</option>
           {(Object.keys(PRIORIDAD_LABEL) as PrioridadRenovacion[]).map((p) => (
@@ -170,7 +171,7 @@ export default function RenovacionesPage() {
 
       {isLoading ? (
         <>
-          <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -192,20 +193,20 @@ export default function RenovacionesPage() {
           </div>
         </>
       ) : lista.length === 0 ? (
-        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
           <RefreshCw className="mx-auto mb-2 h-8 w-8 text-slate-400" />
           <p className="mb-3 text-sm text-slate-500">Sin renovaciones registradas</p>
           <button
             type="button"
             onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
           >
             <Plus className="h-3.5 w-3.5" /> Crear la primera
           </button>
         </div>
       ) : (
         <>
-          <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -231,14 +232,14 @@ export default function RenovacionesPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{formatDate(ren.fecha_vencimiento_contrato)}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${ESTADO_BADGE[ren.estado]}`}>
+                      <StatusBadge variant={ESTADO_VARIANT[ren.estado]}>
                         {ESTADO_LABEL[ren.estado]}
-                      </span>
+                      </StatusBadge>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${PRIORIDAD_BADGE[ren.prioridad]}`}>
+                      <StatusBadge variant={PRIORIDAD_VARIANT[ren.prioridad]}>
                         {PRIORIDAD_LABEL[ren.prioridad]}
-                      </span>
+                      </StatusBadge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
@@ -258,18 +259,18 @@ export default function RenovacionesPage() {
 
           <ul className="md:hidden space-y-3">
             {lista.map((ren) => (
-              <li key={ren.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <li key={ren.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-900">{ren.empresa?.nombre ?? '—'}</p>
                     <p className="mt-0.5 text-xs text-slate-500">{ren.contrato?.numero_contrato} · {ren.contrato?.compania}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${ESTADO_BADGE[ren.estado]}`}>
+                      <StatusBadge variant={ESTADO_VARIANT[ren.estado]} size="sm">
                         {ESTADO_LABEL[ren.estado]}
-                      </span>
-                      <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${PRIORIDAD_BADGE[ren.prioridad]}`}>
+                      </StatusBadge>
+                      <StatusBadge variant={PRIORIDAD_VARIANT[ren.prioridad]} size="sm">
                         {PRIORIDAD_LABEL[ren.prioridad]}
-                      </span>
+                      </StatusBadge>
                     </div>
                     <p className="mt-1 text-xs text-slate-400">Vence: {formatDate(ren.fecha_vencimiento_contrato)}</p>
                   </div>
@@ -328,7 +329,7 @@ export default function RenovacionesPage() {
 
 function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${color}`}>{value}</p>
     </div>

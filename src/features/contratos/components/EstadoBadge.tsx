@@ -1,19 +1,21 @@
-﻿import type { EstadoContrato } from '../../../core/types/entities'
+import type { EstadoContrato } from '../../../core/types/entities'
+import StatusBadge, { type StatusVariant } from '../../../core/components/StatusBadge'
 
-const colors: Record<EstadoContrato, string> = {
-  borrador: 'bg-slate-100 text-slate-700',
-  tramite: 'bg-blue-100 text-blue-700',
-  activo: 'bg-green-100 text-green-700',
-  vencido: 'bg-red-100 text-red-700',
-  baja: 'bg-slate-200 text-slate-600',
-  incidencia: 'bg-amber-100 text-amber-700',
-  cancelado: 'bg-slate-200 text-slate-500 line-through',
+const ESTADO_TO_VARIANT: Record<EstadoContrato, StatusVariant> = {
+  borrador: 'neutral',
+  tramite: 'info',
+  activo: 'success',
+  vencido: 'danger',
+  baja: 'neutral',
+  incidencia: 'warning',
+  cancelado: 'neutral',
 }
 
 export default function EstadoBadge({ estado }: { estado: EstadoContrato }) {
+  const extra = estado === 'cancelado' ? 'line-through' : ''
   return (
-    <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${colors[estado]}`}>
+    <StatusBadge variant={ESTADO_TO_VARIANT[estado]} size="sm" className={extra}>
       {estado}
-    </span>
+    </StatusBadge>
   )
 }

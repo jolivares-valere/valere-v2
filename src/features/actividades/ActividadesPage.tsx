@@ -104,7 +104,7 @@ export default function ActividadesPage() {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Actividades</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Actividades</h1>
           <p className="text-sm text-slate-500">{data?.count ?? 0} en total</p>
         </div>
         <div className="flex gap-2">
@@ -129,7 +129,7 @@ export default function ActividadesPage() {
           <button
             type="button"
             onClick={() => setPanel('new')}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Nueva actividad
           </button>
@@ -163,7 +163,7 @@ export default function ActividadesPage() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
@@ -256,9 +256,9 @@ export default function ActividadesPage() {
 
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-          <button type="button" disabled={page <= 1} onClick={() => updateParam('page', String(page - 1))} className="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-50">Anterior</button>
+          <button type="button" disabled={page <= 1} onClick={() => updateParam('page', String(page - 1))} className="rounded-xl border border-slate-300 px-3 py-1.5 disabled:opacity-50">Anterior</button>
           <span>Página {page} de {totalPages}</span>
-          <button type="button" disabled={page >= totalPages} onClick={() => updateParam('page', String(page + 1))} className="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-50">Siguiente</button>
+          <button type="button" disabled={page >= totalPages} onClick={() => updateParam('page', String(page + 1))} className="rounded-xl border border-slate-300 px-3 py-1.5 disabled:opacity-50">Siguiente</button>
         </div>
       )}
 

@@ -17,7 +17,7 @@ export default function ImportadorPage() {
   return (
     <div className="p-4 md:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Importador CSV</h1>
+        <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Importador CSV</h1>
         <p className="text-sm text-slate-500">Sube un CSV para importar datos en lote</p>
       </div>
 
@@ -38,7 +38,7 @@ export default function ImportadorPage() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         {tab === 'empresas' && <ImportEmpresas />}
         {tab === 'contactos' && <ImportContactos />}
         {tab === 'contratos' && <ImportContratos />}

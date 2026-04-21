@@ -30,7 +30,7 @@ export default function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-72 shrink-0 flex-col rounded-lg border border-slate-200 bg-slate-50 p-3 ${isOver ? 'ring-2 ring-slate-900' : ''}`}
+      className={`flex w-72 shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50 p-3 ${isOver ? 'ring-2 ring-slate-900' : ''}`}
     >
       <div className="mb-1 flex items-baseline justify-between">
         <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
@@ -43,7 +43,7 @@ export default function KanbanColumn({
         <span className="tabular-nums">{eur(totalValor)}</span>
       </div>
       {totalAhorro > 0 && (
-        <p className="mb-3 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+        <p className="mb-3 rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
           Ahorro: {eur(totalAhorro)}/año
         </p>
       )}

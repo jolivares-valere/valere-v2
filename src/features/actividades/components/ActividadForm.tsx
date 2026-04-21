@@ -54,7 +54,7 @@ export default function ActividadForm({ entidadTipo, entidadId, usuarioId, submi
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value as TipoActividad)}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          className="rounded-xl border border-slate-300 px-2 py-1.5 text-sm"
         >
           {TIPOS.map((t) => (
             <option key={t} value={t}>{t}</option>
@@ -66,7 +66,7 @@ export default function ActividadForm({ entidadTipo, entidadId, usuarioId, submi
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           placeholder="Título"
-          className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          className="flex-1 rounded-xl border border-slate-300 px-3 py-1.5 text-sm"
         />
       </div>
       <textarea
@@ -74,21 +74,21 @@ export default function ActividadForm({ entidadTipo, entidadId, usuarioId, submi
         value={descripcion}
         onChange={(e) => setDescripcion(e.target.value)}
         placeholder="Descripción (opcional)"
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
       />
       {tipo === 'tarea' && (
         <input
           type="date"
           value={fechaVencimiento}
           onChange={(e) => setFechaVencimiento(e.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          className="rounded-xl border border-slate-300 px-3 py-1.5 text-sm"
         />
       )}
       <div className="flex justify-end">
         <button
           type="submit"
           disabled={submitting || !titulo.trim()}
-          className="rounded-md bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-60"
+          className="rounded-xl bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-60"
         >
           {submitting ? 'Creando…' : 'Crear'}
         </button>

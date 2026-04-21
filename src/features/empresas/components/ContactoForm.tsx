@@ -68,7 +68,7 @@ export default function ContactoForm({ empresaId, defaultValues, onSubmit, onCan
       <input
         type={type}
         {...form.register(name)}
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
       />
       {form.formState.errors[name] && (
         <span className="mt-1 block text-xs text-red-600">
@@ -101,15 +101,15 @@ export default function ContactoForm({ empresaId, defaultValues, onSubmit, onCan
       </div>
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">Notas</span>
-        <textarea {...form.register('notas')} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        <textarea {...form.register('notas')} rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
       </label>
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">
+          <button type="button" onClick={onCancel} className="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">
             Cancelar
           </button>
         )}
-        <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
           {submitting ? 'Guardando…' : 'Guardar'}
         </button>
       </div>

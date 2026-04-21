@@ -77,7 +77,7 @@ export default function ContratosPage() {
     <div className="p-4 md:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Contratos</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Contratos</h1>
           <p className="text-sm text-slate-500">{lista.length} contratos vigentes</p>
         </div>
         <div className="flex gap-2">
@@ -104,7 +104,7 @@ export default function ContratosPage() {
           <button
             type="button"
             onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Nuevo contrato
           </button>
@@ -129,7 +129,7 @@ export default function ContratosPage() {
       </div>
 
       {vencimientoMode && resumen.data && resumen.data.total > 0 && (
-        <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+        <div className="mb-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
           <div className="flex flex-wrap gap-4 text-sm">
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600" />
@@ -154,7 +154,7 @@ export default function ContratosPage() {
         <VencimientoList loading={porVencer.isLoading} rows={porVencer.data ?? []} />
       ) : isLoading ? (
         <>
-          <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -176,19 +176,19 @@ export default function ContratosPage() {
           </div>
         </>
       ) : lista.length === 0 ? (
-        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
           <p className="mb-3 text-sm text-slate-500">Sin contratos registrados</p>
           <button
             type="button"
             onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
           >
             <Plus className="h-3.5 w-3.5" /> Añadir el primero
           </button>
         </div>
       ) : (
         <>
-          <div className="hidden md:block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -247,7 +247,7 @@ export default function ContratosPage() {
               const dias = calcDiasVencimiento(c.fecha_fin)
               const prioridad = calcPrioridad(dias)
               return (
-                <li key={c.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <li key={c.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <Link to={`/contratos/${c.id}`} className="font-medium text-slate-900 hover:underline">
@@ -316,7 +316,7 @@ export default function ContratosPage() {
 function VencimientoList({ loading, rows }: { loading: boolean; rows: ContratoPorVencer[] }) {
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
@@ -327,13 +327,13 @@ function VencimientoList({ loading, rows }: { loading: boolean; rows: ContratoPo
   }
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
+      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
         <p className="text-sm text-slate-500">No hay contratos próximos a vencer.</p>
       </div>
     )
   }
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <table className="w-full text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>

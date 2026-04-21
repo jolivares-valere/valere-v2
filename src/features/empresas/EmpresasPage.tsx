@@ -42,7 +42,7 @@ export default function EmpresasPage() {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Empresas</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Empresas</h1>
           <p className="text-sm text-slate-500">{data?.count ?? 0} en total</p>
         </div>
         <div className="flex gap-2">
@@ -66,7 +66,7 @@ export default function EmpresasPage() {
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Nueva empresa
           </button>
@@ -83,13 +83,13 @@ export default function EmpresasPage() {
           }}
           placeholder="Buscar por nombre o NIF…"
           aria-label="Buscar empresas por nombre o NIF"
-          className="w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="w-full max-w-sm rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
         <select
           value={tipo}
           onChange={(e) => updateParam('tipo', e.target.value)}
           aria-label="Filtrar por tipo de empresa"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
         >
           <option value="">Todos los tipos</option>
           <option value="empresa">Empresa</option>
@@ -101,7 +101,7 @@ export default function EmpresasPage() {
       </div>
 
       {showForm && (
-        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold">Nueva empresa</h2>
           <EmpresaForm
             onSubmit={onCreate}
@@ -111,7 +111,7 @@ export default function EmpresasPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
@@ -136,7 +136,7 @@ export default function EmpresasPage() {
                       type="button"
                       onClick={() => refetch()}
                       disabled={isFetching}
-                      className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      className="rounded-xl border border-red-300 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
                     >
                       {isFetching ? 'Reintentando…' : 'Reintentar'}
                     </button>
@@ -171,7 +171,7 @@ export default function EmpresasPage() {
             type="button"
             disabled={page <= 1}
             onClick={() => updateParam('page', String(page - 1))}
-            className="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-50"
+            className="rounded-xl border border-slate-300 px-3 py-1.5 disabled:opacity-50"
           >
             Anterior
           </button>
@@ -180,7 +180,7 @@ export default function EmpresasPage() {
             type="button"
             disabled={page >= totalPages}
             onClick={() => updateParam('page', String(page + 1))}
-            className="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-50"
+            className="rounded-xl border border-slate-300 px-3 py-1.5 disabled:opacity-50"
           >
             Siguiente
           </button>

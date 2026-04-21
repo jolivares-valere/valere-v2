@@ -23,7 +23,7 @@ export default function KanbanCard({ op, tareasPendientes, onClick }: Props) {
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`cursor-grab rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm hover:shadow-md active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+      className={`cursor-grab rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm hover:shadow-md active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
     >
       <div className="mb-1 flex items-start justify-between gap-2">
         <p className="font-medium text-slate-900">{op.empresa?.nombre ?? op.nombre}</p>

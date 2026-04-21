@@ -63,7 +63,7 @@ export default function DashboardPage() {
     <div className="p-8">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Dashboard</h1>
           <p className="text-sm text-slate-500">Hola, {user?.full_name ?? 'equipo'}</p>
         </div>
         {!scope.pending && (
@@ -85,9 +85,9 @@ export default function DashboardPage() {
       {resumenVenc.data && resumenVenc.data.total > 0 && (
         <Link
           to="/contratos?vencimiento=1"
-          className="mb-6 flex items-center gap-4 rounded-lg border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm transition hover:shadow-md"
+          className="mb-6 flex items-center gap-4 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm transition hover:shadow-md"
         >
-          <span className="inline-flex rounded-md bg-orange-100 p-2 text-orange-700">
+          <span className="inline-flex rounded-xl bg-orange-100 p-2 text-orange-700">
             <Flame className="h-5 w-5" />
           </span>
           <div className="flex-1">
@@ -139,7 +139,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Alertas accionables */}
-      <section className="mb-8 rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="mb-8 rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
           <AlertTriangle className="h-4 w-4 text-orange-500" />
           <h2 className="text-sm font-semibold text-slate-900">Alertas accionables</h2>
@@ -157,7 +157,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Pipeline visual */}
-      <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
           <TrendingUp className="h-4 w-4 text-valere-blue-medium" />
           Pipeline por etapa
@@ -196,7 +196,7 @@ export default function DashboardPage() {
 
       {/* Fila inferior (huérfanos + tareas) */}
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <AlertTriangle className="h-4 w-4 text-orange-500" />
             Contratos huérfanos
@@ -225,7 +225,7 @@ export default function DashboardPage() {
           </ul>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-slate-900">Mis tareas pendientes</h2>
           {tareas.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
           {!tareas.isLoading && (tareas.data?.length ?? 0) === 0 && (
@@ -233,7 +233,7 @@ export default function DashboardPage() {
           )}
           <ul className="space-y-2">
             {tareas.data?.map((t) => (
-              <li key={t.id} className="rounded-md border border-slate-100 p-3 text-sm">
+              <li key={t.id} className="rounded-xl border border-slate-100 p-3 text-sm">
                 <p className="font-medium text-slate-900">{t.titulo}</p>
                 {t.fecha_vencimiento && (
                   <p className="text-xs text-slate-500">Vence {formatDate(t.fecha_vencimiento, 'relative')}</p>
@@ -328,9 +328,9 @@ function KPI({
     accent === 'green'  ? 'bg-green-50 text-green-700' :
     'bg-slate-100 text-slate-700'
   return (
-    <Link to={to} className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+    <Link to={to} className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
       <div className="mb-3 flex items-center justify-between">
-        <span className={`inline-flex rounded-md p-2 ${bg}`}>{icon}</span>
+        <span className={`inline-flex rounded-xl p-2 ${bg}`}>{icon}</span>
       </div>
       <p className="text-3xl font-bold text-slate-900">{value ?? '—'}</p>
       <p className="mt-1 text-sm text-slate-500 group-hover:text-slate-700">{label}</p>

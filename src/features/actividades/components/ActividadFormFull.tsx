@@ -234,7 +234,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo *</span>
-          <select {...form.register('tipo')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select {...form.register('tipo')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </label>
@@ -244,7 +244,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
           <input
             type="datetime-local"
             {...form.register('fecha_actividad')}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
           {form.formState.errors.fecha_actividad && (
             <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.fecha_actividad.message)}</span>
@@ -253,7 +253,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
 
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium text-slate-700">Título *</span>
-          <input type="text" {...form.register('titulo')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          <input type="text" {...form.register('titulo')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
           {form.formState.errors.titulo && (
             <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.titulo.message)}</span>
           )}
@@ -261,7 +261,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
 
         <label className="block md:col-span-2">
           <span className="mb-1 block text-sm font-medium text-slate-700">Descripción</span>
-          <textarea {...form.register('descripcion')} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          <textarea {...form.register('descripcion')} rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
         </label>
 
         {/* Entidad asociada */}
@@ -272,7 +272,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
               onChange: () => form.setValue('entidad_id', ''),
             })}
             disabled={entidadLocked}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
           >
             <option value="empresa">Empresa</option>
             <option value="contacto">Contacto</option>
@@ -290,7 +290,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
               },
             })}
             disabled={entidadLocked}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
           >
             <option value="">— Selecciona empresa —</option>
             {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
@@ -310,7 +310,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
             <select
               {...form.register('entidad_id')}
               disabled={entidadLocked || !empresaIdWatched}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
             >
               <option value="">— Selecciona —</option>
               {secondLevelOptions?.map((opt) => (
@@ -329,14 +329,14 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
         {isReunionOLlamada && (
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Duración (min)</span>
-            <input type="number" {...form.register('duracion_min')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            <input type="number" {...form.register('duracion_min')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
           </label>
         )}
 
         {isReunionOLlamada && (
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-slate-700">Resultado</span>
-            <select {...form.register('resultado')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <select {...form.register('resultado')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
               <option value="">—</option>
               <option value="positivo">Positivo</option>
               <option value="neutral">Neutral</option>
@@ -350,7 +350,7 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
           <>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Estado tarea</span>
-              <select {...form.register('estado_tarea')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+              <select {...form.register('estado_tarea')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                 <option value="pendiente">Pendiente</option>
                 <option value="completada">Completada</option>
                 <option value="cancelada">Cancelada</option>
@@ -358,11 +358,11 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-slate-700">Vence</span>
-              <input type="datetime-local" {...form.register('fecha_vencimiento')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              <input type="datetime-local" {...form.register('fecha_vencimiento')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
             </label>
             <label className="block md:col-span-2">
               <span className="mb-1 block text-sm font-medium text-slate-700">Asignado a</span>
-              <select {...form.register('asignado_a')} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+              <select {...form.register('asignado_a')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                 <option value="">— Yo ({user?.full_name ?? 'usuario actual'}) —</option>
                 {usuarios.data?.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
               </select>
@@ -378,9 +378,9 @@ export default function ActividadFormFull({ defaultValues, lockedEntidad, onSubm
 
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+          <button type="button" onClick={onCancel} className="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
         )}
-        <button type="submit" disabled={submitting} className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
           {submitting ? 'Guardando…' : 'Guardar'}
         </button>
       </div>
