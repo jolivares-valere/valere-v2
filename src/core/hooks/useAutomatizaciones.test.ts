@@ -108,9 +108,10 @@ describe('useCrearTareaDesdeContrato', () => {
     vi.clearAllMocks()
   })
 
-  it('inserta en "actividades" con tipo=tarea, estado=pendiente y fecha_vencimiento a 30 días', async () => {
+  it('inserta en "actividades" con tipo=tarea, estado=pendiente, fecha_actividad=hoy y fecha_vencimiento a 30 días', async () => {
     const { result } = renderHook(() => useCrearTareaDesdeContrato(), { wrapper })
     const hoy = new Date()
+    const esperadoHoy = hoy.toISOString().slice(0, 10)
     const esperado30d = new Date(hoy.getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
 
     result.current.mutate({
@@ -130,7 +131,10 @@ describe('useCrearTareaDesdeContrato', () => {
     expect(payload.entidad_tipo).toBe('contrato')
     expect(payload.entidad_id).toBe('c-1')
     expect(payload.asignado_a).toBe('user-1')
+    // BUG 6 — evitar regresión: fecha_actividad es HOY, fecha_vencimiento es HOY+30d
+    expect(payload.fecha_actividad).toBe(esperadoHoy)
     expect(payload.fecha_vencimiento).toBe(esperado30d)
+    expect(payload.fecha_vencimiento).not.toBe(payload.fecha_actividad)
     expect(payload.titulo).toContain('Endesa')
     expect(payload.titulo).toContain('Empresa Test')
   })
