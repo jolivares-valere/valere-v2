@@ -85,7 +85,7 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 
 | Tarea | Bloqueador | Urgencia |
 |-------|-----------|---------|
-| **Ejecutar SQL fase28.5 corregido** (FK eventos_usuario_id_fkey, BUG 7) | Pendiente confirmación Juan para Cowork | Alta — arregla /calendario |
+| ~~Ejecutar SQL fase28.5 corregido (FK eventos_usuario_id_fkey, BUG 7)~~ | ~~Cowork aplicó 2026-04-21 y verificó end-to-end~~ | ✅ Cerrado |
 | Sprint 2 del informe de diseño: toasts faltantes en mutaciones, skeletons en features Calc, migrar badges inline ActividadesPage/Dashboard a StatusBadge | Sprint dedicado | Media |
 | Policies granulares para `notificaciones` (hoy tiene policy FOR ALL permisiva) | Sprint dedicado | Baja |
 | Regenerar tipos TypeScript con `supabase gen types` automático | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
@@ -160,7 +160,7 @@ $$;
 - `20260419_fase28_1b_cups_id_fk.sql`: `cups_id` FK en facturas y proposals (FASE 28.1).
 - `20260420_fase28_2_fixes_rls_fks.sql`: RLS custom_fields, recrear FKs a user_profiles (16 tablas), mapeo `get_user_rol()` → 'admin' para master/manager. ✅ Cowork aplicó 2026-04-20.
 - DROP manual: `clients`, `supply_points` + 2 DELETE previos del registro PAZ Y BIEN test. ✅ Cowork aplicó 2026-04-21. 60 → 52 policies tras CASCADE.
-- `20260421_fase28_5_fk_eventos_asignado_a.sql`: FK `eventos.usuario_id` → `user_profiles(id)` (corrigió asunción inicial de `asignado_a`). ⏳ Pendiente de ejecutar.
+- `20260421_fase28_5_fk_eventos_asignado_a.sql`: FK `eventos.usuario_id` → `user_profiles(id)` (corrigió asunción inicial de `asignado_a`). ✅ Cowork aplicó 2026-04-21. BUG 7 cerrado end-to-end (verificado `/calendario` sin PGRST200).
 
 ## Cómo arrancar una nueva sesión
 
