@@ -62,7 +62,7 @@ export default function EventoForm({ evento, defaultDate, defaultEntidadTipo, de
       color: null,
       entidad_tipo: (defaultEntidadTipo ?? evento?.entidad_tipo ?? null) as EventoInsert['entidad_tipo'],
       entidad_id: defaultEntidadId ?? evento?.entidad_id ?? null,
-      asignado_a: evento?.asignado_a ?? null,
+      usuario_id: evento?.usuario_id ?? null,
       created_by: evento?.created_by ?? null,
     }
     if (evento) {

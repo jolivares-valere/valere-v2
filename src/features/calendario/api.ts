@@ -7,29 +7,29 @@ import type { Evento, EventoInsert, EventoUpdate } from '../../core/types/entiti
 const RESOURCE = 'eventos'
 
 export interface EventoConRelaciones extends Evento {
-  asignado?: { id: string; full_name: string | null } | null
+  usuario?: { id: string; full_name: string | null } | null
 }
 
 export interface EventosRangeOptions {
   desde: string
   hasta: string
-  asignado_a?: string
+  usuario_id?: string
 }
 
 export function useEventosEnRango(opts: EventosRangeOptions) {
   return useQuery({
-    queryKey: [RESOURCE, 'range', opts.desde, opts.hasta, opts.asignado_a ?? null],
+    queryKey: [RESOURCE, 'range', opts.desde, opts.hasta, opts.usuario_id ?? null],
     queryFn: async (): Promise<EventoConRelaciones[]> => {
       let q = supabase
         .from('eventos' as never)
-        .select('*, asignado:user_profiles!eventos_asignado_a_fkey(id, full_name)')
+        .select('*, usuario:user_profiles!eventos_usuario_id_fkey(id, full_name)')
         .is('deleted_at' as never, null)
         .gte('fecha_inicio' as never, opts.desde as never)
         .lt('fecha_inicio' as never, opts.hasta as never)
         .order('fecha_inicio' as never, { ascending: true })
 
-      if (opts.asignado_a) {
-        q = q.eq('asignado_a' as never, opts.asignado_a as never)
+      if (opts.usuario_id) {
+        q = q.eq('usuario_id' as never, opts.usuario_id as never)
       }
 
       const { data, error } = await q
@@ -46,7 +46,7 @@ export function useEventosByEntidad(entidadTipo: string | undefined, entidadId: 
     queryFn: async (): Promise<EventoConRelaciones[]> => {
       const { data, error } = await supabase
         .from('eventos' as never)
-        .select('*, asignado:user_profiles!eventos_asignado_a_fkey(id, full_name)')
+        .select('*, usuario:user_profiles!eventos_usuario_id_fkey(id, full_name)')
         .is('deleted_at' as never, null)
         .eq('entidad_tipo' as never, entidadTipo! as never)
         .eq('entidad_id' as never, entidadId! as never)

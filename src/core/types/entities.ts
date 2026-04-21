@@ -350,7 +350,7 @@ export interface Evento {
   color: string | null
   entidad_tipo: EntidadEvento | null
   entidad_id: string | null
-  asignado_a: string | null
+  usuario_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
