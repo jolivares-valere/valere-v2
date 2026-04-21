@@ -1,18 +1,23 @@
 # Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-20 (tarde) por Claude Code — FASE 28 completa + re-test Cowork + bugs residuales corregidos
+> Última actualización: 2026-04-21 por Claude Code — FASE 28 completa + DROP legacy ejecutado + hardening visual
 
 ## Rama de desarrollo
 
 `claude/valere-crm-architecture-2vvEV` — PR #1 abierto → main.
+HEAD actual: `f0ac5fa`. 27 commits desde la última actualización de este fichero.
 
 ## Resumen ejecutivo
 
-CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). **27 fases del roadmap completadas + FASE 28 completada (3 ejes)**. TSC 0 errores · 17/17 tests · build OK.
+CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). **27 fases del roadmap completadas + FASE 28 completa (3 ejes) + FASE 28.1–28.5 hardening y polish**. TSC 0 errores · 39/39 tests · build OK.
 
 **Audit completo 2026-04-19:** 0 P0 pendientes · 0 P1 pendientes. Consolidado en `docs/AUDIT_2026-04-19.md`.
 
-## Commits FASE 28 (esta sesión 2026-04-20)
+**DROP legacy ejecutado 2026-04-21**: Cowork dropeó `clients` y `supply_points` en Supabase (datos de PAZ Y BIEN test migrados a empresas). `proposals` (EN) se queda — la usa activamente AnalisisPage/PropuestasEnergiaPage/TrackingPage.
+
+## Commits (sesiones 2026-04-20 y 2026-04-21)
+
+### FASE 28 — Personalización + Eje 1/2/3 (2026-04-20 AM)
 
 | Commit | Qué hace |
 |--------|----------|
@@ -21,9 +26,29 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | `f28d9a3` | FASE 28 Eje 1 — Custom fields (useCustomFields, CustomFieldsPanel, CustomFieldsManager, tab "campos" en empresas y oportunidades) |
 | `abff85a` | FASE 28 Eje 3 — Automatizaciones (oportunidad ganada → borrador contrato; contrato activado → tarea 30d) |
 | `f51bfc8` | Hardening: role gating /admin, focus trap ConfirmDialog, CSP meta tag |
-| `be8585b` | FASE 28.2 fixes post-test: slug custom fields, profileLoaded flag (fix BUG 5 /admin directo), encoding â€" → —, migration SQL con RLS policies + recrear FKs a user_profiles |
-| `2df6d7e` | FASE 28.3: fix automatización ganada→contrato con canonicalEtapa (el form ofrecía dos 'Ganada' y solo disparaba con la canónica), logger con serializeError (elimina [object Object]), +11 tests (17→28) |
+| `be8585b` | FASE 28.2 fixes post-test Cowork: slug custom fields, profileLoaded flag (fix BUG 5 /admin directo), encoding â€" → —, migration SQL con RLS policies + recrear FKs a user_profiles |
+| `2df6d7e` | FASE 28.3: fix automatización ganada→contrato con canonicalEtapa, logger con serializeError (elimina [object Object]), +11 tests (17→28) |
 | `29d2eff` | FASE 28.4: eliminar etapas legacy del form de oportunidades; normalizarEtapa() convierte legacy→canónica al cargar |
+| `c9e2594` | CI de GitHub Actions (tsc + test + build) + ESTADO.md |
+| `a40634e` | Persistir fix get_user_rol() (master/manager → admin) en migration fase28.2 |
+| `6c5d9aa` | Handoff doc `docs/HANDOFF_2026-04-20.md` |
+| `9f22a8c` | Informe de diseño `docs/DESIGN_REVIEW_2026-04-20.md` (hallazgos priorizados en 3 sprints) |
+| `79a7b6b` | Referenciar informe de diseño desde handoff |
+
+### FASE 28 continuación — Sprint 1 A11y + Sprint 2 visual + DROP legacy (2026-04-21)
+
+| Commit | Qué hace |
+|--------|----------|
+| `5b7d0ff` | Sprint 1 accesibilidad: 5 confirm() nativos → ConfirmDialog, aria-labels + focus-visible, bonus OffersTab con confirmación |
+| `b1169f5` | README deploy Edge Function `chat-consultor` (código ya hardeniado: JWT + CORS + validación) |
+| `f855890` | +11 tests de hooks (useAutomatizaciones + useCustomFields, total 28→39) + dashboard tokens valere (bg-valere-blue vs bg-blue-500 decorativos) |
+| `359a0fb` | BUG 6 (fecha display) + aria-labels contextuales en contactos/contratos/incidencias/renovaciones/documentos + NotificationBell aria-expanded/haspopup |
+| `6905bd4` | `docs/LEGACY_TABLES_KILL_LIST.md` + test refuerzo BUG 6 (fecha_actividad ≠ fecha_vencimiento) |
+| `d665f24` | Frontend pre-DROP: elimina fallback `supply_points?.clients?.company_name` en TrackingPage y PropuestasEnergiaPage |
+| `397fdc1` | **TAREA 2 unificación visual**: rounded-md/lg → rounded-xl en 11 features CRM, H1 homologados al estilo Calc, StatusBadge genérico con 7 variantes semánticas, migración de EstadoBadge + IncidenciasPage + RenovacionesPage |
+| `d90a97a` | BUG 7 migration SQL (FK eventos.asignado_a — fallará y se corrige en f0ac5fa) + rounded-md residuales (ExportButton, Sidebar, ConfirmDialog, LoginPage, GlobalSearch, Skeleton, DocumentosTab) |
+| `7f38b2b` | Post-DROP: limpiar tipos TS (`src/core/types/database.ts` -145 líneas, 0 refs a clients/supply_points) |
+| `f0ac5fa` | **BUG 7 corregido**: la columna real es `usuario_id` (no `asignado_a`). Migration + interface Evento + useEventosEnRango + EventoForm alineados al schema real |
 
 ## Fases completadas (27/27 + FASE 28)
 
@@ -60,15 +85,26 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 
 | Tarea | Bloqueador | Urgencia |
 |-------|-----------|---------|
-| **Aplicar SQL 20260420_fase28_2_fixes_rls_fks.sql** en Supabase | Requiere SQL Editor del dashboard | Alta — desbloquea empresas/contratos |
-| Re-testear automatización ganada→contrato | Cowork el 2026-04-20 no pudo (drag&drop en viewport 533px); fix aplicado vía onSubmit en 2df6d7e | Alta |
+| **Ejecutar SQL fase28.5 corregido** (FK eventos_usuario_id_fkey, BUG 7) | Pendiente confirmación Juan para Cowork | Alta — arregla /calendario |
+| Sprint 2 del informe de diseño: toasts faltantes en mutaciones, skeletons en features Calc, migrar badges inline ActividadesPage/Dashboard a StatusBadge | Sprint dedicado | Media |
+| Policies granulares para `notificaciones` (hoy tiene policy FOR ALL permisiva) | Sprint dedicado | Baja |
+| Regenerar tipos TypeScript con `supabase gen types` automático | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
+| Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` + secrets GEMINI_API_KEY/ALLOWED_ORIGIN | Media |
 | Retirar policies duplicadas `cfs_admin/cfv_admin` (conviven con las nuevas `*_authenticated`) | Limpieza | Baja |
-| DROP `clients` + `supply_points` en Supabase | Cowork verifica `facturas.cups_id IS NULL = 0` primero | Baja |
-| Eliminar fallback `supply_points` en `ProposalWithDetails` | Tras DROP confirmado | Baja |
-| Regenerar tipos TypeScript (`supabase gen types`) | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
-| Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` | Media |
-| Secrets Supabase (GEMINI_API_KEY, ALLOWED_ORIGIN) | Acceso al proyecto Supabase | Media |
+| Tipos legacy `Client`/`SupplyPoint` en `src/types/database.ts` | Sin consumidores tras el DROP; eliminar en sprint dedicado | Baja |
 | Testar CSP en dev (`npm run dev`) | Si algo falla: aflojar `connect-src` o `script-src` | Baja |
+
+## Acciones completadas esta semana (2026-04-20/21)
+
+- ✅ FASE 28 Eje 1 (Custom fields), Eje 2 (Dashboards por rol), Eje 3 (Automatizaciones)
+- ✅ Sprint 1 a11y del informe de diseño (ConfirmDialog, aria-labels, focus-visible)
+- ✅ TAREA 2 escuela visual rounded-xl unificada + H1 homologados + StatusBadge genérico
+- ✅ DROP `clients` + `supply_points` ejecutado por Cowork en Supabase (2026-04-21)
+- ✅ Tipos TS limpiados post-DROP (-145 líneas en database.ts)
+- ✅ Migration fase28.2: RLS policies para custom_fields + recrear FKs a user_profiles
+- ✅ Fix get_user_rol() persistido en migration (master/manager → admin)
+- ✅ CI GitHub Actions (tsc + test + build en cada push)
+- ⏳ Migration fase28.5: BUG 7 FK eventos.usuario_id — SQL corregido, pendiente ejecución por Cowork
 
 ## Re-test Cowork 2026-04-20 (tras aplicar fase28.2 SQL)
 
@@ -105,17 +141,26 @@ $$;
 | `empresas` | ✅ activa | |
 | `cups` | ✅ activa | |
 | `facturas` | ✅ activa | Renombrada de invoice_history |
-| `clients` | ⚠️ legacy | DROP pendiente de confirmación Cowork |
-| `supply_points` | ⚠️ legacy | DROP pendiente de confirmación Cowork |
+| `clients` | ❌ DROPPED | Cowork 2026-04-21. Fallback eliminado en frontend previamente. |
+| `supply_points` | ❌ DROPPED | Cowork 2026-04-21. Ídem. |
+| `proposals` (Calc EN) | ✅ activa | NO dropear: uso activo en AnalisisPage (insert) + PropuestasEnergiaPage/TrackingPage (listados). Vacía en prod hoy. |
 | `custom_fields_schema` | ✅ activa | UI implementada en admin |
-| `custom_fields_values` | ✅ activa | UI implementada en fichas |
+| `custom_fields_values` | ✅ activa | UI implementada en fichas. Unique index (schema_id, entidad_id) en fase28.2 |
 | `contratos` | ✅ activa | |
 | `oportunidades` | ✅ activa | |
 | `incidencias` | ✅ activa | |
 | `renovaciones` | ✅ activa | |
 | `actividades` | ✅ activa | |
 | `documentos` (tabla + bucket) | ✅ activa | |
-| `eventos` | ✅ activa | |
+| `eventos` | ✅ activa | Columna real: `usuario_id` (no `asignado_a` como asumió el código originalmente). FK pendiente de aplicar con fase28.5. |
+
+## Migrations aplicadas en Supabase
+
+- `20260418_fase20.9_rls_granular.sql`: RLS granular para 11 tablas CRM, helper `is_manager_or_above()`.
+- `20260419_fase28_1b_cups_id_fk.sql`: `cups_id` FK en facturas y proposals (FASE 28.1).
+- `20260420_fase28_2_fixes_rls_fks.sql`: RLS custom_fields, recrear FKs a user_profiles (16 tablas), mapeo `get_user_rol()` → 'admin' para master/manager. ✅ Cowork aplicó 2026-04-20.
+- DROP manual: `clients`, `supply_points` + 2 DELETE previos del registro PAZ Y BIEN test. ✅ Cowork aplicó 2026-04-21. 60 → 52 policies tras CASCADE.
+- `20260421_fase28_5_fk_eventos_asignado_a.sql`: FK `eventos.usuario_id` → `user_profiles(id)` (corrigió asunción inicial de `asignado_a`). ⏳ Pendiente de ejecutar.
 
 ## Cómo arrancar una nueva sesión
 

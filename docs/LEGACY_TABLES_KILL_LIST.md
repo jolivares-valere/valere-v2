@@ -1,7 +1,16 @@
 # Legacy tables — kill list
 
+> **ESTADO: DROP ejecutado 2026-04-21 (commit `7f38b2b` en frontend).**
 > Análisis del uso real de las 3 tablas legacy Calc en el código.
 > Basado en commit `359a0fb` (branch `claude/valere-crm-architecture-2vvEV`).
+
+## Resultado final
+
+- ✅ `clients` DROPEADA por Cowork.
+- ✅ `supply_points` DROPEADA por Cowork.
+- ✅ `proposals` (EN) **conservada** — uso activo confirmado.
+- ✅ Tipos TS limpiados en `src/core/types/database.ts` (commit `7f38b2b`).
+- ✅ 60 → 52 policies en Supabase (CASCADE eliminó 8 asociadas).
 
 ## TL;DR
 
