@@ -137,9 +137,77 @@ export interface Cups {
   energia_p4_kwh: number | null
   energia_p5_kwh: number | null
   energia_p6_kwh: number | null
+  // Campos Datadis (migración 20260422_datadis_integracion)
+  datadis_sincronizado: boolean | null
+  datadis_ultima_sync: string | null
+  datadis_distribuidor_cod: string | null
+  datadis_punto_tipo: number | null
   deleted_at: string | null
   created_at: string
 }
+
+// ──────────────────────────────────────────────
+// INTEGRACIÓN DATADIS
+// ──────────────────────────────────────────────
+
+/** Credenciales de Datadis almacenadas por empresa */
+export interface DatadisToken {
+  id: string
+  empresa_id: string
+  username: string          // NIF/NIE/CIF del titular en Datadis
+  password_enc: string      // Contraseña cifrada (solo para escritura, no mostrar en UI)
+  autorizado: boolean
+  token_cache: string | null
+  token_expira: string | null
+  ultimo_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Consumo horario descargado de Datadis */
+export interface DatadisConsumption {
+  id: string
+  cups_id: string
+  fecha: string             // ISO date: "2026-01-15"
+  hora: number              // 0–23
+  consumo_kwh: number
+  excedente_kwh: number
+  metodo_obtencion: 'real' | 'estimada'
+  origen: string
+  created_at: string
+}
+
+// Respuestas raw de la API de Datadis (formato que devuelve la API oficial)
+export interface DatadisSupplyRaw {
+  cups: string
+  validDateFrom: string
+  validDateTo: string
+  pointType: number         // 1 = cuarto-horario, 2 = cierre mensual
+  distributorCode: string   // "2" = Iberdrola, etc.
+  distributorName: string
+  marketer: string          // Comercializadora actual
+  postalCode: string
+  province: string
+  municipality: string
+  address: string
+  contractedPowerkW: number[]  // Potencias P1–P6
+  accessTariff: string      // "2.0TD", "3.0TD", etc.
+  selfConsumptionType: string | null
+  surplusDistribution: boolean | null
+}
+
+export interface DatadisConsumptionRaw {
+  cups: string
+  date: string              // "2026/01/15"
+  time: string              // "01:00"
+  consumptionKWh: number
+  surplusEnergyKWh: number
+  obtainMethod: string      // "Real" | "Estimated"
+}
+
+export type DatadisTokenInsert = Omit<DatadisToken, 'id' | 'created_at' | 'updated_at'>
+export type DatadisTokenUpdate = Partial<DatadisTokenInsert>
+export type DatadisConsumptionInsert = Omit<DatadisConsumption, 'id' | 'created_at'>
 
 export interface Oportunidad {
   id: string
@@ -359,3 +427,5 @@ export interface Evento {
 
 export type EventoInsert = Insert<Evento>
 export type EventoUpdate = Update<Evento>
+
+// Datadis (Insert/Update ya definidos inline arriba para evitar conflicto con helper genérico)

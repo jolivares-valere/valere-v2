@@ -2,6 +2,95 @@
 
 Fichero de contexto persistente para agentes Claude (Code, Cowork, API). Leer siempre antes de trabajar en el repo.
 
+---
+
+## 🔗 ENLACES DE SERVICIOS (NO MODIFICAR)
+
+| Servicio | URL / Referencia |
+|---|---|
+| **GitHub repo** | https://github.com/jolivares-valere/valere-v2 |
+| **Supabase proyecto** | https://supabase.com/dashboard/project/gtphkowfcuiqbvfkwjxb |
+| **Supabase API URL** | https://gtphkowfcuiqbvfkwjxb.supabase.co |
+| **Vercel deploy** | https://valere-v2.vercel.app (o el dominio activo en Vercel dashboard) |
+| **Dev local** | http://localhost:3000 (puerto fijo, vite --port 3000) |
+| **Drive logos/branding** | https://drive.google.com/drive/folders/1JxJR7w2iuHnGJZXg4EQXr82r9g1-FoJe |
+| **Drive empresa Valere** | https://drive.google.com/drive/folders/1wZBFZuhACbDKMndJWo4S1EJLbQp8PrvN |
+| **GitHub Actions CI** | https://github.com/jolivares-valere/valere-v2/actions |
+
+**Puerto de desarrollo: SIEMPRE 3000.** No usar 5173 ni otros. Si el servidor no arranca en 3000, matar proceso y reiniciar.
+
+---
+
+## 🤖 SISTEMA DE AGENTES
+
+Este proyecto usa 4 agentes especializados que trabajan en paralelo. Cada agente tiene su capa de responsabilidad y NO debe tocar las capas de los demás.
+
+### Agente 1 — Cowork (coordinador + features de backend)
+- **Quién:** Claude en la app Cowork de escritorio (este agente)
+- **Responsabilidad:** planificación, features nuevas, hooks, API calls, SQL migrations, documentación
+- **Toca:** `src/features/`, `src/core/`, `supabase/migrations/`, `docs/`
+- **NO toca:** tokens de diseño CSS, identidad visual
+
+### Agente 2 — Claude Code CLI (implementación + QA)
+- **Quién:** Claude Code en terminal del ordenador de Juan
+- **Responsabilidad:** ejecutar builds, tests, commits, push, debugging interactivo
+- **Toca:** todo el repo, especialmente verificación TSC + tests antes de cada PR
+- **Prompt de arranque para Claude Code:**
+  ```
+  cd ~/valere-v2
+  git pull origin main
+  cat CLAUDE.md docs/ESTADO.md
+  ls .cowork/inbox/
+  git log --oneline -5
+  Continúa desde donde lo dejamos. Rama de trabajo: claude/<descripcion>.
+  ```
+
+### Agente 3 — Claude Design (diseño visual)
+- **Quién:** Claude Design (app independiente) o Claude in Chrome apuntando a localhost:3000
+- **Responsabilidad:** analizar screenshots de la app, comparar con branding Valere, generar propuestas CSS/tokens
+- **Toca:** SOLO genera archivos de diseño que Cowork implementa. NO hace commits.
+- **Input que necesita:** screenshots de pantallas actuales + archivos de branding del Drive
+- **Output que produce:** especificaciones de tokens (colores, tipografía, spacing) en formato markdown + componentes HTML de referencia
+- **Branding Valere disponible en:** https://drive.google.com/drive/folders/1JxJR7w2iuHnGJZXg4EQXr82r9g1-FoJe
+
+### Agente 4 — Auditor autónomo (skill valere-auditor)
+- **Quién:** subagente lanzado por Cowork o Code al final de cada feature
+- **Responsabilidad:** TSC 0 errores, 39/39 tests, build OK, RLS correcto, sin regresiones
+- **Activa con:** skill `valere-auditor` (ver `.claude/skills/valere-auditor/`)
+- **Output:** informe en `docs/AUDIT_<YYYY-MM-DD>.md`
+
+---
+
+## 📋 PROTOCOLO DE SESIÓN AUTOMÁTICO
+
+### Al ABRIR sesión (ejecutar SIEMPRE, en este orden):
+```bash
+git pull origin main
+cat CLAUDE.md
+cat docs/ESTADO.md
+ls .cowork/inbox/ 2>/dev/null || echo "(inbox vacío)"
+git log --oneline -5
+```
+Después decir: "He leído el estado. Estamos en: [resumen de 2 líneas de ESTADO.md]."
+
+### Al CERRAR sesión (ejecutar SIEMPRE):
+```bash
+# 1. Actualizar docs/ESTADO.md (fecha, commits, pendientes)
+# 2. Crear resumen en docs/SESIONES/YYYY-MM-DD-resumen.md
+# 3. Dejar mensajes en .cowork/outbox/ si hay instrucciones para siguiente sesión
+# 4. Commit y push
+git add docs/ESTADO.md docs/SESIONES/
+git commit -m "docs: actualizar ESTADO.md sesión $(date +%Y-%m-%d)"
+git push origin main
+```
+
+### Bus de mensajes entre sesiones:
+- **`.cowork/inbox/`** — mensajes que esta sesión RECIBE de sesiones anteriores (leer al abrir)
+- **`.cowork/outbox/`** — mensajes que esta sesión DEJA para la siguiente (escribir al cerrar)
+- Formato de archivo: `YYYY-MM-DDTHH-MM-SS-descripcion.md`
+
+---
+
 ## Producto
 
 **Valere** — plataforma para Valere Consultores, consultora energética española. Dos grandes bloques funcionales que ahora conviven en este repo y que estamos fusionando bajo una sola arquitectura:
@@ -89,9 +178,10 @@ src/features/<dominio>/
 ## Comandos útiles
 
 ```bash
-npm run dev            # Vite dev server (localhost:5173)
+npm run dev            # Vite dev server → http://localhost:3000 (SIEMPRE puerto 3000)
 npm run build          # Build producción
 npx tsc --noEmit       # Type-check (DEBE estar a 0 errores antes de commit)
+npm test -- --run      # Tests (deben pasar 39/39)
 npm run preview        # Preview build local
 ```
 

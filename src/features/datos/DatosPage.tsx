@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   FileUp, Plus, Search, Loader2, Trash2, Save, Building2, Zap, Calendar, AlertCircle, Edit2
 } from 'lucide-react';
+import DatadisPanel from './components/DatadisPanel';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -418,6 +419,32 @@ export default function DataCapture() {
           </CardContent>
         </Card>
       )}
+
+      {/* Panel de integración Datadis — visible cuando hay CUPS seleccionado */}
+      {selectedSPId && (() => {
+        const cupsSeleccionado = cupsRows.find(c => c.id === selectedSPId);
+        return cupsSeleccionado ? (
+          <Card className="border-none shadow-md bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-50">
+              <CardTitle className="text-lg font-display text-valere-blue-dark flex items-center gap-2">
+                <Zap className="w-5 h-5 text-blue-500" />
+                Datadis
+                {cupsSeleccionado.datadis_sincronizado && (
+                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800 ml-1">
+                    Sincronizado
+                  </span>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Importa datos técnicos y consumos históricos automáticamente desde datadis.es
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <DatadisPanel cups={cupsSeleccionado} />
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
 
       {!selectedClientId && (
         <EmptyState
