@@ -1,6 +1,6 @@
 # Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-22 por Claude Code — FASE 28 completa + Sprint 2 visual aplicado (toasts + skeletons + badges a StatusBadge)
+> Última actualización: 2026-04-22 por Cowork — Integración Datadis completa + sistema multi-agente + CLAUDE.md actualizado + migraciones Supabase ejecutadas
 
 ## Rama de desarrollo
 
@@ -34,6 +34,13 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | `6c5d9aa` | Handoff doc `docs/HANDOFF_2026-04-20.md` |
 | `9f22a8c` | Informe de diseño `docs/DESIGN_REVIEW_2026-04-20.md` (hallazgos priorizados en 3 sprints) |
 | `79a7b6b` | Referenciar informe de diseño desde handoff |
+
+### Integración Datadis + sistema multi-agente (2026-04-22 Cowork)
+
+| Commit | Qué hace |
+|--------|----------|
+| `29b3e97` | Sprint 2 parte 3: skeleton DatosPage facturas + ESTADO.md |
+| `8073c71` | feat(agentes): sistema multi-agente + CLAUDE.md actualizado + Datadis integration (service, hooks, panel, migration) |
 
 ### Sprint 2 visual (2026-04-22 autónomo)
 
@@ -95,8 +102,9 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 |-------|-----------|---------|
 | ~~Ejecutar SQL fase28.5 corregido (FK eventos_usuario_id_fkey, BUG 7)~~ | ~~Cowork aplicó 2026-04-21 y verificó end-to-end~~ | ✅ Cerrado |
 | ~~Sprint 2 del informe de diseño: toasts + skeletons + badges inline~~ | ~~Aplicado 2026-04-22 (commits 0c6eea2, 3422117)~~ | ✅ Cerrado |
-| ~~Policies granulares para `notificaciones`~~ | Migration `fase28.6` preparada — pendiente de ejecutar en Supabase | ✅ Código listo |
-| ~~Retirar policies duplicadas `cfs_admin/cfv_admin`~~ | Incluido en `fase28.6` | ✅ Código listo |
+| ~~Policies granulares para `notificaciones`~~ | ~~Migration `fase28.6` preparada~~ | ✅ Ejecutado en Supabase 2026-04-22 |
+| ~~Retirar policies duplicadas `cfs_admin/cfv_admin`~~ | ~~Incluido en `fase28.6`~~ | ✅ Ejecutado en Supabase 2026-04-22 |
+| ~~Integración Datadis~~ | ~~Migration + service + hooks + panel~~ | ✅ Completo 2026-04-22 |
 | Regenerar tipos TypeScript con `supabase gen types` automático | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
 | Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` + secrets GEMINI_API_KEY/ALLOWED_ORIGIN | Media |
 | ~~Retirar policies duplicadas `cfs_admin/cfv_admin` (duplicado arriba)~~ | Incluido en `fase28.6` | ✅ Código listo |
@@ -170,7 +178,8 @@ $$;
 - `20260420_fase28_2_fixes_rls_fks.sql`: RLS custom_fields, recrear FKs a user_profiles (16 tablas), mapeo `get_user_rol()` → 'admin' para master/manager. ✅ Cowork aplicó 2026-04-20.
 - DROP manual: `clients`, `supply_points` + 2 DELETE previos del registro PAZ Y BIEN test. ✅ Cowork aplicó 2026-04-21. 60 → 52 policies tras CASCADE.
 - `20260421_fase28_5_fk_eventos_asignado_a.sql`: FK `eventos.usuario_id` → `user_profiles(id)` (corrigió asunción inicial de `asignado_a`). ✅ Cowork aplicó 2026-04-21. BUG 7 cerrado end-to-end (verificado `/calendario` sin PGRST200).
-- `20260422_fase28_6_rls_policies_cleanup.sql`: policies granulares para `notificaciones` (SELECT/UPDATE/DELETE por `usuario_id` o master/manager) + limpieza de policies duplicadas `cfs_admin`/`cfv_admin`/`cfs_read` (las `*_authenticated` de fase28.2 ya cubren todo). ⏳ Pendiente de ejecutar en Supabase.
+- `20260422_fase28_6_rls_policies_cleanup.sql`: policies granulares para `notificaciones` + limpieza de policies duplicadas. ✅ Ejecutado en Supabase 2026-04-22.
+- `20260422_datadis_integracion.sql`: columnas datadis_* en cups + tabla datadis_tokens + tabla datadis_consumptions + RLS granular. ✅ Ejecutado en Supabase 2026-04-22.
 
 ## Cómo arrancar una nueva sesión
 
