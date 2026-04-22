@@ -14,7 +14,8 @@ Trabajo autónomo mientras no estabas. He aplicado el **Sprint 2 completo** del 
 |--------|-----|
 | `0c6eea2` | Sprint 2 parte 1: 3 toasts faltantes (useUpdateEtapa, useToggleTareaCompletada, useMarcarTodasLeidas) + skeletons en PropuestasEnergiaPage y TrackingPage + badges inline de ActividadesPage/Dashboard → StatusBadge + eliminar interface `Client` legacy |
 | `3422117` | Sprint 2 parte 2: skeletons en AdminPage (3 tabs internos) + CustomFieldsManager |
-| `TBD` | Sprint 2 parte 3: skeleton en DatosPage facturas + esta actualización de docs |
+| `376cff9` | Sprint 2 parte 3: skeleton en DatosPage facturas + actualización de docs |
+| `5c3da06` | Preparación cierre: migration fase28.6 (policies granulares notificaciones + cleanup cfs duplicadas) + README.md + docs/DEPLOY.md (Vercel y Cloudflare) + docs/MERGE_STRATEGY.md (propuesta squash merge) |
 
 ## Qué verás cuando hagas pull
 
@@ -38,27 +39,37 @@ Trabajo autónomo mientras no estabas. He aplicado el **Sprint 2 completo** del 
 ### Cleanup
 - Interface `Client` eliminada de `src/types/database.ts` (sin consumidores tras el DROP)
 
-## Pendientes (sin tocar, esperando tu decisión)
+## Qué te queda a ti para cerrar (3 acciones)
 
-### Deployment URL
-Sigue sin decidir. Cuando vuelvas:
-- **Cloudflare Tunnel** (5 min, gratis, tu PC) para pruebas puntuales de compañeros
-- **Vercel** (15 min, gratis, CI/CD) para demos a cliente o uso frecuente
+### 1. Ejecutar SQL `fase28.6` en Supabase (2 min)
 
-### Merge PR #1 a main
-PR acumula ~42 commits. Decisión previa:
-- Squash o no
-- Tag `v2.0.0`
-- Actualizar README de main
+Abre Supabase → SQL Editor → pega el contenido de:
+```
+supabase/migrations/20260422_fase28_6_rls_policies_cleanup.sql
+```
 
-### Tareas infraestructura Supabase
-- Deploy Edge Function `chat-consultor` + secrets
-- Policies granulares para `notificaciones`
-- Retirar policies duplicadas `cfs_admin/cfv_admin`
-- Regenerar tipos TS con `supabase gen types`
+Click Run. Cierra los 2 pendientes de RLS:
+- Policies granulares para `notificaciones` (solo destinatario + master/manager).
+- Limpieza de 3 policies duplicadas en `custom_fields_schema`/`values`.
 
-### Features nuevas (roadmap futuro)
-SIPS auto-import, firma electrónica, modo oscuro, PWA, panel cliente, ETL BOE.
+Idempotente y reversible.
+
+### 2. Decidir deployment (15 min)
+
+Tienes `docs/DEPLOY.md` con pasos paso a paso. Recomendación: **Vercel** para producción. Si solo necesitas compartir con 1-2 compañeros hoy, **Cloudflare Tunnel** te vale en 5 min sin CI/CD.
+
+### 3. Mergear PR #1 a main (5 min)
+
+Tienes `docs/MERGE_STRATEGY.md` con propuesta concreta. Recomendación: **Squash merge** con el título/mensaje ya redactado (copia-pega en GitHub). Después `git tag v2.0.0`.
+
+## Pendientes NO bloqueantes (roadmap futuro)
+
+### Infraestructura Supabase (requiere CLI)
+- Deploy Edge Function `chat-consultor` + secrets (guía en `supabase/functions/chat-consultor/README.md`)
+- Regenerar tipos TS con `supabase gen types` — requiere `SUPABASE_ACCESS_TOKEN`
+
+### Features nuevas (roadmap)
+SIPS auto-import (alto ROI), firma electrónica, modo oscuro, PWA, panel cliente autoservicio, ETL BOE.
 
 ## Verde al cerrar
 
