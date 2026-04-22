@@ -95,10 +95,11 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 |-------|-----------|---------|
 | ~~Ejecutar SQL fase28.5 corregido (FK eventos_usuario_id_fkey, BUG 7)~~ | ~~Cowork aplicó 2026-04-21 y verificó end-to-end~~ | ✅ Cerrado |
 | ~~Sprint 2 del informe de diseño: toasts + skeletons + badges inline~~ | ~~Aplicado 2026-04-22 (commits 0c6eea2, 3422117)~~ | ✅ Cerrado |
-| Policies granulares para `notificaciones` (hoy tiene policy FOR ALL permisiva) | Sprint dedicado | Baja |
+| ~~Policies granulares para `notificaciones`~~ | Migration `fase28.6` preparada — pendiente de ejecutar en Supabase | ✅ Código listo |
+| ~~Retirar policies duplicadas `cfs_admin/cfv_admin`~~ | Incluido en `fase28.6` | ✅ Código listo |
 | Regenerar tipos TypeScript con `supabase gen types` automático | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
 | Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` + secrets GEMINI_API_KEY/ALLOWED_ORIGIN | Media |
-| Retirar policies duplicadas `cfs_admin/cfv_admin` (conviven con las nuevas `*_authenticated`) | Limpieza | Baja |
+| ~~Retirar policies duplicadas `cfs_admin/cfv_admin` (duplicado arriba)~~ | Incluido en `fase28.6` | ✅ Código listo |
 | Tipos legacy `Client`/`SupplyPoint` en `src/types/database.ts` | Sin consumidores tras el DROP; eliminar en sprint dedicado | Baja |
 | Testar CSP en dev (`npm run dev`) | Si algo falla: aflojar `connect-src` o `script-src` | Baja |
 
@@ -169,6 +170,7 @@ $$;
 - `20260420_fase28_2_fixes_rls_fks.sql`: RLS custom_fields, recrear FKs a user_profiles (16 tablas), mapeo `get_user_rol()` → 'admin' para master/manager. ✅ Cowork aplicó 2026-04-20.
 - DROP manual: `clients`, `supply_points` + 2 DELETE previos del registro PAZ Y BIEN test. ✅ Cowork aplicó 2026-04-21. 60 → 52 policies tras CASCADE.
 - `20260421_fase28_5_fk_eventos_asignado_a.sql`: FK `eventos.usuario_id` → `user_profiles(id)` (corrigió asunción inicial de `asignado_a`). ✅ Cowork aplicó 2026-04-21. BUG 7 cerrado end-to-end (verificado `/calendario` sin PGRST200).
+- `20260422_fase28_6_rls_policies_cleanup.sql`: policies granulares para `notificaciones` (SELECT/UPDATE/DELETE por `usuario_id` o master/manager) + limpieza de policies duplicadas `cfs_admin`/`cfv_admin`/`cfs_read` (las `*_authenticated` de fase28.2 ya cubren todo). ⏳ Pendiente de ejecutar en Supabase.
 
 ## Cómo arrancar una nueva sesión
 
