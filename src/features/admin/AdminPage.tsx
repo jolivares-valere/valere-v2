@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import EmptyState from '@/core/components/EmptyState';
+import { SkeletonRow } from '@/components/ui/Skeleton';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import type { UserProfile, Retailer, RetailerOffer, GlobalConfig } from '@/types/database';
 import { supabase } from '@/core/supabase/client';
@@ -73,7 +74,15 @@ function UsersTab() {
     else { toast.success('Rol actualizado'); refetch(); }
   };
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-valere-blue-dark" /></div>;
+  if (loading) return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+      <table className="w-full">
+        <tbody>
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <Card className="border-none shadow-md bg-white mt-4 overflow-hidden">
@@ -177,7 +186,15 @@ function RetailersTab() {
     refetch();
   };
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  if (loading) return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+      <table className="w-full">
+        <tbody>
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <>
@@ -334,7 +351,15 @@ function OffersTab() {
     setDialogOpen(true);
   };
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  if (loading) return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+      <table className="w-full">
+        <tbody>
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <>

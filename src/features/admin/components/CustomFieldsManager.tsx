@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import EmptyState from '@/core/components/EmptyState'
+import { SkeletonRow } from '@/components/ui/Skeleton'
 import {
   useCustomFieldsSchemaAdmin,
   useCreateCustomFieldSchema,
@@ -206,9 +207,11 @@ export default function CustomFieldsManager() {
 
       <CardContent className="p-0">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-          </div>
+          <table className="w-full">
+            <tbody>
+              {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}
+            </tbody>
+          </table>
         ) : fields.length === 0 ? (
           <EmptyState
             icon={<Plus className="h-8 w-8" />}
