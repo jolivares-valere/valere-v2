@@ -1,0 +1,38 @@
+import { useDraggable } from '@dnd-kit/core'
+import type { OportunidadConEmpresa } from '../api'
+import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../../core/utils/energy'
+import PrioridadBadge from '../../contratos/components/PrioridadBadge'
+
+interface Props {
+  op: OportunidadConEmpresa
+  onClick: () => void
+}
+
+export default function KanbanCard({ op, onClick }: Props) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: op.id })
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
+  const dias = calcDiasVencimiento(op.contrato_origen?.fecha_fin ?? null)
+  const prioridad = calcPrioridad(dias)
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onClick={onClick}
+      className={`cursor-grab rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm hover:shadow-md active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <p className="mb-1 font-medium text-slate-900">{op.empresa?.nombre ?? op.nombre}</p>
+      <p className="mb-2 text-xs text-slate-500">
+        {op.tipo.replace('_', ' ')} · {formatComision(op.valor_estimado_eur)}
+      </p>
+      {op.tipo === 'renovacion' && op.contrato_origen?.fecha_fin && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-500">{dias}d</span>
+          <PrioridadBadge prioridad={prioridad} />
+        </div>
+      )}
+    </div>
+  )
+}

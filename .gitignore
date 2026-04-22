@@ -30,3 +30,7 @@ npm-debug.log*
 # Cache
 .cache/
 .parcel-cache/
+*.tsbuildinfo
+
+supabase/.temp/
+tsc_output.txt

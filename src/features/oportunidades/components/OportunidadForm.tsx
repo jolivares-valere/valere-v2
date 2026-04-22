@@ -1,0 +1,227 @@
+﻿import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../../core/supabase/client'
+import { useContactosPorEmpresa } from '../../contactos/api'
+import CustomFieldsPanel from '../../../core/components/CustomFieldsPanel'
+import type { Oportunidad, OportunidadInsert } from '../../../core/types/entities'
+
+const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
+const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida', 'cancelada', 'auditoria_consumo', 'oferta_presentada', 'contrato_firmado', 'activo', 'cerrada_ganada', 'cerrada_perdida'] as const
+
+// Mapeo de etapas legacy → canónica. Al cargar una oportunidad con etapa
+// legacy, el form la normaliza para que al guardar se quede en canónica.
+const LEGACY_TO_CANONICAL: Record<string, typeof ETAPAS[number]> = {
+  contactado: 'auditoria_consumo',
+  analisis: 'auditoria_consumo',
+  propuesta_enviada: 'oferta_presentada',
+  ganada: 'cerrada_ganada',
+  perdida: 'cerrada_perdida',
+  cancelada: 'cerrada_perdida',
+}
+
+function normalizarEtapa(e: string | undefined | null): typeof ETAPAS[number] {
+  if (!e) return 'prospecto'
+  return LEGACY_TO_CANONICAL[e] ?? (e as typeof ETAPAS[number])
+}
+
+const optNum = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+  z.number().nullable(),
+)
+
+const schema = z.object({
+  empresa_id: z.string().uuid('Empresa obligatoria'),
+  contacto_id: z.string().uuid().or(z.literal('')).transform((v) => v || null),
+  nombre: z.string().min(2, 'Mínimo 2 caracteres'),
+  tipo: z.enum(TIPOS),
+  etapa: z.enum(ETAPAS),
+  probabilidad_pct: optNum.refine((v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 100), 'Entre 0 y 100'),
+  valor_estimado_eur: optNum.refine((v) => v === null || v >= 0, 'Importe inválido'),
+  ahorro_anual_estimado: optNum.refine((v) => v === null || v >= 0, 'Importe inválido'),
+  fecha_cierre_prevista: z.string().optional().transform((v) => v || null),
+  notas: z.string().optional().transform((v) => v || null),
+})
+
+export type OportunidadFormValues = z.input<typeof schema>
+
+interface Props {
+  defaultValues?: Partial<Oportunidad>
+  onSubmit: (values: OportunidadInsert) => Promise<void> | void
+  onCancel?: () => void
+  submitting?: boolean
+}
+
+export default function OportunidadForm({ defaultValues, onSubmit, onCancel, submitting }: Props) {
+  const empresas = useQuery({
+    queryKey: ['empresas', 'options'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('empresas').select('id, nombre').is('deleted_at', null).order('nombre')
+      if (error) throw error
+      return (data ?? []) as { id: string; nombre: string }[]
+    },
+  })
+
+  const form = useForm<OportunidadFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      empresa_id: defaultValues?.empresa_id ?? '',
+      contacto_id: defaultValues?.contacto_id ?? '',
+      nombre: defaultValues?.nombre ?? '',
+      tipo: defaultValues?.tipo ?? 'nueva_venta',
+      etapa: normalizarEtapa(defaultValues?.etapa),
+      probabilidad_pct: defaultValues?.probabilidad_pct?.toString() ?? '',
+      valor_estimado_eur: defaultValues?.valor_estimado_eur?.toString() ?? '',
+      ahorro_anual_estimado: defaultValues?.ahorro_anual_estimado?.toString() ?? '',
+      fecha_cierre_prevista: defaultValues?.fecha_cierre_prevista ?? '',
+      notas: defaultValues?.notas ?? '',
+    },
+  })
+
+  const empresaIdWatched = form.watch('empresa_id')
+  const contactos = useContactosPorEmpresa(empresaIdWatched)
+
+  useEffect(() => {
+    if (empresas.data && defaultValues) {
+      form.reset({
+        ...form.getValues(),
+        empresa_id: defaultValues.empresa_id ?? '',
+        contacto_id: defaultValues.contacto_id ?? '',
+      })
+    }
+  }, [empresas.data, defaultValues?.empresa_id, defaultValues?.contacto_id])
+
+  const handle = form.handleSubmit(async (values) => {
+    const v = values as unknown as {
+      empresa_id: string
+      contacto_id: string | null
+      nombre: string
+      tipo: typeof TIPOS[number]
+      etapa: typeof ETAPAS[number]
+      probabilidad_pct: number | null
+      valor_estimado_eur: number | null
+      ahorro_anual_estimado: number | null
+      fecha_cierre_prevista: string | null
+      notas: string | null
+    }
+    const insert: OportunidadInsert = {
+      empresa_id: v.empresa_id,
+      contacto_id: v.contacto_id,
+      contrato_origen_id: defaultValues?.contrato_origen_id ?? null,
+      comercial_id: defaultValues?.comercial_id ?? null,
+      tipo: v.tipo,
+      nombre: v.nombre,
+      etapa: v.etapa,
+      probabilidad_pct: v.probabilidad_pct ?? 20,
+      valor_estimado_eur: v.valor_estimado_eur,
+      ahorro_anual_estimado: v.ahorro_anual_estimado,
+      fecha_cierre_prevista: v.fecha_cierre_prevista,
+      motivo_perdida: defaultValues?.motivo_perdida ?? null,
+      notas: v.notas,
+      tags: defaultValues?.tags ?? [],
+      external_id: defaultValues?.external_id ?? null,
+      created_by: defaultValues?.created_by ?? null,
+    }
+    await onSubmit(insert)
+  })
+
+  const field = (name: keyof OportunidadFormValues, label: string, type = 'text') => (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <input type={type} {...form.register(name)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none" />
+      {form.formState.errors[name] && (
+        <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors[name]?.message)}</span>
+      )}
+    </label>
+  )
+
+  return (
+    <form onSubmit={handle} className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <label className="block md:col-span-2">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Empresa *</span>
+          <select
+            {...form.register('empresa_id', {
+              onChange: () => form.setValue('contacto_id', ''),
+            })}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">— Selecciona empresa —</option>
+            {empresas.data?.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+          </select>
+          {form.formState.errors.empresa_id && (
+            <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.empresa_id?.message)}</span>
+          )}
+        </label>
+        <label className="block md:col-span-2">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Contacto principal</span>
+          <select
+            {...form.register('contacto_id')}
+            disabled={!empresaIdWatched}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+          >
+            <option value="">— Sin contacto —</option>
+            {contactos.data?.map((c) => {
+              const nombre = `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}`
+              const cargo = c.cargo ? ` — ${c.cargo}` : ''
+              const decisor = c.es_decisor ? ' â­' : ''
+              return (
+                <option key={c.id} value={c.id}>{`${nombre}${cargo}${decisor}`}</option>
+              )
+            })}
+          </select>
+          {empresaIdWatched && contactos.data && contactos.data.length === 0 && (
+            <span className="mt-1 block text-xs text-slate-500">Esta empresa no tiene contactos aún.</span>
+          )}
+        </label>
+        {field('nombre', 'Nombre *')}
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Tipo *</span>
+          <select {...form.register('tipo')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+            <option value="nueva_venta">Nueva venta</option>
+            <option value="renovacion">Renovación</option>
+            <option value="ampliacion">Ampliación</option>
+            <option value="recuperacion">Recuperación</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Etapa *</span>
+          <select {...form.register('etapa')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+            <option value="prospecto">Prospecto</option>
+            <option value="auditoria_consumo">Auditoría consumo</option>
+            <option value="oferta_presentada">Oferta presentada</option>
+            <option value="negociacion">Negociación</option>
+            <option value="contrato_firmado">Contrato firmado</option>
+            <option value="activo">Activo</option>
+            <option value="cerrada_ganada">Ganada</option>
+            <option value="cerrada_perdida">Perdida</option>
+          </select>
+        </label>
+        {field('probabilidad_pct', 'Probabilidad (%)', 'number')}
+        {field('valor_estimado_eur', 'Valor estimado (€)', 'number')}
+        {field('ahorro_anual_estimado', 'Ahorro anual estimado (€)', 'number')}
+        {field('fecha_cierre_prevista', 'Fecha cierre prevista', 'date')}
+      </div>
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700">Notas</span>
+        <textarea {...form.register('notas')} rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+      </label>
+      <div className="flex justify-end gap-2">
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+        )}
+        <button type="submit" disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60">
+          {submitting ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
+
+      {defaultValues?.id && (
+        <div className="border-t border-slate-100 pt-4">
+          <CustomFieldsPanel entidad_tipo="oportunidad" entidad_id={defaultValues.id} />
+        </div>
+      )}
+    </form>
+  )
+}

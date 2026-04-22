@@ -3,21 +3,12 @@
 // All Supabase table types defined here. No duplicates.
 // ============================================================
 
-export interface Client {
-  id: string;
-  company_name: string;
-  nif: string;
-  fiscal_address: string;
-  contact_person: string;
-  contact_email: string;
-  contact_phone: string;
-  fiscal_city: string;
-  fiscal_zip: string;
-  fiscal_province: string;
-  notes: string;
-  consultor_asignado: string;
-  created_at: string;
-}
+// NOTA: la interface `Client` fue eliminada tras el DROP de la tabla
+// `clients` en Supabase (2026-04-21). Sus consumidores ya migraron a
+// `Empresa` del CRM.
+// `SupplyPoint` se mantiene como tipo interno: la tabla SQL ya no
+// existe, pero el calculator sigue operando sobre esa forma de datos
+// (construida desde `cups` vía `cupsToSupplyPoint` adapter).
 
 export interface SupplyPoint {
   id: string;
@@ -56,6 +47,7 @@ export interface Powers {
 export interface InvoiceHistory {
   id: string;
   supply_point_id: string;
+  cups_id: string | null;
   month: number;
   year: number;
   consumption_kwh: number;
@@ -110,6 +102,7 @@ export interface Proposal {
   id: string;
   created_at: string;
   supply_point_id: string;
+  cups_id: string | null;
   current_annual_cost_eur: number;
   best_offer_annual_cost_eur: number;
   best_offer_retailer: string;
@@ -156,16 +149,11 @@ export interface UserProfile {
 // JOINED / VIEW TYPES (for queries with relations)
 // ============================================================
 
-export interface SupplyPointWithClient extends SupplyPoint {
-  clients: Pick<Client, 'company_name'>;
-}
-
 export interface ProposalWithDetails extends Proposal {
-  supply_points: {
-    cups: string;
-    alias?: string;
-    clients: {
-      company_name: string;
+  cups_rel?: {
+    codigo_cups: string;
+    empresas: {
+      nombre: string;
     };
   };
 }
