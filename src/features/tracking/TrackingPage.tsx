@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import StatCard from '@/core/components/StatCard';
 import EmptyState from '@/core/components/EmptyState';
+import { SkeletonRow, SkeletonCard } from '@/components/ui/Skeleton';
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery';
 import { formatEur, formatPct, generateCsv, downloadFile } from '@/core/utils/format';
 import { formatDate } from '@/core/utils/dates';
@@ -62,8 +63,17 @@ export default function Tracking() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-valere-blue-dark" />
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+          <table className="w-full">
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={5} />)}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }

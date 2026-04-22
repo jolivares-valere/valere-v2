@@ -3,21 +3,12 @@
 // All Supabase table types defined here. No duplicates.
 // ============================================================
 
-export interface Client {
-  id: string;
-  company_name: string;
-  nif: string;
-  fiscal_address: string;
-  contact_person: string;
-  contact_email: string;
-  contact_phone: string;
-  fiscal_city: string;
-  fiscal_zip: string;
-  fiscal_province: string;
-  notes: string;
-  consultor_asignado: string;
-  created_at: string;
-}
+// NOTA: la interface `Client` fue eliminada tras el DROP de la tabla
+// `clients` en Supabase (2026-04-21). Sus consumidores ya migraron a
+// `Empresa` del CRM.
+// `SupplyPoint` se mantiene como tipo interno: la tabla SQL ya no
+// existe, pero el calculator sigue operando sobre esa forma de datos
+// (construida desde `cups` vía `cupsToSupplyPoint` adapter).
 
 export interface SupplyPoint {
   id: string;

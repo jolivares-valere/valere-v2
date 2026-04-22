@@ -14,6 +14,7 @@ import {
   type OportunidadEstancada,
 } from './api'
 import { useResumenVencimientos } from '../contratos/api'
+import StatusBadge from '../../core/components/StatusBadge'
 import { formatDate } from '../../core/utils/dates'
 
 const ETAPA_LABEL: Record<string, string> = {
@@ -217,9 +218,9 @@ export default function DashboardPage() {
                     {h.numero_contrato ?? 'Sin nº'} · vence {formatDate(h.fecha_fin)} ({h.dias_para_vencimiento}d)
                   </p>
                 </div>
-                <span className="rounded bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                <StatusBadge variant="alert" size="sm">
                   {h.prioridad_renovacion}
-                </span>
+                </StatusBadge>
               </li>
             ))}
           </ul>
@@ -298,9 +299,9 @@ function AlertasOportunidades({ loading, rows }: { loading: boolean; rows: Oport
                 {r.empresa_nombre} · {ETAPA_LABEL[r.etapa] ?? r.etapa}
               </p>
             </div>
-            <span className="ml-3 shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-              {r.dias_sin_actualizar}d
-            </span>
+            <div className="ml-3 shrink-0">
+              <StatusBadge variant="neutral" size="sm">{r.dias_sin_actualizar}d</StatusBadge>
+            </div>
             <Link to="/oportunidades" className="ml-2 shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Ver oportunidad">
               <ChevronRight className="h-4 w-4" />
             </Link>

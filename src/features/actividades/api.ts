@@ -204,10 +204,12 @@ export function useToggleTareaCompletada() {
       if (error) { logError(error, 'useToggleTareaCompletada'); throw error }
       return data as unknown as Actividad
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
       qc.invalidateQueries({ queryKey: ['dashboard', 'mis-tareas'] })
+      toast.success(vars.completada ? 'Tarea completada' : 'Tarea marcada como pendiente')
     },
+    onError: (e) => toast.error('No se pudo actualizar la tarea', { description: (e as Error).message }),
   })
 }
 

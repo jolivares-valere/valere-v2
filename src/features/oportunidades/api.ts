@@ -144,6 +144,20 @@ export function useUpdateEtapa() {
       if (ctx?.prev) qc.setQueryData([RESOURCE], ctx.prev)
       toast.error('No se pudo mover la oportunidad', { description: (err as Error).message })
     },
+    onSuccess: (_data, vars) => {
+      toast.success(`Oportunidad movida a ${ETAPA_LABEL[vars.etapa] ?? vars.etapa}`)
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: [RESOURCE] }),
   })
+}
+
+const ETAPA_LABEL: Record<string, string> = {
+  prospecto: 'Prospecto',
+  auditoria_consumo: 'Auditoría consumo',
+  oferta_presentada: 'Oferta presentada',
+  negociacion: 'Negociación',
+  contrato_firmado: 'Contrato firmado',
+  activo: 'Activo',
+  cerrada_ganada: 'Ganada',
+  cerrada_perdida: 'Perdida',
 }

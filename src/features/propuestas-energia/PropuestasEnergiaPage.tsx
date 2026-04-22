@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import StatCard from '@/core/components/StatCard';
 import EmptyState from '@/core/components/EmptyState';
+import { SkeletonRow, SkeletonCard } from '@/components/ui/Skeleton';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import { formatEur, formatPct, generateCsv, downloadFile } from '@/core/utils/format';
 import { formatDate } from '@/core/utils/dates';
@@ -83,8 +84,17 @@ export default function Proposals() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-valere-blue-dark" />
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+          <table className="w-full">
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }

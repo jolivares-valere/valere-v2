@@ -15,8 +15,15 @@ import ActividadFormFull from './components/ActividadFormFull'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ExportButton from '../../core/components/ExportButton'
 import { SkeletonRow } from '../../components/ui/Skeleton'
+import StatusBadge, { type StatusVariant } from '../../core/components/StatusBadge'
 import { formatDate } from '../../core/utils/dates'
-import type { ActividadInsert, TipoActividad, EntidadTipo } from '../../core/types/entities'
+import type { ActividadInsert, TipoActividad, EntidadTipo, EstadoTarea } from '../../core/types/entities'
+
+const ESTADO_TAREA_VARIANT: Record<EstadoTarea, StatusVariant> = {
+  pendiente: 'warning',
+  completada: 'success',
+  cancelada: 'neutral',
+}
 
 const TIPOS: { value: TipoActividad; label: string }[] = [
   { value: 'nota', label: 'Notas' },
@@ -225,13 +232,9 @@ export default function ActividadesPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {isTarea && a.estado_tarea && (
-                      <span className={`rounded px-2 py-0.5 text-xs ${
-                        a.estado_tarea === 'completada' ? 'bg-green-100 text-green-700' :
-                        a.estado_tarea === 'cancelada' ? 'bg-slate-100 text-slate-500' :
-                        'bg-amber-100 text-amber-700'
-                      }`}>
+                      <StatusBadge variant={ESTADO_TAREA_VARIANT[a.estado_tarea] ?? 'neutral'} size="sm">
                         {a.estado_tarea}
-                      </span>
+                      </StatusBadge>
                     )}
                     {a.resultado && (
                       <span className="ml-1 text-xs text-slate-500">{a.resultado}</span>

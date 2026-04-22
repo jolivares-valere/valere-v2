@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 import type { Notificacion } from '../../core/types/entities'
@@ -70,7 +71,9 @@ export function useMarcarTodasLeidas() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [RESOURCE] })
+      toast.success('Todas las notificaciones marcadas como leídas')
     },
+    onError: (e) => toast.error('No se pudo marcar todas como leídas', { description: (e as Error).message }),
   })
 }
 
