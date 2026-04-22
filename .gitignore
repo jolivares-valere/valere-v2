@@ -30,3 +30,6 @@ npm-debug.log*
 # Cache
 .cache/
 .parcel-cache/
+
+# TypeScript build info
+*.tsbuildinfo
