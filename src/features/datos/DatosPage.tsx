@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import EmptyState from '@/core/components/EmptyState';
+import { SkeletonRow } from '@/components/ui/Skeleton';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
 import type { SupplyPoint, InvoiceHistory } from '@/types/database';
 import type { Cups, Empresa } from '@/core/types/entities';
@@ -353,9 +354,11 @@ export default function DataCapture() {
           </CardHeader>
           <CardContent className="p-0">
             {loadingInv ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-valere-blue-dark" />
-              </div>
+              <table className="w-full">
+                <tbody>
+                  {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}
+                </tbody>
+              </table>
             ) : invoices.length === 0 ? (
               <EmptyState
                 icon={<FileUp className="w-8 h-8" />}

@@ -1,6 +1,6 @@
 # Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-21 por Claude Code — FASE 28 completa + DROP legacy ejecutado + hardening visual
+> Última actualización: 2026-04-22 por Claude Code — FASE 28 completa + Sprint 2 visual aplicado (toasts + skeletons + badges a StatusBadge)
 
 ## Rama de desarrollo
 
@@ -34,6 +34,14 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | `6c5d9aa` | Handoff doc `docs/HANDOFF_2026-04-20.md` |
 | `9f22a8c` | Informe de diseño `docs/DESIGN_REVIEW_2026-04-20.md` (hallazgos priorizados en 3 sprints) |
 | `79a7b6b` | Referenciar informe de diseño desde handoff |
+
+### Sprint 2 visual (2026-04-22 autónomo)
+
+| Commit | Qué hace |
+|--------|----------|
+| `0c6eea2` | Sprint 2 parte 1: toasts faltantes (useUpdateEtapa, useToggleTareaCompletada, useMarcarTodasLeidas) + skeletons en PropuestasEnergiaPage y TrackingPage + badges inline de ActividadesPage y Dashboard → StatusBadge + eliminar interface `Client` legacy (0 consumidores tras DROP) |
+| `3422117` | Sprint 2 parte 2: skeletons en AdminPage (3 tabs) + CustomFieldsManager |
+| `TBD` | Sprint 2 parte 3: skeleton en DatosPage listado de facturas + actualización ESTADO.md |
 
 ### FASE 28 continuación — Sprint 1 A11y + Sprint 2 visual + DROP legacy (2026-04-21)
 
@@ -86,7 +94,7 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | Tarea | Bloqueador | Urgencia |
 |-------|-----------|---------|
 | ~~Ejecutar SQL fase28.5 corregido (FK eventos_usuario_id_fkey, BUG 7)~~ | ~~Cowork aplicó 2026-04-21 y verificó end-to-end~~ | ✅ Cerrado |
-| Sprint 2 del informe de diseño: toasts faltantes en mutaciones, skeletons en features Calc, migrar badges inline ActividadesPage/Dashboard a StatusBadge | Sprint dedicado | Media |
+| ~~Sprint 2 del informe de diseño: toasts + skeletons + badges inline~~ | ~~Aplicado 2026-04-22 (commits 0c6eea2, 3422117)~~ | ✅ Cerrado |
 | Policies granulares para `notificaciones` (hoy tiene policy FOR ALL permisiva) | Sprint dedicado | Baja |
 | Regenerar tipos TypeScript con `supabase gen types` automático | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
 | Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` + secrets GEMINI_API_KEY/ALLOWED_ORIGIN | Media |
