@@ -1,8 +1,8 @@
 # MCP Setup — Valere CRM
 
-Guía para conectar los 3 MCPs (Supabase, Vercel, GitHub) a los agentes Claude del proyecto.
+Guía para conectar los MCPs a los agentes Claude del proyecto.
 
-> **Resumen ejecutivo:** Supabase y Vercel se conectan a **Cowork** (agente 1) desde el botón "Connect" en la UI. GitHub no existe como MCP oficial en el registro de Claude, así que se usa el servidor auto-hosteado (oficial de GitHub) vía `.mcp.json` en **Claude Code CLI** (agente 2). Este fichero vive en la raíz del repo.
+> **Resumen ejecutivo:** Supabase y Vercel se conectan a **Cowork** (agente 1) desde el botón "Connect" en la UI, y en `.mcp.json` para **Claude Code CLI** (agente 2). GitHub queda **fuera** de MCP — se usa `gh` CLI (GitHub CLI) a mano desde la terminal. Decisión tomada 2026-04-23: el MCP oficial de GitHub no está en el registro de Claude y el workaround auto-hosteado (Docker) añade complejidad sin retorno claro mientras Claude Code CLI no esté instalado.
 
 ---
 
@@ -55,64 +55,58 @@ El `.mcp.json` apunta al endpoint HTTP oficial (`https://mcp.vercel.com/`). No r
 
 ---
 
-## 3. GitHub MCP (auto-hosteado)
+## 3. GitHub — sin MCP, con `gh` CLI
 
-GitHub **no tiene MCP oficial en el registro de Cowork**. Se usa el servidor oficial de GitHub (imagen Docker) vía `.mcp.json`, que solo funciona en **Claude Code CLI**.
+Decisión: **GitHub fuera de MCP**. El MCP oficial de GitHub no está en el registro de Claude, y el workaround auto-hosteado (Docker + github-mcp-server + PAT fine-grained) exige Claude Code CLI instalado y Docker corriendo. Mientras eso no pase, es más rápido usar `gh` directamente.
 
-### Requisitos previos
-- Docker Desktop instalado y arrancado (Windows/Mac).
-  - Alternativa sin Docker: usar el binario nativo de [`github-mcp-server`](https://github.com/github/github-mcp-server/releases) y cambiar el bloque `github` en `.mcp.json` a `"command": "<ruta-al-binario>"`.
-
-### Crear Personal Access Token (PAT)
-1. Ir a https://github.com/settings/tokens (pestaña "Fine-grained tokens" recomendada).
-2. **Scopes mínimos:**
-   - Repository access: `jolivares-valere/valere-v2` (sólo este repo)
-   - Repository permissions: `Contents: Read & Write`, `Issues: Read & Write`, `Pull requests: Read & Write`, `Actions: Read`, `Metadata: Read`
-3. Copiar el token `ghp_...` o `github_pat_...`.
-4. Añadir a `.env`:
-
-```bash
-echo "GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxx" >> .env
+### Instalación (una vez por máquina)
+```powershell
+winget install --id GitHub.cli
+# reinicia PowerShell para que coja el PATH
+gh auth login
+# elegir: GitHub.com → HTTPS → Login with a web browser
 ```
 
-> `.env` ya está en `.gitignore`. **Nunca commitear el token.**
+### Flujo típico desde terminal
+```powershell
+# Abrir un PR de la rama actual
+gh pr create --title "…" --body "…"
 
-### Verificar
-Reinicia Claude Code CLI en la raíz del repo:
-```bash
-cd ~/valere-v2
-claude mcp list    # debe aparecer "github: connected"
+# Ver PRs abiertos
+gh pr list
+
+# Estado del CI de un PR
+gh pr checks 123
+
+# Leer issues abiertos
+gh issue list
 ```
 
-Primera prueba: pide a Claude Code "lista los últimos 5 PRs abiertos de este repo".
-
-### Qué desbloquea
-- Abrir PRs, crear issues, comentar sobre cambios desde Claude sin salir del CLI
-- Leer estado del CI de GitHub Actions (los 39/39 tests + TSC 0 errores)
-- Revisar histórico de commits y autores
-- Listar branches y comparar diffs remotos
+### Cuando retomar el MCP de GitHub
+Si algún día se instala Claude Code CLI y se quiere automatizar flujos (ej. "Claude, abre un PR con el diff que acabas de hacer"), entonces sí merece la pena reactivarlo. La configuración Docker + PAT está documentada en la historia de este doc (commit previo). Por ahora, no.
 
 ---
 
 ## Decisión de reparto por agente
 
-| Capacidad | Agente 1 Cowork | Agente 2 Claude Code CLI |
+| Capacidad | Agente 1 Cowork | Terminal PowerShell (Juan) |
 |---|---|---|
-| Supabase — leer/migrar | ✅ (MCP UI) | ✅ (.mcp.json) |
-| Vercel — deploys y logs | ✅ (MCP UI) | ✅ (.mcp.json) |
-| GitHub — PRs/issues | ❌ (no hay MCP en registry) | ✅ (.mcp.json auto-hosteado) |
-| `git push` real | ❌ (regla del proyecto) | ✅ |
+| Supabase — leer/migrar | ✅ (MCP UI) | ✅ (si instala Claude Code CLI, vía .mcp.json) |
+| Vercel — deploys y logs | ✅ (MCP UI) | idem |
+| GitHub — PRs/issues | ❌ (sin MCP) | ✅ (`gh` CLI) |
+| `git push` real | ❌ (regla del proyecto) | ✅ (`git push`) |
+| `npm test` / `npx tsc` | ❌ | ✅ |
 
-Esto preserva la regla del `CLAUDE.md`: Cowork planifica y edita; Claude Code CLI es el único que hace commits y push.
+Esto preserva la regla del `CLAUDE.md`: Cowork planifica y edita; la terminal hace commits, push, tests y abre PRs.
 
 ---
 
 ## Troubleshooting
 
 - **`supabase: failed to start`** — revisa que `SUPABASE_ACCESS_TOKEN` está en `.env` y que tu token tiene acceso al proyecto.
-- **`github: docker: command not found`** — Docker Desktop no arrancado o no instalado. Arranca Docker o cambia a binario nativo.
-- **Vercel pide login cada vez** — token OAuth caducado; vuelve a abrir el flujo desde la UI de Cowork o re-ejecuta `claude mcp auth vercel`.
-- **Ver qué MCPs ve Claude Code** — `claude mcp list` desde la raíz del repo.
+- **Vercel pide login cada vez** — token OAuth caducado; vuelve a abrir el flujo desde la UI de Cowork.
+- **`gh: command not found`** — `winget install --id GitHub.cli` y reinicia PowerShell.
+- **`gh` no autentica** — `gh auth status` para ver estado; `gh auth login` para rehacer.
 
 ---
 
