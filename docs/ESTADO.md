@@ -1,6 +1,62 @@
-# Estado actual del proyecto Valere v2
+﻿# Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-22 por Cowork — Integración Datadis completa + sistema multi-agente + CLAUDE.md actualizado + migraciones Supabase ejecutadas
+> Última actualización: 2026-04-23 por Cowork — Sprint seguridad completo (fase 28.6 + 28.7a + 28.7b + 28.7c aplicadas via Supabase MCP, 0 ERRORs, 0 WARNs RLS/funciones) · MCPs Supabase + Vercel conectados · docs ARQUITECTURA_PROYECTOS + SEGURIDAD + MCP_SETUP nuevos/actualizados
+
+
+## Sesion 2026-04-23 — MCPs + hardening seguridad
+
+**Rama:** claude/mcp-setup (PR #5 abierto -> main).
+
+### Hitos
+- Supabase MCP conectado desde Cowork - operativo contra gtphkowfcuiqbvfkwjxb
+- Vercel MCP conectado desde Cowork
+- GitHub fuera de MCP (decision opcion b) - gh CLI instalado localmente
+- Migration fase28_6_rls_policies_cleanup aplicada
+- Migration fase28_7a_views_security_invoker aplicada (8 ERRORs cerrados)
+- Migration fase28_7b_rls_policies_tightening aplicada (15 WARNs cerrados)
+- Migration fase28_7c_functions_search_path aplicada (6 WARNs cerrados)
+- Auth password hardening: minimum length 12 + mixed complexity
+- docs/ARQUITECTURA_PROYECTOS.md nuevo
+- docs/SEGURIDAD.md nuevo
+- docs/MCP_SETUP.md actualizado a opcion b
+
+### Advisors Supabase: 34 -> 1
+Solo queda auth_leaked_password_protection WARN - requiere Pro plan, mitigado.
+
+### Pendientes abiertos
+- Localizar repo valere-gestion-potencias
+- Carpeta CRM VALERE/ vacia en mount Cowork - borrar o reutilizar
+- Activar Pro plan cuando se escale
+- PR #5 pendiente de merge cuando CI pase
+
+
+## Sesión 2026-04-23 — MCPs + hardening seguridad
+
+**Rama:** `claude/mcp-setup` (PR #5 abierto → main).
+
+### Hitos
+- ✅ Supabase MCP conectado desde Cowork — `list_projects`, `execute_sql`, `apply_migration`, `get_advisors` operativos contra `gtphkowfcuiqbvfkwjxb`
+- ✅ Vercel MCP conectado desde Cowork
+- ✅ GitHub fuera de MCP (decisión "opción b") — `gh` CLI instalado localmente; `.mcp.json` sólo tiene supabase + vercel
+- ✅ Migration `fase28_6_rls_policies_cleanup` aplicada (notificaciones granular + drop policies duplicadas custom_fields)
+- ✅ Migration `fase28_7a_views_security_invoker` aplicada (8 vistas → SECURITY INVOKER, 8 ERRORs cerrados)
+- ✅ Migration `fase28_7b_rls_policies_tightening` aplicada (9 policies granularizadas, 15 WARNs cerrados)
+- ✅ Migration `fase28_7c_functions_search_path` aplicada (6 funciones con search_path fijo, 6 WARNs cerrados)
+- ✅ Auth password hardening en dashboard: minimum length 12 + lowercase/uppercase/digits/symbols
+- ✅ `docs/ARQUITECTURA_PROYECTOS.md` nuevo — mapea CRM + valere-gestion-potencias + futuras apps satélite
+- ✅ `docs/SEGURIDAD.md` nuevo — registro de decisiones de seguridad (incluye decisión de no upgrade a Pro por leaked password protection)
+- ✅ `docs/MCP_SETUP.md` actualizado para opción b (GitHub vía gh, no MCP)
+
+### Advisors Supabase: 34 → 1
+Solo queda `auth_leaked_password_protection` WARN — requiere Pro plan, mitigado con password length + complexity. Decisión documentada en `docs/SEGURIDAD.md` §1.
+
+### Pendientes abiertos
+- Localizar repo de `valere-gestion-potencias` (búsqueda GitHub jolivares-valere devuelve solo valere-v2 público → repo privado o local sin subir)
+- Carpeta `CRM VALERE/` vacía en mount Cowork — borrar o reutilizar
+- Activar Pro plan cuando se escale (desbloquea leaked password protection + PITR)
+- PR #5 `claude/mcp-setup` pendiente de merge cuando CI pase
+
+
 
 ## Rama de desarrollo
 
@@ -321,3 +377,4 @@ Lee todo y dime dónde nos quedamos. Continúa desde ahí.
 ```bash
 cd ~/valere-v2 && claude -c
 ```
+
