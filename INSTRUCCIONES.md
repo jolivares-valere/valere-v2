@@ -29,7 +29,7 @@
 4. En "Environment Variables", anade:
    - `VITE_SUPABASE_URL` = `https://gtphkowfcuiqbvfkwjxb.supabase.co`
    - `VITE_SUPABASE_ANON_KEY` = [copiar de Supabase Settings → API → anon public]
-   - `VITE_GEMINI_API_KEY` = `AIzaSyDqjcyy328DMa9-5mPoohJZPqvF4JfjYuE`
+   > Nota: `VITE_GEMINI_API_KEY` fue retirada en FASE 20.8 — el chat IA ahora usa un secret server-side `GEMINI_API_KEY` en la Edge Function `chat-consultor` de Supabase. Ya no se configura en Vercel/Cloudflare.
 5. Pulsa **Deploy**
 6. En 2-3 minutos tendras la app en `valere-v2.vercel.app`
 7. (Opcional) Configura dominio personalizado: `app.valereconsultores.com`
@@ -59,8 +59,9 @@ Crea el archivo `.env` en la raiz:
 ```
 VITE_SUPABASE_URL=https://gtphkowfcuiqbvfkwjxb.supabase.co
 VITE_SUPABASE_ANON_KEY=[pegar de Supabase Settings -> API]
-VITE_GEMINI_API_KEY=AIzaSyDqjcyy328DMa9-5mPoohJZPqvF4JfjYuE
 ```
+
+> Nota: `VITE_GEMINI_API_KEY` ya no se usa — el chat IA consume un secret server-side `GEMINI_API_KEY` configurado en Supabase Edge Functions (ver `supabase/functions/chat-consultor/README.md`).
 
 ### Instalar y arrancar
 ```bash

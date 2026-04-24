@@ -22,6 +22,7 @@ const InformesPage = lazy(() => import('./features/informes/InformesPage'))
 const IncidenciasPage = lazy(() => import('./features/incidencias/IncidenciasPage'))
 const RenovacionesPage = lazy(() => import('./features/renovaciones/RenovacionesPage'))
 const CalendarioPage = lazy(() => import('./features/calendario/CalendarioPage'))
+const AsistentePanel = lazy(() => import('./features/asistente-crm/AsistentePanel'))
 
 function LoadingScreen() {
   return (
@@ -49,6 +50,10 @@ function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: str
   return (
     <AppShell>
       <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
+      {/* Asistente del CRM — widget flotante en todas las páginas autenticadas */}
+      <Suspense fallback={null}>
+        <AsistentePanel />
+      </Suspense>
     </AppShell>
   )
 }
