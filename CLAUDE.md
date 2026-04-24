@@ -11,7 +11,8 @@ Fichero de contexto persistente para agentes Claude (Code, Cowork, API). Leer si
 | **GitHub repo** | https://github.com/jolivares-valere/valere-v2 |
 | **Supabase proyecto** | https://supabase.com/dashboard/project/gtphkowfcuiqbvfkwjxb |
 | **Supabase API URL** | https://gtphkowfcuiqbvfkwjxb.supabase.co |
-| **Vercel deploy** | https://valere-v2.vercel.app (o el dominio activo en Vercel dashboard) |
+| **Hosting CRM** | **https://valere-v2.pages.dev** (Cloudflare Pages — migrado 2026-04-24) |
+| **Vercel** | ❌ Cuenta suspendida desde 2026-04-24. CRM ya migrado. Potencias pendiente. |
 | **Dev local** | http://localhost:3000 (puerto fijo, vite --port 3000) |
 | **Drive logos/branding** | https://drive.google.com/drive/folders/1JxJR7w2iuHnGJZXg4EQXr82r9g1-FoJe |
 | **Drive empresa Valere** | https://drive.google.com/drive/folders/1wZBFZuhACbDKMndJWo4S1EJLbQp8PrvN |
@@ -248,3 +249,47 @@ Lee todo y dime dónde nos quedamos.
 1. Actualizar `docs/ESTADO.md` con lo que se hizo y lo que queda.
 2. Si la sesión fue larga, añadir entrada en `docs/SESIONES/`.
 3. Commit + push.
+
+---
+
+## 🗺️ MAPA DE DOCUMENTACIÓN ESTRATÉGICA
+
+Entrada rápida para orientarte. Todos los planes vivos en `docs/`:
+
+| Archivo | Propósito |
+|---|---|
+| `docs/ESTADO.md` | Estado actual del proyecto — actualizar al cerrar sesión |
+| `docs/ROADMAP_FUSION.md` | Roadmap técnico histórico del CRM |
+| `docs/ARQUITECTURA_PROYECTOS.md` | Mapa de apps del ecosistema Valere |
+| `docs/SEGURIDAD.md` | Registro de decisiones de seguridad |
+| `docs/DEPLOY.md` | Guía de deploy |
+| `docs/MCP_SETUP.md` | Setup MCPs Supabase/Vercel |
+| `docs/PLAN_UNIFICACION_SUPABASE.md` | **Sprint futuro**: unificar los 2 proyectos Supabase (6 fases, 10-12d) |
+| `docs/PLAN_ASISTENTE_RAG_CRM.md` | **Plan asistente RAG** — ruta estable única (5 fases) |
+| `docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md` | Migrar Potencias de Vercel a Cloudflare (incluye refactor pre-migración) |
+| `docs/PLAN_ARSYS_CONVERSION_IMPORT.md` | Plan rescate correos Arsys cuando backup esté listo |
+| `docs/SETUP_OPENCLAW_MISSION_CONTROL.md` | Setup OpenClaw para control remoto desde Cowork |
+| `docs/AUDIT_SEGURIDAD_2026-04-24.md` | Auditoría preventiva del repo (limpio) |
+| `docs/CREDENCIALES_1PASSWORD.csv` | Importable a 1Password |
+| `docs/COMUNICADO_NUEVO_URL_CRM.md` | Borrador email/Slack para equipo |
+| `docs/SESIONES/` | Resúmenes históricos de sesiones |
+| `docs/help/` | **Documentación de ayuda consumida por el asistente RAG del CRM** |
+
+## 💬 Asistente RAG del CRM
+
+El CRM tiene un widget flotante de ayuda (`AsistentePanel`) accesible desde todas las páginas autenticadas. Arquitectura:
+
+- **Frontend**: `src/features/asistente-crm/`
+- **Backend**: `supabase/functions/ask-crm-docs/` (Edge Function)
+- **Adapter IA sustituible**: `supabase/functions/_shared/ai-adapter.ts` (Gemini por defecto)
+- **Datos**: tabla `crm_help_embeddings` + función `match_crm_help` (pgvector)
+- **Pipeline**: `.github/workflows/regenerate-help-embeddings.yml` regenera embeddings cuando `docs/help/**` cambia
+- **Script local**: `scripts/generate-help-embeddings.mjs`
+
+**Para activarlo completamente** hace falta:
+1. Configurar secrets GitHub: `GEMINI_API_KEY_EMBEDDINGS`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
+2. Ejecutar el workflow manualmente la primera vez (o hacer push que modifique `docs/help/`).
+3. Configurar secret Supabase de la Edge Function: `GEMINI_API_KEY`.
+4. Deploy: `supabase functions deploy ask-crm-docs`.
+
+Ver `docs/PLAN_ASISTENTE_RAG_CRM.md` para plan completo.

@@ -1,0 +1,4 @@
+# Configuración de la Edge Function ask-crm-docs.
+# JWT verification obligatoria — solo usuarios autenticados del CRM.
+
+verify_jwt = true

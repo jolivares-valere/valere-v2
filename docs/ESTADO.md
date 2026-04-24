@@ -1,6 +1,6 @@
 ﻿# Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-24 por Cowork (sesión noche, autonomía 2h) — **Sprint autónomo 4 entregables**: Mapa estratégico v5 actualizado con hallazgos post-investigación · Fase 1 asistente RAG arrancada (`docs/help/` + 5 docs piloto + README convenciones) · Plan migración Potencias a Cloudflare (incluye refactor previo `VITE_GEMINI_API_KEY`) · Auditoría seguridad preventiva del repo (resultado: limpio tras limpieza INSTRUCCIONES.md) · Decisión chat IA: ruta estable única (widget RAG integrado, sin NotebookLM como UI usuarios) · energética cerrada (archivada confirmada), key YuE inexistente en cuenta Valere, excedentes localizado en Drive + repo GitHub creado vacío · Pendiente urgente: rescate correos Arsys (~17 días, gestionado por Claude web)
+> Última actualización: 2026-04-24 por Cowork (3er sprint autónomo noche) — **Asistente RAG del CRM end-to-end IMPLEMENTADO**: (1) Edge Function `ask-crm-docs` con adapter IA sustituible (Gemini por defecto, Claude/OpenAI pluggable). (2) Widget React `AsistentePanel` flotante integrado en App.tsx dentro del AuthGuard. (3) 20 docs `docs/help/` totales cubriendo features core. (4) CLAUDE.md actualizado con mapa docs + arquitectura asistente. **Listo para deploy**: configurar secrets + `supabase functions deploy ask-crm-docs` + activar workflow embeddings. Pendiente urgente: backup Arsys (~15 días, Claude web).
 
 ## Sesión 2026-04-24 (tarde) — Migración Cloudflare + 2ª fuga de credencial
 
