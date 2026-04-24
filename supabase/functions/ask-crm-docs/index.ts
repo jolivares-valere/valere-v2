@@ -124,6 +124,7 @@ serve(async (req) => {
     )
   }
 
+  const startedAt = Date.now()
   try {
     const ai = getAdapter()
 
@@ -160,6 +161,17 @@ serve(async (req) => {
     }
 
     if (!chunks || chunks.length === 0) {
+      // Log: pregunta no respondida (gap de doc)
+      await logAsistente(supabaseService, {
+        pregunta: question,
+        seccion: section,
+        encontrada_respuesta: false,
+        num_chunks: 0,
+        top_similarity: null,
+        provider: ai.provider,
+        duracion_ms: Date.now() - startedAt,
+      })
+
       return jsonResponse(
         {
           answer:
@@ -193,6 +205,17 @@ ${question}
 
     // 4. Generar respuesta
     const answer = await ai.generate(fullPrompt)
+
+    // 4.5. Log de la consulta exitosa
+    await logAsistente(supabaseService, {
+      pregunta: question,
+      seccion: section,
+      encontrada_respuesta: true,
+      num_chunks: chunks.length,
+      top_similarity: chunks[0]?.similarity ?? null,
+      provider: ai.provider,
+      duracion_ms: Date.now() - startedAt,
+    })
 
     // 5. Devolver con citas
     return jsonResponse(
@@ -236,4 +259,36 @@ function jsonResponse(
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+}
+
+/**
+ * Log anonimizado de consulta. NO guarda user_id ni IP — solo métricas
+ * para análisis de uso (qué preguntan, qué falta en la doc).
+ * Falla silenciosamente si hay error: NO bloquear la respuesta al usuario.
+ */
+async function logAsistente(
+  supabase: ReturnType<typeof createClient>,
+  data: {
+    pregunta: string
+    seccion: string | null
+    encontrada_respuesta: boolean
+    num_chunks: number
+    top_similarity: number | null
+    provider: string
+    duracion_ms: number
+  },
+): Promise<void> {
+  try {
+    await supabase.from('crm_asistente_log').insert({
+      pregunta: data.pregunta,
+      seccion: data.seccion,
+      encontrada_respuesta: data.encontrada_respuesta,
+      num_chunks_encontrados: data.num_chunks,
+      top_similarity: data.top_similarity,
+      provider: data.provider,
+      duracion_ms: data.duracion_ms,
+    })
+  } catch (err) {
+    console.warn('[ask-crm-docs] log failed (no bloqueante):', err)
+  }
 }
