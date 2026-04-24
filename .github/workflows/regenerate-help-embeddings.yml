@@ -4,7 +4,7 @@ name: Regenerate CRM help embeddings
 # cuando se mergea a main un PR que los modifique.
 #
 # Estado: ESQUELETO. Pendiente de activar cuando se complete Fase 2 del plan RAG.
-# Ver docs/PLAN_ASISTENTE_RAG_CRM.md §Fase 2.
+# Ver docs/PLAN_ASISTENTE_RAG_CRM.md §Fase 2.h
 #
 # Antes de activar este workflow:
 #   1. Crear la tabla crm_help_embeddings en Supabase (SQL migration).
@@ -44,7 +44,7 @@ jobs:
         run: |
           npm ci
           # Instala las deps extra del script (si no están ya en package.json)
-          npm install --no-save @google/generative-ai@latest gray-matter@latest
+          npm install --no-save @google/genai@latest gray-matter@latest
 
       - name: Regenerate embeddings
         env:
