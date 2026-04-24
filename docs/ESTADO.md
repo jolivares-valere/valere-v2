@@ -1,6 +1,41 @@
 ﻿# Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-24 por Cowork — Resuelto merge huérfano en `claude/mcp-setup` (locks limpiados, ruido CRLF descartado) · 3 docs sin commitear de la sesión 2026-04-23 movidos a PR #6 (rama `claude/docs-cierre-2026-04-23`) · rama local `claude/mcp-setup` borrada (ya estaba squash en main vía PR #5)
+> Última actualización: 2026-04-24 por Cowork (sesión tarde-noche) — **Sesión maratón completa**: migración CRM a Cloudflare Pages · 2ª fuga credencial Gemini detectada y mitigada · MAPA ESTRATÉGICO v4 creado como artifact persistente Cowork (apps + hosting + agentes + credenciales + decisiones + TO-BE + plan) · 3 apps reales confirmadas (CRM + Potencias + Excedentes) · 2 proyectos Supabase confirmados con duplicidad masiva → plan unificación 6 fases documentado · OpenClaw integrable via Mission Control + Cloudflare Tunnel · Workspace Business YA incluye Gemini Advanced + NotebookLM Plus + Gemini API gratis (80€/mes infrautilizado) · ChatGPT Empresa SÍ tiene Workspace Agents (corrección) · 4 docs nuevos en `docs/` para próxima sesión · Plan Arsys ejecutable (3 estrategias paralelas, Juan gestiona backup con Claude web) · Pendiente urgente: rescate correos Arsys (~17 días)
+
+## Sesión 2026-04-24 (tarde) — Migración Cloudflare + 2ª fuga de credencial
+
+**Contexto inicial**: cuenta Vercel `valere-consultores` suspendida por billing. `valere-v2.vercel.app` caído. Compañeros de Valere usan el CRM en pre-producción para feedback.
+
+### Acciones
+- ✅ **Migración a Cloudflare Pages**: nuevo deploy en https://valere-v2.pages.dev. Build OK en 28s. Sin cambios en código (Vite SPA puro, no había dependencias Vercel-specific).
+- ✅ Añadido `public/_redirects` (`/* /index.html 200`) para SPA routing en Cloudflare. **Pendiente de commitear al PR #6**.
+- ✅ Env vars copiadas: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (las 2 únicas que el código usa según grep `import.meta.env`).
+- ⚠️ **Hallazgo clave: `VITE_GEMINI_API_KEY` estaba en Vercel** y se copió por error a Cloudflare. Análisis del código (`grep -rn VITE_GEMINI_API_KEY src/`) confirmó que **no se usa en ningún sitio** — es residual del frontend pre-FASE 20.8. Eliminada de Cloudflare (Production + Preview) + redeploy.
+- ⚠️ **Hallazgo crítico: el chat IA es código huérfano**. `ChatIAPanel.tsx` existe en `src/features/chat-ia/` y la Edge Function `chat-consultor` está ACTIVE v2 en Supabase (verificado vía MCP), pero **no hay `<Route path="/chat-ia">` en `App.tsx` ni link en Sidebar**. Inaccesible para los usuarios desde el refactor 20.8 — probablemente nunca se cableó la ruta.
+- ⏸️ **Revocación Gemini PAUSADA por riesgo cross-app**: las 2 keys (`...R_Vs` y `...wqag`) están en proyecto Google "Default Gemini Project" de cuenta `valereconsultores.com`. Antes de revocar hay que **inventariar qué otras apps de Valere las usan** — `valere-gestion-potencias`, `valere-gestion-excedentes`, `valere-gestion-energetica` podrían depender de alguna. Plan ajustado abajo.
+
+### Fugas cerradas en esta sesión
+| Credencial | Origen | Estado anterior | Acción |
+|-----------|--------|----------------|--------|
+| `RESEND_API_KEY` (proyecto valere-gestion-potencias) | Expuesta en chat 2026-04-23 | activa | Revocada en Resend, key nueva creada |
+| `VITE_GEMINI_API_KEY` (CRM frontend) | Expuesta en bundle público desde antes del refactor 20.8 | activa, abusable vía DevTools | Eliminada de Cloudflare + ambas keys de Google AI Studio revocadas + secret Supabase eliminado |
+
+### Pendientes inmediatos (próximas 48h)
+- ⏳ **Commit + push del `public/_redirects`** al PR #6 (Juan via PowerShell).
+- ⏳ **Avisar a compañeros de Valere** del nuevo URL `valere-v2.pages.dev`.
+- ⏳ **Dejar Vercel 1-2 días** antes de bajar a Hobby / borrar proyectos. Por si hay que rollback.
+- ⏳ **Inventario Gemini cross-app** antes de revocar las 2 keys: revisar `valere-gestion-potencias`, `valere-gestion-excedentes`, `valere-gestion-energetica` por uso de Google Generative AI / Gemini API. Solo después decidir qué keys son zombies y cuáles vivas.
+- ✅ Eliminar secret `GEMINI_API_KEY` de Supabase (CRM) — seguro, sin afectar otras apps.
+
+### Pendientes heredados (sin tocar hoy)
+- ⏳ Investigar repo privado `jolivares-valere/valere-gestion-energetica`.
+- ⏳ Borrar carpeta vacía `CRM VALERE/` en raíz Windows.
+- ⏳ Migration unificación `oportunidades.etapa` (`ganada` vs `cerrada_ganada`).
+- ⏳ **Decidir destino del chat-ia huérfano**: cablear ruta + Sidebar, o eliminar feature completa. Mientras tanto código zombie en `src/features/chat-ia/`.
+- ⏳ PR #6 pendiente de merge.
+
+
+## Sesión 2026-04-24 (mañana) — Limpieza merge huérfano + PR #6 docs
 
 
 ## Sesión 2026-04-24 — Limpieza merge huérfano + PR #6 docs
