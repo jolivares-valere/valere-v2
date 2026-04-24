@@ -224,27 +224,56 @@ Ver [`docs/ROADMAP_FUSION.md`](docs/ROADMAP_FUSION.md) para el plan detallado de
 - **`docs/SESIONES/`**: log de sesiones anteriores (JSONL raw + resumen legible).
 - **`.cowork/inbox/` y `.cowork/outbox/`**: bus de mensajes entre agentes Claude.
 
-### Arranque de sesión nueva
+### ⚡ PROTOCOLO INICIO DE SESIÓN — OBLIGATORIO
+
+**Ejecutar siempre estos comandos antes de hacer nada:**
+
+```bash
+git pull origin main
+cat CLAUDE.md
+cat docs/ESTADO.md
+ls .cowork/inbox/ 2>/dev/null || true
+git log --oneline -10
+```
+
+Estos archivos son la memoria del proyecto. Sin leerlos, cualquier cambio puede pisar trabajo anterior.
+
+Si hay archivos en `.cowork/inbox/`, leerlos antes de continuar — contienen instrucciones de sesiones anteriores.
 
 **Claude Code (CLI/Desktop):**
 ```bash
 cd ~/valere-v2 && claude -c   # continuar última sesión
-# O sesión nueva:
-# "Lee CLAUDE.md, docs/ESTADO.md y git log --oneline -10. Continúa."
+# O sesión nueva: ejecutar el bloque de comandos de arriba manualmente
 ```
 
 **Claude Cowork (Web — claude.ai/code):**
 ```
-Trabajas en valere-v2, rama claude/valere-crm-architecture-2vvEV.
-Ejecuta:
-  git pull origin claude/valere-crm-architecture-2vvEV
-  cat CLAUDE.md docs/ESTADO.md docs/ROADMAP_FUSION.md
-  ls .cowork/outbox/ .cowork/inbox/
+Ejecuta estos comandos y lee el resultado antes de empezar:
+  git pull origin main
+  cat CLAUDE.md
+  cat docs/ESTADO.md
+  ls .cowork/inbox/ .cowork/outbox/
   git log --oneline -10
-Lee todo y dime dónde nos quedamos.
+Después dime dónde estamos y qué hacemos.
 ```
 
-### Al cerrar sesión
-1. Actualizar `docs/ESTADO.md` con lo que se hizo y lo que queda.
-2. Si la sesión fue larga, añadir entrada en `docs/SESIONES/`.
-3. Commit + push.
+### ⚡ PROTOCOLO CIERRE DE SESIÓN — OBLIGATORIO
+
+**Al terminar cualquier sesión, siempre:**
+
+1. Actualizar `docs/ESTADO.md`:
+   - Cambiar la fecha de "Última actualización" al día de hoy.
+   - Añadir los commits de esta sesión a la tabla de historial.
+   - Mover las tareas completadas de "Pendientes" a "Completadas".
+   - Añadir cualquier tarea nueva descubierta a "Pendientes".
+
+2. Si la sesión fue significativa, crear entrada en `docs/SESIONES/YYYY-MM-DD-resumen.md`.
+
+3. Commit y push:
+```bash
+git add docs/ESTADO.md docs/SESIONES/
+git commit -m "docs: actualizar ESTADO.md sesión $(date +%Y-%m-%d)"
+git push origin $(git branch --show-current)
+```
+
+**Esto garantiza que la próxima sesión (incluso si esta se quedó colgada) tenga siempre el contexto actualizado.**
