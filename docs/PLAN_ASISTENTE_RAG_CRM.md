@@ -1,125 +1,275 @@
-# Plan asistente "Resolver dudas del CRM"
+# Plan Asistente del CRM — Ruta Estable Única
 
-> Generado 2026-04-24 por Cowork. Plan en 2 fases: A inmediata (NotebookLM, 0 €), C integrada (Gemini API free tier en CRM).
-> Casto de uso real: compañeros de Valere consultan dudas sobre cómo usar el CRM. Asistente de documentación viva, no consultor energético.
-
----
-
-## Aclaración sobre coste
-
-| Opción | Coste real | Encaja "sin token" |
-|---|---|---|
-| Gemini API estándar (AI Studio / Vertex) | Free tier generoso, después por token | ⚠️ Free tier sí, después no |
-| Gemini Advanced en Workspace | 0 € (incluido) | ✅ Pero solo en UI Google, no API |
-| NotebookLM Plus | 0 € (incluido en Workspace) | ✅ Pero usuario va a notebooklm.google.com |
-| OpenClaw + ChatGPT Empresa | Tarifa fija ChatGPT | ✅ Sin tokens API |
-| Anthropic API | Por token | ❌ |
-
-**Realidad**: "Workspace incluye Gemini gratis" significa para usuarios humanos en herramientas Google, NO para apps externas que llaman API. Para widget en CRM, sin pasar por API por token, las opciones reales son **NotebookLM externo** o **OpenClaw como backend**.
+> Generado 2026-04-24 por Cowork. **Decisión arquitectónica**: ruta única, todo dentro del CRM, sin dependencias de UI externas.
+> Caso de uso: compañeros de Valere consultan dudas sobre cómo usar el CRM. Asistente de documentación viva, no consultor energético abierto.
 
 ---
 
-## FASE A — NotebookLM como entrada al asistente (esta semana, 1h trabajo)
+## Decisión arquitectónica
 
-**Lo que se hace**:
+**Ruta estable única**: todo el asistente vive dentro del CRM, controlado por Valere, sin dependencias de productos externos específicos para la experiencia del usuario.
 
-1. Crear notebook nuevo en https://notebooklm.google.com con cuenta Workspace Valere.
-2. Subir como sources:
-   - `CLAUDE.md` del repo (contexto general).
-   - `README.md` del repo.
-   - Toda la carpeta `docs/` (manual de uso, decisiones de arquitectura, fases).
-   - Cualquier doc adicional sobre cómo usar el CRM (si tienes manuales en Drive, también).
-3. Compartir el notebook con los emails @valereconsultores.com del equipo.
-4. En el CRM, añadir un botón visible (header o sidebar) "💬 Resolver dudas" que abre el notebook en pestaña nueva.
+### Por qué NO usar NotebookLM como UI del asistente
 
-**Implementación en código**:
+NotebookLM es excelente como producto, pero como UI principal introduce **inestabilidad estructural**:
 
-`src/components/layout/Sidebar.tsx` (o donde tengas el menú):
+- **Producto externo de terceros**: si Google lo cambia/retira/encarece, perdéis la solución.
+- **Dependencia de Workspace**: si en algún momento dejáis Workspace, perdéis la solución.
+- **Re-educación posterior**: si los compañeros aprenden a consultar dudas en NotebookLM y luego se mete un widget integrado, hay que cambiarles la costumbre.
+- **Calendario fuera de tu control**: las features y la disponibilidad las decide Google.
 
-```tsx
-<a
-  href="https://notebooklm.google.com/notebook/<NOTEBOOK_ID>"
-  target="_blank"
-  rel="noopener noreferrer"
-  className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-slate-100"
->
-  <span>💬</span>
-  <span>Resolver dudas del CRM</span>
-</a>
-```
+**NotebookLM se queda como herramienta personal opcional** para que Juan explore la documentación cuando esté escribiendo código, no como UI del equipo.
 
-Donde `<NOTEBOOK_ID>` lo sacas de la URL del notebook compartido.
+### Por qué SÍ ruta integrada en CRM
 
-**Cómo se actualiza la doc**:
-
-- Cada vez que cambias algo del CRM, actualizas el `docs/` del repo.
-- Una vez al mes, vas al notebook NotebookLM y "Refresh sources" → re-sube los docs actualizados desde Drive (si los sincronizas a Drive automáticamente con el script GitHub Actions del bonus abajo).
-
-**Tiempo total**: 1h Juan + 0 línea código backend.
-
-**Coste**: 0 €.
+- **0 dependencia de productos externos específicos**: solo dependes de tu repo + tu Supabase + un modelo de IA cualquiera.
+- **Doc viva donde vive el código**: `docs/help/` del repo. Cero riesgo de desincronización.
+- **Modelo IA sustituible**: Gemini hoy, Claude mañana, OpenAI después — mismo endpoint cambiando ~10 líneas. Sin lock-in.
+- **Una sola UI**: los compañeros aprenden a usar UN sitio para todo. Sin fricciones.
+- **Robusta a cambios de proveedor**: cambiar de hosting (Cloudflare → AWS → otro), de modelo IA, de cuota — el flujo de usuario no cambia.
 
 ---
 
-## FASE C — Widget integrado en CRM (en 1-2 semanas, opcional)
-
-**Lo que se hace**:
-
-Widget flotante "burbuja de chat" en el CRM, conectado a una Edge Function Supabase que hace RAG sobre los embeddings de la documentación.
-
-**Arquitectura**:
+## Arquitectura objetivo
 
 ```
-[Widget CRM] → [Edge Function ask-crm-docs] → [pgvector Supabase]
-                          ↓
-                  [Gemini API free tier]
-                          ↓
-                  Respuesta con citas a docs
+[Usuario en CRM]
+       ↓
+[Widget burbuja RAG]
+       ↓
+[Edge Function ask-crm-docs]
+       ↓
+[pgvector Supabase] ←──── [Pipeline embeddings (GitHub Action)]
+       ↓                         ↑
+[Adapter modelo IA]              │
+       ↓                  [docs/help/*.md en repo]
+[Modelo (Gemini hoy, sustituible)]
+       ↓
+[Respuesta con citas a docs]
 ```
 
-**Componentes a construir**:
+**Principio de sustitución del modelo IA**: el adapter aísla el resto del sistema. Cambiar Gemini por Claude o GPT es modificar 1 fichero (~10 líneas), sin tocar el widget, el pipeline, los embeddings, ni la base de datos.
 
-### C.1 Activar pgvector en Supabase (5 min)
+---
+
+## Fase 1 — Estructura `docs/help/` y convenciones (4-6h)
+
+**Objetivo**: tener una fuente única de verdad para la documentación del CRM con convenciones que permitan extracción automática.
+
+### 1.1 Estructura
+
+```
+docs/help/
+  ├── README.md                    # índice de la doc
+  ├── empezando/
+  │   ├── primer-acceso.md
+  │   ├── interfaz-general.md
+  │   └── configurar-perfil.md
+  ├── empresas/
+  │   ├── crear-empresa.md
+  │   ├── editar-empresa.md
+  │   ├── importar-csv.md
+  │   └── custom-fields.md
+  ├── contactos/
+  │   └── ...
+  ├── contratos/
+  │   └── ...
+  ├── oportunidades/
+  │   ├── pipeline-kanban.md
+  │   ├── etapas.md
+  │   └── automatizaciones.md
+  ├── actividades-y-calendario/
+  │   └── ...
+  ├── incidencias-y-renovaciones/
+  │   └── ...
+  ├── documentos/
+  │   └── ...
+  ├── notificaciones/
+  │   └── ...
+  ├── informes-y-exportacion/
+  │   └── ...
+  └── faqs/
+      └── preguntas-frecuentes.md
+```
+
+### 1.2 Convenciones de cada `.md` (importantes para el RAG)
+
+```markdown
+---
+title: Crear una empresa
+section: empresas
+audience: comerciales,admin
+keywords: [empresa, cliente, alta, nuevo, crear, añadir]
+related: [importar-csv, custom-fields, contactos/asociar-contacto]
+---
+
+# Crear una empresa
+
+## Resumen rápido (1-2 líneas)
+Para dar de alta una empresa nueva en el CRM, ir a "Empresas" → botón "+ Nueva empresa" → rellenar el formulario.
+
+## Paso a paso
+1. En el menú lateral, click en "Empresas".
+2. Botón "+ Nueva empresa" arriba a la derecha.
+3. Rellenar campos obligatorios:
+   - **Nombre**: nombre comercial.
+   - **NIF/CIF**: identificador fiscal.
+   - **Comercial asignado**: por defecto, tú.
+4. Click "Guardar".
+
+## Errores frecuentes
+- **"NIF ya existe"**: la empresa ya está dada de alta. Buscar por NIF en la lista.
+- **"Campo obligatorio"**: revisar que todos los campos con asterisco están rellenos.
+
+## Preguntas relacionadas
+- ¿Cómo añadir contactos a una empresa?
+- ¿Cómo importar muchas empresas de golpe?
+- ¿Qué son los custom fields?
+```
+
+**Por qué esta estructura**:
+
+- **Frontmatter** permite filtrar y categorizar en el RAG.
+- **Resumen rápido** se prioriza para respuestas cortas.
+- **Paso a paso** se cita literalmente cuando el usuario pregunta "cómo X".
+- **Errores frecuentes** son las preguntas más comunes — el RAG las encuentra rápido.
+- **Preguntas relacionadas** generan sugerencias contextuales en el widget.
+
+### 1.3 Trabajo
+
+Inventariar todas las features del CRM (las 27 fases + FASE 28) y escribir un `.md` por flujo importante. ~30-40 docs iniciales.
+
+**Recomendación**: empezar con los 10 flujos más usados (crear empresa, crear oportunidad, mover en kanban, registrar actividad, etc.) y crecer.
+
+---
+
+## Fase 2 — Pipeline de embeddings (4-6h)
+
+### 2.1 Activar pgvector
 
 ```sql
--- Aplicar como migration
+-- supabase/migrations/20260424_enable_pgvector_for_help.sql
 create extension if not exists vector with schema extensions;
 ```
 
-### C.2 Tabla de embeddings (10 min)
+### 2.2 Tabla de embeddings
 
 ```sql
-create table public.crm_docs_embeddings (
+create table public.crm_help_embeddings (
   id uuid primary key default gen_random_uuid(),
-  source_path text not null,           -- ej: "docs/USO_CRM.md#crear-empresa"
-  chunk_text text not null,            -- el fragmento de texto
-  embedding vector(768) not null,      -- text-embedding-004 = 768 dims
-  source_url text,                     -- ej: link al doc en Drive/GitHub
+  source_path text not null,            -- "docs/help/empresas/crear-empresa.md"
+  section text not null,                -- "empresas"
+  title text not null,                  -- del frontmatter
+  chunk_index int not null,             -- 0, 1, 2... orden dentro del doc
+  chunk_text text not null,
+  embedding vector(768) not null,       -- text-embedding-004 dimensions
+  source_url text,                      -- link a github o doc canónica
   created_at timestamptz default now()
 );
 
-create index on public.crm_docs_embeddings
-  using hnsw (embedding vector_cosine_ops);
+create index on public.crm_help_embeddings using hnsw (embedding vector_cosine_ops);
+create index on public.crm_help_embeddings (section);
 
-alter table public.crm_docs_embeddings enable row level security;
-create policy "authenticated read" on public.crm_docs_embeddings
+alter table public.crm_help_embeddings enable row level security;
+create policy "authenticated read" on public.crm_help_embeddings
   for select to authenticated using (true);
 ```
 
-### C.3 Pipeline de generación de embeddings (4-6h)
+### 2.3 Función `match_crm_help`
 
-GitHub Action que se dispara en push a `main` cuando cambian archivos en `docs/`:
+```sql
+create or replace function match_crm_help(
+  query_embedding vector(768),
+  match_count int default 5,
+  filter_section text default null
+)
+returns table (
+  source_path text,
+  section text,
+  title text,
+  chunk_text text,
+  source_url text,
+  similarity float
+)
+language sql stable
+as $$
+  select
+    source_path, section, title, chunk_text, source_url,
+    1 - (embedding <=> query_embedding) as similarity
+  from public.crm_help_embeddings
+  where filter_section is null or section = filter_section
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+### 2.4 Script de generación de embeddings
+
+`scripts/generate-help-embeddings.mjs`:
+
+```javascript
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from "@supabase/supabase-js";
+import { readFile, readdir } from "fs/promises";
+import path from "path";
+import matter from "gray-matter";
+
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const embeddingModel = genai.getGenerativeModel({ model: "text-embedding-004" });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+async function chunkMarkdown(content, maxChars = 800) {
+  // Chunk por secciones de markdown (headers ## / ###)
+  // Si una sección es muy larga, partirla por párrafos
+  // Mantener el header como contexto en cada chunk
+  // ... implementación
+}
+
+async function processFile(filePath, basePath) {
+  const raw = await readFile(filePath, "utf-8");
+  const { data: frontmatter, content } = matter(raw);
+  const chunks = await chunkMarkdown(content);
+  const relativePath = path.relative(basePath, filePath);
+
+  const embeddings = await Promise.all(
+    chunks.map(async (chunk, i) => {
+      const result = await embeddingModel.embedContent(chunk);
+      return {
+        source_path: relativePath,
+        section: frontmatter.section || "general",
+        title: frontmatter.title || "Sin título",
+        chunk_index: i,
+        chunk_text: chunk,
+        embedding: result.embedding.values,
+        source_url: `https://github.com/jolivares-valere/valere-v2/blob/main/${relativePath}`,
+      };
+    })
+  );
+
+  return embeddings;
+}
+
+async function main() {
+  // 1. Leer todos los .md en docs/help/
+  // 2. Procesar cada uno (chunking + embeddings)
+  // 3. Borrar embeddings antiguos
+  // 4. Insertar nuevos en batch
+  console.log("Done");
+}
+
+main().catch(console.error);
+```
+
+### 2.5 GitHub Action
 
 ```yaml
-# .github/workflows/regenerate-embeddings.yml
-name: Regenerate CRM docs embeddings
+# .github/workflows/regenerate-help-embeddings.yml
+name: Regenerate CRM help embeddings
 on:
   push:
     branches: [main]
     paths:
-      - 'docs/**'
-      - 'CLAUDE.md'
-      - 'README.md'
+      - 'docs/help/**'
 
 jobs:
   regenerate:
@@ -130,181 +280,155 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - run: node scripts/generate-embeddings.mjs
+      - run: node scripts/generate-help-embeddings.mjs
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
 ```
 
-`scripts/generate-embeddings.mjs`:
-- Lee todos los `.md` en `docs/`, `CLAUDE.md`, `README.md`.
-- Chunk inteligente por sección (parsing markdown headers).
-- Llama Gemini API `text-embedding-004` por cada chunk.
-- Borra embeddings antiguos + inserta nuevos en `crm_docs_embeddings`.
+**Resultado**: cada vez que un PR a `main` cambia `docs/help/**`, los embeddings se regeneran automáticamente. Doc → bot siempre sincronizado.
 
-### C.4 Edge Function `ask-crm-docs` (3-4h)
+---
+
+## Fase 3 — Edge Function `ask-crm-docs` (3-4h)
+
+### 3.1 Adapter de modelo IA (clave para sustituibilidad)
+
+`supabase/functions/_shared/ai-adapter.ts`:
 
 ```typescript
-// supabase/functions/ask-crm-docs/index.ts
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
+// Adapter abstracto. Cambiar de modelo = cambiar este archivo.
+export interface AIAdapter {
+  embed(text: string): Promise<number[]>;
+  generate(prompt: string): Promise<string>;
+}
 
-Deno.serve(async (req) => {
-  const { question } = await req.json();
-  const supabase = createClient(...);
-  const genai = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY"));
+export function createGeminiAdapter(): AIAdapter {
+  // Implementación actual con @google/genai
+}
 
-  // 1. Generar embedding de la pregunta
-  const embeddingModel = genai.getGenerativeModel({ model: "text-embedding-004" });
-  const queryEmbedding = await embeddingModel.embedContent(question);
+// Ejemplo futuro:
+// export function createClaudeAdapter(): AIAdapter { ... }
+// export function createOpenAIAdapter(): AIAdapter { ... }
 
-  // 2. Búsqueda semántica en pgvector (top 5 chunks)
-  const { data: chunks } = await supabase.rpc("match_crm_docs", {
-    query_embedding: queryEmbedding.embedding.values,
-    match_count: 5,
-  });
-
-  // 3. Construir prompt con contexto + pregunta
-  const context = chunks.map(c => `[${c.source_path}]\n${c.chunk_text}`).join("\n\n");
-  const prompt = `
-Eres el asistente del CRM Valere. Responde a la pregunta del usuario basándote en la documentación adjunta. Si la respuesta no está en la doc, dilo claramente. Cita las secciones de doc en las que te basas.
-
-Documentación:
-${context}
-
-Pregunta del usuario:
-${question}
-`;
-
-  // 4. Generar respuesta con gemini-2.0-flash
-  const chatModel = genai.getGenerativeModel({ model: "gemini-2.0-flash" });
-  const result = await chatModel.generateContent(prompt);
-
-  return Response.json({
-    answer: result.response.text(),
-    sources: chunks.map(c => ({ path: c.source_path, url: c.source_url })),
-  });
-});
-```
-
-### C.5 Función `match_crm_docs` en Postgres (15 min)
-
-```sql
-create or replace function match_crm_docs(
-  query_embedding vector(768),
-  match_count int default 5
-)
-returns table (
-  source_path text,
-  chunk_text text,
-  source_url text,
-  similarity float
-)
-language sql stable
-as $$
-  select
-    source_path, chunk_text, source_url,
-    1 - (embedding <=> query_embedding) as similarity
-  from public.crm_docs_embeddings
-  order by embedding <=> query_embedding
-  limit match_count;
-$$;
-```
-
-### C.6 Widget React en el CRM (3-4h)
-
-`src/features/asistente-crm/AsistentePanel.tsx`:
-
-```tsx
-import { useState } from 'react';
-import { supabase } from '@/core/supabase/client';
-
-export function AsistentePanel() {
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Array<{role: string; content: string; sources?: any[]}>>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const send = async () => {
-    if (!input.trim()) return;
-    const question = input;
-    setInput("");
-    setMessages(m => [...m, { role: "user", content: question }]);
-    setLoading(true);
-
-    const { data, error } = await supabase.functions.invoke("ask-crm-docs", {
-      body: { question },
-    });
-
-    if (error) {
-      setMessages(m => [...m, { role: "assistant", content: "Lo siento, no he podido responder. Intenta de nuevo." }]);
-    } else {
-      setMessages(m => [...m, { role: "assistant", content: data.answer, sources: data.sources }]);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <>
-      {/* Botón flotante */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 bg-blue-600 text-white rounded-full w-14 h-14 shadow-lg hover:scale-105 transition flex items-center justify-center"
-        aria-label="Resolver dudas del CRM"
-      >
-        💬
-      </button>
-
-      {/* Panel */}
-      {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 h-[500px] bg-white rounded-lg shadow-2xl border flex flex-col">
-          <header className="p-3 border-b font-semibold flex justify-between items-center">
-            <span>Asistente del CRM</span>
-            <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900">×</button>
-          </header>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {messages.length === 0 && (
-              <p className="text-sm text-slate-500">Pregúntame cualquier duda sobre el CRM.</p>
-            )}
-            {messages.map((m, i) => (
-              <div key={i} className={`text-sm ${m.role === "user" ? "text-right" : "text-left"}`}>
-                <div className={`inline-block px-3 py-2 rounded-lg ${m.role === "user" ? "bg-blue-100" : "bg-slate-100"}`}>
-                  {m.content}
-                </div>
-                {m.sources && m.sources.length > 0 && (
-                  <div className="text-xs text-slate-500 mt-1">
-                    Fuentes: {m.sources.map((s: any) => s.path).join(", ")}
-                  </div>
-                )}
-              </div>
-            ))}
-            {loading && <div className="text-sm text-slate-400">Pensando...</div>}
-          </div>
-          <footer className="p-3 border-t flex gap-2">
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && send()}
-              placeholder="Escribe tu pregunta..."
-              className="flex-1 border rounded px-3 py-2 text-sm"
-              disabled={loading}
-            />
-            <button
-              onClick={send}
-              disabled={loading || !input.trim()}
-              className="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50"
-            >
-              Enviar
-            </button>
-          </footer>
-        </div>
-      )}
-    </>
-  );
+export function getAdapter(): AIAdapter {
+  const provider = Deno.env.get("AI_PROVIDER") || "gemini";
+  switch (provider) {
+    case "gemini": return createGeminiAdapter();
+    // case "claude": return createClaudeAdapter();
+    // case "openai": return createOpenAIAdapter();
+    default: throw new Error(`Unknown provider: ${provider}`);
+  }
 }
 ```
 
-### C.7 Montar el widget en `App.tsx`
+**Cambiar de modelo IA en el futuro** = cambiar `AI_PROVIDER` env var + asegurar que el nuevo adapter está implementado. Cero impacto en el resto del sistema.
+
+### 3.2 Edge Function
+
+```typescript
+// supabase/functions/ask-crm-docs/index.ts
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAdapter } from "../_shared/ai-adapter.ts";
+
+const SYSTEM_PROMPT = `Eres el asistente del CRM Valere. Ayudas a los compañeros de Valere Consultores a usar el CRM. Responde basándote SIEMPRE en la documentación adjunta. Si la respuesta no está en la doc, dilo claramente y sugiere preguntar al admin.
+
+Reglas:
+- Sé conciso. Respuestas de 1-3 frases si la pregunta es simple.
+- Si das instrucciones paso a paso, numéralas.
+- Cita las secciones de doc en las que te basas (al final de la respuesta).
+- No inventes funcionalidades que no aparezcan en la doc.
+- Idioma: castellano siempre.`;
+
+Deno.serve(async (req) => {
+  // Verificar JWT (verify_jwt: true en config.toml)
+  const { question, section } = await req.json();
+  if (!question || question.length > 500) {
+    return new Response("Pregunta inválida", { status: 400 });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+  const ai = getAdapter();
+
+  // 1. Embedding de la pregunta
+  const queryEmbedding = await ai.embed(question);
+
+  // 2. Búsqueda semántica (filtra por sección si viene)
+  const { data: chunks, error } = await supabase.rpc("match_crm_help", {
+    query_embedding: queryEmbedding,
+    match_count: 5,
+    filter_section: section || null,
+  });
+
+  if (error || !chunks || chunks.length === 0) {
+    return new Response(JSON.stringify({
+      answer: "No encuentro información sobre eso en la documentación. Pregunta al admin del CRM.",
+      sources: [],
+    }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // 3. Construir prompt con contexto
+  const context = chunks
+    .map((c, i) => `[Fuente ${i + 1}: ${c.title} (${c.source_path})]\n${c.chunk_text}`)
+    .join("\n\n");
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n## Documentación relevante\n${context}\n\n## Pregunta del usuario\n${question}`;
+
+  // 4. Generar respuesta
+  const answer = await ai.generate(fullPrompt);
+
+  return new Response(JSON.stringify({
+    answer,
+    sources: chunks.map(c => ({
+      title: c.title,
+      path: c.source_path,
+      url: c.source_url,
+      similarity: c.similarity,
+    })),
+  }), { headers: { "Content-Type": "application/json" } });
+});
+```
+
+### 3.3 Configuración
+
+```toml
+# supabase/functions/ask-crm-docs/config.toml
+verify_jwt = true
+```
+
+Secret `GEMINI_API_KEY` configurado en Supabase Dashboard.
+
+### 3.4 La Edge Function actual `chat-consultor` se RETIRA
+
+Tras tener `ask-crm-docs` funcionando:
+
+1. Verificar que el frontend del CRM no tiene referencias a `chat-consultor`.
+2. Eliminar `supabase/functions/chat-consultor/` del repo.
+3. En Supabase, despublicar la función `chat-consultor`.
+4. Eliminar el secret `GEMINI_API_KEY` antiguo si era distinto del nuevo (rotación).
+
+---
+
+## Fase 4 — Widget RAG en CRM (3-4h)
+
+### 4.1 Estructura
+
+```
+src/features/asistente-crm/
+  ├── AsistentePanel.tsx          # botón flotante + panel
+  ├── components/
+  │   ├── ChatBubble.tsx          # un mensaje
+  │   ├── SourcesCitation.tsx     # citas a docs
+  │   └── SuggestedQuestions.tsx  # preguntas relacionadas
+  ├── hooks/
+  │   └── useAsistente.ts         # llamada Edge Function + state
+  └── types.ts
+```
+
+### 4.2 Componente principal (resumen — implementación detallada en Fase C original)
 
 ```tsx
 import { AsistentePanel } from "@/features/asistente-crm/AsistentePanel";
@@ -313,45 +437,102 @@ function App() {
   return (
     <>
       <Routes>...</Routes>
-      <AsistentePanel />  {/* fuera del Routes para que esté en todas las páginas */}
+      <AsistentePanel />  {/* fuera del Routes — visible en todas las páginas */}
     </>
   );
 }
 ```
 
-### C.8 Coste real Gemini API free tier
+### 4.3 Detección automática de sección actual
 
-Free tier (al 2026-04):
-- `text-embedding-004`: 1500 req/día gratis.
-- `gemini-2.0-flash`: 1.5 req/seg + 1M tokens/día gratis.
+El widget detecta en qué página está el usuario y filtra el RAG por sección automáticamente. Si está en `/empresas`, las búsquedas se priorizan en `section: "empresas"`. Esto mejora la precisión sin que el usuario tenga que filtrar.
 
-Para 5 usuarios con uso interno (digamos 50 preguntas/día por usuario = 250 queries/día):
-- 250 embeddings de pregunta + ~5 retrievals + 250 generaciones = sobra de largo dentro del free tier.
+```tsx
+const location = useLocation();
+const section = location.pathname.split("/")[1]; // "empresas", "contratos", etc.
 
-Si en algún momento explota → upgrade a Vertex AI con cuota Workspace o pricing por token.
+const { data } = await supabase.functions.invoke("ask-crm-docs", {
+  body: { question, section },
+});
+```
 
----
+### 4.4 Citas clicables
 
-## FASE B — Alternativa con OpenClaw (si quieres tarifa fija garantizada)
-
-Si en algún momento Fase C llega al límite de free tier, sustituir el backend por OpenClaw:
-
-- En vez de Edge Function llamando Gemini API → llamar a Mission Control de OpenClaw.
-- OpenClaw consulta ChatGPT con tu suscripción Empresa (sin tokens).
-- Documentación cargada como knowledge base en OpenClaw o pasada en cada llamada.
-
-Requiere setup OpenClaw + Mission Control + Cloudflare Tunnel (ver `docs/SETUP_OPENCLAW_MISSION_CONTROL.md`).
+Las fuentes en la respuesta son links a la doc en GitHub (campo `source_url`). El usuario puede abrirlas para leer el contexto completo.
 
 ---
 
-## Recomendación final
+## Fase 5 — Evolución progresiva (continuo)
 
-1. **Esta semana**: implementar Fase A (NotebookLM externo). 1h Juan, 0 línea código backend, valor inmediato.
-2. **En 1-2 semanas**: implementar Fase C cuando tengamos la unificación Supabase encarrilada y haya capacidad. ~16h trabajo total.
-3. **A futuro**: Fase B solo si Fase C llega a límites.
+Una vez el widget RAG está vivo, evolucionar SEGÚN USO REAL:
 
-## Pendientes antes de Fase C
+- **Métrica 1**: ¿qué preguntas hacen los compañeros más a menudo?
+  - Loguear preguntas anonimizadas en una tabla `asistente_log` (sin identificar usuario).
+  - Revisar mensualmente: las top 10 preguntas indican qué documentación falta o qué tooltips/ayudas inline merecen el esfuerzo.
 
-- Unificación Supabase debería estar hecha o en sprint avanzado (para no construir sobre 2 backends que se van a fusionar).
-- Decisión sobre dónde vive la doc del CRM (`docs/` del repo es el sitio canónico — confirmar).
-- Crear el componente `<Route>` para el panel chat-ia que está huérfano (o sustituirlo directamente por el widget nuevo).
+- **Métrica 2**: ¿cuándo el bot dice "no encuentro información"?
+  - Esas preguntas son el TODO automático para escribir nueva documentación.
+
+### Ayudas integradas que añadir según métricas
+
+| Tipo | Cuándo añadir | Ejemplo |
+|---|---|---|
+| **Empty state explicativo** | Usuarios preguntan "no veo nada aquí" | "No hay empresas. Crea la primera con el botón + arriba." |
+| **Tooltip en campo** | Usuarios preguntan qué significa un campo | "?" junto a "Probabilidad %" → "Estimación de cierre. 0% perdida, 100% ganada." |
+| **Tour interactivo** | Nuevos compañeros se pierden la primera vez | Walkthrough de 5 pasos: dashboard → empresas → oportunidades → kanban → actividades. |
+| **Mensaje de error mejorado** | Validation con texto críptico | "NIF ya existe" → "Esa empresa ya está dada de alta. Buscar por NIF aquí." |
+
+**Coste**: ~2-3h por sprint para añadir 1-2 ayudas inline basadas en métricas reales.
+
+**Por qué evolutivo y no de golpe**: añadir todas las ayudas al principio sin métricas reales acaba en mucho texto inútil que satura la UI. Mejor responder a uso real.
+
+---
+
+## Coste consolidado
+
+| Fase | Coste | Cuándo |
+|---|---|---|
+| Fase 1 — Estructura `docs/help/` (10 docs iniciales) | 4-6h | Sprint dedicado |
+| Fase 2 — Pipeline embeddings | 4-6h | Sprint dedicado |
+| Fase 3 — Edge Function ask-crm-docs | 3-4h | Sprint dedicado |
+| Fase 4 — Widget RAG | 3-4h | Sprint dedicado |
+| Fase 5 — Evolución progresiva | 2-3h por sprint | Continuo |
+
+**Total para tener algo funcional**: ~15-20h. ~3 días concentrados.
+
+**Coste mensual operativo**: dentro del free tier de Gemini API mientras el uso sea bajo (5 compañeros, ~50 queries/día = sobra).
+
+---
+
+## Sustitución del modelo IA en el futuro
+
+Si en algún momento quieres cambiar Gemini por Claude, OpenAI o cualquier otro:
+
+1. Implementar el adapter nuevo en `supabase/functions/_shared/ai-adapter.ts`.
+2. Configurar el secret nuevo en Supabase (`CLAUDE_API_KEY` o el que sea).
+3. Cambiar la env var `AI_PROVIDER` a `claude` (o el nuevo).
+4. Listo. Sin tocar pipeline, embeddings, frontend, ni base de datos.
+
+**Salvedad**: si cambias de proveedor de embeddings (text-embedding-004 vs Voyage AI vs OpenAI ada-002), las dimensiones del vector pueden ser distintas. Eso obliga a regenerar todos los embeddings y a cambiar el tipo de la columna (`vector(768)` → `vector(1536)`). Es ~2h de migración. Mantener el mismo proveedor de embeddings durante el tiempo que se pueda.
+
+---
+
+## NotebookLM como herramienta personal de Juan (opcional)
+
+Aunque no es la UI del asistente, NotebookLM puede ser útil para Juan cuando esté escribiendo nueva documentación:
+
+- Subir `docs/help/` actualizado a un notebook personal.
+- Hacer preguntas tipo "¿qué tema falta cubrir?" o "¿hay información duplicada entre `crear-empresa.md` e `importar-csv.md`?".
+- Usar Audio Overviews para generar un audio de la doc completa cuando se metan compañeros nuevos.
+
+Esto NO afecta a la arquitectura del asistente del CRM. Es solo herramienta de productividad personal.
+
+---
+
+## Pendientes antes de empezar
+
+1. **Decidir si esta es la ruta** (este documento). ✅ Confirmado por Juan 2026-04-24.
+2. **Unificación Supabase** debería estar hecha o en curso (no construir sobre 2 backends que se van a fusionar).
+3. **Inventario completo de features del CRM** para escribir los 30-40 docs iniciales (2-3h de trabajo aparte por sprint).
+4. **Decisión modelo IA inicial**: Gemini API free tier (recomendado para empezar) o ya integrado con OpenClaw para tarifa fija desde día 1.
+5. **Eliminar el `chat-consultor` actual** (Edge Function huérfana) cuando esté listo el reemplazo.
