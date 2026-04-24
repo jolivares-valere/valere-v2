@@ -1,0 +1,65 @@
+name: Regenerate CRM help embeddings
+
+# Regenera automáticamente los embeddings de docs/help/ en Supabase
+# cuando se mergea a main un PR que los modifique.
+#
+# Estado: ESQUELETO. Pendiente de activar cuando se complete Fase 2 del plan RAG.
+# Ver docs/PLAN_ASISTENTE_RAG_CRM.md §Fase 2.
+#
+# Antes de activar este workflow:
+#   1. Crear la tabla crm_help_embeddings en Supabase (SQL migration).
+#   2. Configurar los secrets de GitHub:
+#      - GEMINI_API_KEY_EMBEDDINGS (rotación defensiva: distinta de la del chat)
+#      - SUPABASE_URL
+#      - SUPABASE_SERVICE_KEY
+#   3. Verificar que pgvector está activado en el proyecto Supabase.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/help/**'
+      - 'CLAUDE.md'
+      - 'README.md'
+      - 'scripts/generate-help-embeddings.mjs'
+  workflow_dispatch:  # permite trigger manual desde UI de GitHub
+
+jobs:
+  regenerate:
+    name: Regenerate embeddings
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Instala las deps extra del script (si no están ya en package.json)
+          npm install --no-save @google/generative-ai@latest gray-matter@latest
+
+      - name: Regenerate embeddings
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_EMBEDDINGS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/generate-help-embeddings.mjs
+
+      - name: Report success
+        if: success()
+        run: echo "✅ Embeddings regenerados correctamente."
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "❌ Falló la regeneración de embeddings."
+          echo "Revisar logs arriba para detalles."
+          echo "El widget del CRM puede responder con info desactualizada hasta que se resuelva."
