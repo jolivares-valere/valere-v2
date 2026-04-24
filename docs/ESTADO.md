@@ -1,6 +1,36 @@
 ﻿# Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-23 por Cowork — Sprint seguridad completo (fase 28.6 + 28.7a + 28.7b + 28.7c aplicadas via Supabase MCP, 0 ERRORs, 0 WARNs RLS/funciones) · MCPs Supabase + Vercel conectados · docs ARQUITECTURA_PROYECTOS + SEGURIDAD + MCP_SETUP nuevos/actualizados
+> Última actualización: 2026-04-24 por Cowork — Resuelto merge huérfano en `claude/mcp-setup` (locks limpiados, ruido CRLF descartado) · 3 docs sin commitear de la sesión 2026-04-23 movidos a PR #6 (rama `claude/docs-cierre-2026-04-23`) · rama local `claude/mcp-setup` borrada (ya estaba squash en main vía PR #5)
+
+
+## Sesión 2026-04-24 — Limpieza merge huérfano + PR #6 docs
+
+**Rama:** `claude/docs-cierre-2026-04-23` → PR #6 abierto contra main.
+
+### Qué pasaba
+Working tree de Cowork tenía un `git merge` de `origin/main` (`ef3aa68`) en `claude/mcp-setup` (`5a7590e`) **a medio cerrar**: 6 lock files huérfanos (`.git/index.lock`, `HEAD.lock`, `ORIG_HEAD.lock`, `refs/heads/claude/mcp-setup.lock`) que el sandbox no podía borrar (`Operation not permitted` por mount Windows), 198 ficheros mostrados como "modified" que en realidad eran 100% ruido CRLF/LF (mismo nº de inserciones que de borrados línea a línea), y 3 docs sin commitear de la sesión cowork del día anterior.
+
+Como PR #5 ya se había mergeado a main por **squash** (`ef3aa68`), `claude/mcp-setup` y `origin/main` contenían exactamente el mismo código — la rama local quedaba obsoleta.
+
+### Acciones
+- ✅ `mcp__cowork__allow_cowork_file_delete` para desbloquear los locks → `rm -f` los 6 lock files.
+- ✅ `git merge --abort` + `git checkout -- .` → working tree limpio (sólo 3 untracked docs reales).
+- ✅ Rama nueva `claude/docs-cierre-2026-04-23` desde `origin/main` (ef3aa68) con los 3 docs.
+- ✅ Commit `68720bd` + push + **PR #6** abierto (`docs: cierre sesión 2026-04-23 + planning apps satélite`).
+- ✅ Rama local `claude/mcp-setup` borrada (estaba squash en main).
+
+### Docs commiteados en PR #6
+- `docs/PLANNING_APPS_SATELITE.md` (12.9 KB)
+- `docs/SCRIPT_SUBIR_POTENCIAS_A_GITHUB.md` (8.8 KB)
+- `docs/SESIONES/2026-04-23-cierre-tarde.md` (4.2 KB)
+
+### Pendientes que siguen vivos (de sesión 2026-04-23)
+- ⏳ Regenerar `RESEND_API_KEY` (expuesta en chat).
+- ⏳ Investigar repo privado `jolivares-valere/valere-gestion-energetica`.
+- ⏳ Borrar carpeta vacía `CRM VALERE/` en raíz del clone Windows.
+- ⏳ Migration unificación `oportunidades.etapa` (`ganada` vs `cerrada_ganada`).
+- ⏳ Activar Pro plan Supabase cuando se escale.
+- ⏳ Cerrar PR #6 (mergear cuando CI pase).
 
 
 ## Sesion 2026-04-23 — MCPs + hardening seguridad
