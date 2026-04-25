@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './core/hooks/useAuth'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
+import { ErrorBoundary } from './core/components/ErrorBoundary'
 
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage'))
 const EmpresasPage = lazy(() => import('./features/empresas/EmpresasPage'))
@@ -49,11 +50,17 @@ function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: str
   }
   return (
     <AppShell>
-      <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
-      {/* Asistente del CRM — widget flotante en todas las páginas autenticadas */}
-      <Suspense fallback={null}>
-        <AsistentePanel />
-      </Suspense>
+      <ErrorBoundary moduleName="esta sección">
+        <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
+      </ErrorBoundary>
+      {/* Asistente del CRM — widget flotante en todas las páginas autenticadas.
+          Va en su propio ErrorBoundary para que un fallo del asistente
+          (Edge Function caída, respuesta malformada) no tire la página. */}
+      <ErrorBoundary moduleName="el asistente">
+        <Suspense fallback={null}>
+          <AsistentePanel />
+        </Suspense>
+      </ErrorBoundary>
     </AppShell>
   )
 }

@@ -39,28 +39,33 @@ function createGeminiAdapter(apiKey: string): AIAdapter {
     provider: 'gemini',
 
     async embed(text: string): Promise<number[]> {
-      // text-embedding-004 → 768 dimensions (coincide con la tabla)
+      // gemini-embedding-001 con outputDimensionality=768 (coincide con la tabla
+      // crm_help_embeddings y con scripts/generate-help-embeddings.mjs).
+      // text-embedding-004 fue deprecado para cuentas nuevas en abril 2026.
       const result = await ai.models.embedContent({
-        model: 'text-embedding-004',
+        model: 'gemini-embedding-001',
         contents: text,
+        config: {
+          outputDimensionality: 768,
+        },
       })
-      // Formato de respuesta según @google/genai 1.0.0:
-      // result.embeddings[0].values o similar según versión
-      const embedding =
-        (result as any).embedding?.values ??
+      const values =
         (result as any).embeddings?.[0]?.values ??
-        []
-      if (!Array.isArray(embedding) || embedding.length !== 768) {
+        (result as any).embedding?.values ??
+        null
+      if (!Array.isArray(values) || values.length !== 768) {
         throw new Error(
-          `Gemini embedding inválido: length=${embedding?.length}, expected 768`,
+          `Gemini embedding inválido: length=${values?.length}, expected 768`,
         )
       }
-      return embedding
+      return values
     },
 
     async generate(prompt: string): Promise<string> {
+      // gemini-2.5-flash: sustituye a gemini-2.0-flash (deprecado para cuentas
+      // nuevas desde abril 2026). Misma latencia, mejor calidad de respuesta.
       const result = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
       })
       // Formato de respuesta según @google/genai 1.0.0:

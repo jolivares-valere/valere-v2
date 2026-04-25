@@ -148,10 +148,10 @@ function UsersTab() {
 
 function RetailersTab() {
   const { data: retailers, loading, refetch } = useSupabaseQuery<Retailer>({
-    table: 'retailers',
+    table: 'comercializadoras',
     order: { column: 'name', ascending: true },
   });
-  const mutation = useSupabaseMutation('retailers');
+  const mutation = useSupabaseMutation('comercializadoras');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -297,12 +297,12 @@ function RetailersTab() {
 
 function OffersTab() {
   const { data: offers, loading, refetch } = useSupabaseQuery<any>({
-    table: 'retailer_offers',
-    select: '*, retailers(name)',
+    table: 'comercializadora_ofertas',
+    select: '*, comercializadoras(name)',
     order: { column: 'created_at', ascending: false },
   });
-  const { data: retailers } = useSupabaseQuery<Retailer>({ table: 'retailers' });
-  const mutation = useSupabaseMutation('retailer_offers');
+  const { data: retailers } = useSupabaseQuery<Retailer>({ table: 'comercializadoras' });
+  const mutation = useSupabaseMutation('comercializadora_ofertas');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -311,16 +311,16 @@ function OffersTab() {
   const defaultTariff = '2.0TD';
   const defaultCfg = getTariffConfig(defaultTariff);
   const [form, setForm] = useState<any>({
-    retailer_id: '', product_name: '', access_rate: defaultTariff, surplus_model: 'compensacion_simple',
+    comercializadora_id: '', product_name: '', access_rate: defaultTariff, surplus_model: 'compensacion_simple',
     energy_prices: Array(defaultCfg.energia).fill(0), power_prices: Array(defaultCfg.potencia).fill(0),
     surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
     allow_zero_invoice: false, include_in_comparison: true,
   });
 
   const save = async () => {
-    if (!form.retailer_id) { toast.error('Selecciona una comercializadora'); return; }
+    if (!form.comercializadora_id) { toast.error('Selecciona una comercializadora'); return; }
     if (isEditing && editingId) {
-      const { id, created_at, retailers, ...updateData } = form;
+      const { id, created_at, comercializadoras, ...updateData } = form;
       await mutation.update(editingId, updateData, 'Oferta actualizada');
     } else {
       await mutation.insert(form, 'Oferta creada');
@@ -334,7 +334,7 @@ function OffersTab() {
   const startEditOffer = (o: any) => {
     const cfg = getTariffConfig(o.access_rate || '2.0TD');
     setForm({
-      retailer_id: o.retailer_id ?? '',
+      comercializadora_id: o.comercializadora_id ?? '',
       product_name: o.product_name ?? '',
       access_rate: o.access_rate ?? '2.0TD',
       surplus_model: o.surplus_model ?? 'compensacion_simple',
@@ -370,7 +370,7 @@ function OffersTab() {
             onClick={() => {
               const cfg = getTariffConfig('2.0TD');
               setForm({
-                retailer_id: '', product_name: '', access_rate: '2.0TD', surplus_model: 'compensacion_simple',
+                comercializadora_id: '', product_name: '', access_rate: '2.0TD', surplus_model: 'compensacion_simple',
                 energy_prices: Array(cfg.energia).fill(0), power_prices: Array(cfg.potencia).fill(0),
                 surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
                 allow_zero_invoice: false, include_in_comparison: true,
@@ -402,7 +402,7 @@ function OffersTab() {
               <TableBody>
                 {offers.map((o: any) => (
                   <TableRow key={o.id} className="border-slate-50 hover:bg-slate-50/30">
-                    <TableCell className="pl-6 font-semibold text-valere-blue-dark">{o.retailers?.name || '—'}</TableCell>
+                    <TableCell className="pl-6 font-semibold text-valere-blue-dark">{o.comercializadoras?.name || '—'}</TableCell>
                     <TableCell>{o.product_name || '—'}</TableCell>
                     <TableCell><Badge variant="outline">{o.access_rate}</Badge></TableCell>
                     <TableCell className="text-sm text-valere-ink/60">{o.surplus_model}</TableCell>
@@ -436,8 +436,8 @@ function OffersTab() {
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Comercializadora *</label>
               <select
-                value={form.retailer_id}
-                onChange={e => setForm((p: any) => ({ ...p, retailer_id: e.target.value }))}
+                value={form.comercializadora_id}
+                onChange={e => setForm((p: any) => ({ ...p, comercializadora_id: e.target.value }))}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
               >
                 <option value="">— Seleccionar —</option>

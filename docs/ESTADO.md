@@ -1,6 +1,240 @@
 ﻿# Estado actual del proyecto Valere v2
 
-> Última actualización: 2026-04-25 por Cowork (4º sprint autónomo) — **Diseño Fase 0 Unificación Supabase + tabla asistente_log + plan Auth Google + 3 docs calculadora**: (1) `docs/PLAN_UNIFICACION_SUPABASE_FASE_0.md` — schema canónico SQL completo de las 36 tablas + scripts de migración con dedupe por CIF/NIF y CUPS + plan rollback + verificación post-migración (ahorra 2-3 días del sprint dedicado). (2) Tabla `crm_asistente_log` aplicada en Supabase + Edge Function actualizada para loggear preguntas (anonimizado, RGPD) — habilita métricas de uso + detección automática de gaps de doc. (3) `docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md` — plan paso a paso 6 fases (4-6h trabajo + comunicación + dual-mode + cleanup). (4) 3 docs help/ calculadora (captura facturas, análisis comparativo, generar propuesta) → 23 docs help/ totales. Pendiente urgente: backup Arsys (Claude web).
+> Última actualización: 2026-04-26 por Cowork (9º sprint autónomo) — **`RUNBOOK.ps1` maestro en la raíz**. Un solo comando para Juan: `powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\joliv\valere-v2\RUNBOOK.ps1"`. Automatiza reparación `.git/` (null bytes + locks) idempotente + Bloque 1 completo del `RUNBOOK_PENDIENTE_JUAN.md` (sync rama PR #6, reset CRLF, git rm legacy + framer-motion uninstall, git add 26 entregables sprints 5-8 + paralelo C, TSC, tests, commit, push) + pausas con instrucciones inline para Bloques 2/4/6/8. Flags: `-DryRun`, `-OnlyRepair`, `-SkipPush`, `-SkipTests`, `-YesToAll`. Idempotente — re-ejecutable sin romper nada.
+
+> Sprint 8 (2026-04-26 tarde) — **Validación FE refactor 100% + compat views completas (SELECT/INSERT/UPDATE/DELETE) + Plan Fase 4-5 + RLS hardening draft**. (1) Refactor FE Fase 3 cerrado: `src/types/database.ts` actualizado (`RetailerOffer.retailer_id`→`comercializadora_id`, `RetailerOfferWithName.retailers`→`comercializadoras`); 0 refs legacy en `src/`. (2) Compat views validadas via MCP — INSERT vía view legacy mapea trigger → tabla canónica con `comercializadora_id` correctamente; UPDATE/DELETE auto-updatable de Postgres también funciona (incluso con column alias). FE legacy puede coexistir sin tocar nada. (3) `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` — plan ejecutivo Fases 4 (deploy + apps satélite con compat views) y 5 (cleanup). Decisión arquitectónica para Potencias-app: views CRM (`clients`, `supplies`, `profiles`, etc.) que minimizan refactor. (4) Riesgo storage identificado: PDFs de Potencias en bucket separado — pendiente decisión Juan. (5) `supabase/migrations/_draft_rls_hardening_8_tables.sql` — 8 tablas Potencias-side con USING(true) → 4 policies granulares cada una (select/insert/update/delete), patrón comercial-creador o manager+. (6) Inventory limpieza completo para script PowerShell git rm.
+
+> Sprint 7 (2026-04-26 tarde) — **Unificación Supabase Fase 1 APLICADA en prod + Fase 3 FE refactor APLICADO + Fase 2 datos preparada para Juan**. Aplicada migration `fase1_unificacion_renames_schema` (renames retailers→comercializadoras, retailer_offers→comercializadora_ofertas, boe_regulated_prices→precios_regulados_boe, comercializadora_ofertas.retailer_id→comercializadora_id, +7 cols precios_regulados_boe con backfill 29/29). `proposals` queda viva (decisión Juan). Plus: vistas legacy retailers/retailer_offers/boe_regulated_prices con SECURITY INVOKER + INSTEAD OF INSERT triggers — red de seguridad para FE no migrado (drop tras tests). Refactor FE en src/features/admin/AdminPage.tsx + src/features/analisis/AnalisisPage.tsx (8 cambios: tabla strings, retailer_id→comercializadora_id, .retailers?.→.comercializadoras?.). Tipos TS regenerados post-rename en src/core/types/database.ts (3727 líneas, ahora con nombres canónicos). Advisors: 4 ERRORs cerrados (security_definer_view via SECURITY INVOKER), quedan 9 WARNs (RLS USING(true) heredados de sprint 4 + auth Pro). Fase 2 datos NO ejecutada por Cowork (bridge MCP cross-project token-prohibitivo a 408 filas) — Juan lo ejecuta vía pg_dump+psql siguiendo `scripts/unificacion_fase2_protocolo.md`.
+
+> Sprint 6 (2026-04-25 tarde) — **Unificación Supabase Fase 1 lista para aplicar + Fase 2 scripts cross-proyecto + Fase 3 refactor FE mapeado**. Hallazgo clave: la migración de schema en sprint 4 (`unificacion_potencias_aditiva`) ya añadió todas las tablas Potencias en el CRM — solo faltan **3 renames** (retailers→comercializadoras, retailer_offers→comercializadora_ofertas, boe_regulated_prices→precios_regulados_boe), drop `proposals` (0 rows), y añadir 7 columnas a `precios_regulados_boe` con backfill. Todo en `supabase/migrations/20260426_fase1_unificacion_renames_schema.sql`, validado vía dry-run con transacción ROLLBACK contra prod. **Decisión arquitectónica**: migración in-place sobre CRM (no proyecto nuevo) — CRM ya está en eu-west-1, ahorra coste, rollback trivial. Fase 2 (import 408 filas Potencias→CRM): protocolo + 3 scripts SQL preparados en `scripts/unificacion_fase2_*` con dedupe por CIF/CUPS normalizado, mapeo legacy→canonical, transacción única. Fase 3 (FE refactor): 8 archivos mapeados en `docs/REFACTOR_FE_FASE3_2026-04-26.md`. Tipos canónicos regenerados en `src/core/types/database_canonical_2026-04-26.ts` (3520 líneas). Pendiente Juan: revisar Fase 1 SQL y aplicar, luego ejecutar protocolo Fase 2 con backups + connection strings.
+
+> Sprint 5 (2026-04-25 mañana) — **Asistente RAG verificado en producción + sync repo↔deployed + inventario Gemini cross-app + decisión chat-ia**. (1) `ask-crm-docs` Edge Function v9 ACTIVE confirmada vía Supabase MCP: 216 embeddings cargados + 12 consultas reales hoy (sim 0.56-0.90, ~3-7s/req) → asistente operativo end-to-end. Pipeline embeddings ya corrió. (2) `supabase/functions/_shared/ai-adapter.ts` actualizado en repo para alinear con producción: `gemini-embedding-001` (outputDimensionality=768) + `gemini-2.5-flash` (los modelos antiguos fueron deprecados para cuentas nuevas en abril 2026). (3) `docs/INVENTARIO_GEMINI_2026-04-25.md` — inventario completo de valere-v2 (todo server-side, cero exposición frontend) + script PowerShell para inventariar apps satélite + estrategia de revocación segura (no revocar hasta que Potencias se refactorice). (4) Decisión `chat-ia` huérfano: **eliminar** — ningún import en src/, redundante con asistente RAG. Comandos rm preparados para Juan. (5) Reparado index.lock + null sha1 corruption del repo `.git/`. Pendiente: ejecución del script PowerShell de cierre (rm chat-ia + chat-consultor + basura raíz + commit + push al PR #6) + cierre inventario Gemini en repos satélite.
+
+> Sprint 4 (2026-04-25 madrugada) — **Diseño Fase 0 Unificación Supabase + tabla asistente_log + plan Auth Google + 3 docs calculadora**: (1) `docs/PLAN_UNIFICACION_SUPABASE_FASE_0.md` — schema canónico SQL completo de las 36 tablas + scripts de migración con dedupe por CIF/NIF y CUPS + plan rollback + verificación post-migración (ahorra 2-3 días del sprint dedicado). (2) Tabla `crm_asistente_log` aplicada en Supabase + Edge Function actualizada para loggear preguntas (anonimizado, RGPD) — habilita métricas de uso + detección automática de gaps de doc. (3) `docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md` — plan paso a paso 6 fases (4-6h trabajo + comunicación + dual-mode + cleanup). (4) 3 docs help/ calculadora (captura facturas, análisis comparativo, generar propuesta) → 23 docs help/ totales. Pendiente urgente: backup Arsys (Claude web).
+
+## Sesión 2026-04-26 — Sprint autónomo 8 (Validación + Plan + Hardening drafts)
+
+**Contexto inicial**: sprint 7 dejó Fase 1 + FE refactor aplicados pero Juan pidió completar lo que quedase + validación + Fase 4-5. Carta blanca autónoma sin commits ni Fase 2 (passwords).
+
+### Acciones
+
+#### Refactor FE — completar refs legacy
+- ✅ `src/types/database.ts` actualizado: `RetailerOffer.retailer_id`→`comercializadora_id` + `RetailerOfferWithName.retailers`→`comercializadoras` (interface aliases).
+- ✅ Grep exhaustivo confirmó **0 refs legacy en `src/`** tras update. `calculator.ts` no necesita cambios (lee solo campos genéricos del offer). Tests no mockean tablas viejas.
+- ✅ Decisión `src/types/database.ts`: NO borrar — 8 archivos lo importan para tipos calculator-internos (`SupplyPoint`, `Powers`, `InvoiceData`, etc. que NO viven en BD).
+
+#### Validación compat views (red de seguridad)
+- ✅ SELECT counts cuadran: 6/6 retailers/comercializadoras, 0/0 ofertas, 29/29 precios.
+- ✅ INSERT vía view legacy `retailers` → trigger `legacy_retailers_insert` mapea a `comercializadoras` correctamente.
+- ✅ INSERT vía `retailer_offers` → trigger mapea `retailer_id`→`comercializadora_id`. Verificado: `comercializadora_id = 5e35c61e... (Iberdrola)` post-insert.
+- ✅ UPDATE vía view (incluyendo cambiar `retailer_id`) → auto-updatable de Postgres llega a tabla canónica.
+- ✅ DELETE vía view → 0 filas en tabla canónica post-delete. **FE legacy puede coexistir 100% sin tocar nada**.
+
+#### Plan Fases 4 y 5
+- ✅ `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` — runbook ejecutivo (~250 líneas):
+  - **Fase 4**: deploy CRM + smoke tests + decisión apps satélite (recomendación: views CRM en lugar de refactor masivo) + opción habilitar features Potencias en CRM (decisión producto pendiente).
+  - **Fase 5**: drop compat views + drop `proposals` + pausar proyecto Potencias + cleanup repo + hardening RLS + auditoría final + post-mortem.
+  - **Riesgo Storage**: PDFs en bucket Potencias — `client_documents.storage_path` apunta al bucket viejo. Requiere migración bucket o CDN compartida. **Pendiente decisión Juan**.
+  - **Estimación restante**: 5-7 días persona (vs 10-12 originales).
+
+#### RLS hardening draft
+- ✅ `supabase/migrations/_draft_rls_hardening_8_tables.sql` (prefijo `_draft_` no se auto-aplica). Sustituye las 8 USING(true) por 4 policies granulares cada una (select/insert/update/delete). Patrón: SELECT abierto a authed (info compartida), INSERT/UPDATE solo creador o manager+, DELETE solo manager+. Caso especial `alertas`: cualquier authed puede marcar leída.
+- 🟡 **Aplicar tras Fase 2 datos completa** para poder testear con usuarios reales.
+
+#### Inventory limpieza
+- ✅ `git ls-files` confirma archivos a borrar: `q`, `useAuth.ts`, dos `.txt`, `supabase-migration.sql`, `src/features/chat-ia/ChatIAPanel.tsx`, `supabase/functions/chat-consultor/{index.ts,README.md}`, `src/core/types/database_canonical_2026-04-26.ts` (duplicado idéntico, `diff -q` sin output).
+- ✅ Untracked (ya en .gitignore): `tsc_output.txt`, carpeta `CRM VALERE/` vacía. No requieren `git rm`.
+
+### Pendientes inmediatos para Juan
+
+1. **Ejecutar Fase 2 datos** (~30 min vía pg_dump+psql, protocolo en sprint 6/7).
+2. **Ejecutar script PowerShell de cierre** (sprint 5+6+7+8 acumulados): commits + git rm + push. Script en handoff sprint 7 todavía válido + adiciones del sprint 8 abajo.
+3. **Decisión storage PDFs Potencias**: ver `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` §Riesgos.
+4. **Decisión apps satélite Opción A vs B**: separadas vs absorbidas por CRM. Ver §4.D del plan.
+5. **Sprint dedicado: aplicar `_draft_rls_hardening_8_tables.sql`** tras Fase 2 (rename a sin prefijo `_draft_` y aplicar via MCP).
+
+### Pendientes heredados
+- Backup Arsys (Claude web).
+- Refactor Potencias app a serverless (`docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md`).
+- Migración Auth → Google Identity.
+- Inventario Gemini cross-app (script PowerShell en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
+
+
+## Sesión 2026-04-26 (anterior) — Sprint autónomo 7 (Unificación Supabase Fase 1 + Fase 3 FE EJECUTADAS)
+
+**Contexto inicial**: sprint 6 dejó Fase 1 lista para aplicar, Fase 2 preparada, Fase 3 mapeada. Juan da OK y restricción dura: no Pro plan (sin branches). Pide ejecutar las 3 fases con la mejor estrategia de aislamiento posible sin coste.
+
+### Estrategia de aislamiento adoptada (sin Pro)
+
+Híbrida en 3 capas defensivas:
+1. **DDL (Fase 1)**: dry-run via `BEGIN…ROLLBACK` contra prod con verificación inline → aplicar via MCP `apply_migration` → rollback documentado.
+2. **Datos (Fase 2)**: schema `_potencia_staging` en CRM. Bridge cross-project intentado vía MCP (`row_to_json` desde Potencias → `jsonb_populate_recordset` en CRM). Funciona técnicamente (58 filas migradas) pero token-prohibitivo a 516 filas — pivotada a `pg_dump+psql` para Juan.
+3. **Snapshot full antes de COMMIT real**: delegado a Juan vía PowerShell (sin connection string en sandbox).
+
+### Acciones — Fase 1 ✅ APLICADA EN PROD
+
+- ✅ `apply_migration fase1_unificacion_renames_schema`:
+  - Renames: `retailers`→`comercializadoras` (6 filas), `retailer_offers`→`comercializadora_ofertas` (0 filas), `boe_regulated_prices`→`precios_regulados_boe` (29 filas).
+  - Rename FK col `retailer_id`→`comercializadora_id`.
+  - Add 7 cols a `precios_regulados_boe` (`tariff_type`, `rate_eur_kw_day`, `valid_from`, `valid_to`, `updated_by`, `updated_at`, `legacy_potencia_id`). Backfill 29/29 desde `tariff`/`price` legacy.
+  - **Decisión Juan**: `proposals` NO se dropea — queda viva hasta sprint FE consolide AnalisisPage/TrackingPage/PropuestasEnergiaPage bajo `propuestas` canónica.
+- ✅ `apply_migration fase1b_legacy_compat_views`: red de seguridad para que el FE legacy siga funcionando mientras se migra:
+  - `create or replace view retailers/retailer_offers/boe_regulated_prices` apuntando a las renombradas.
+  - `INSTEAD OF INSERT` triggers para que `useSupabaseMutation('retailers')` siga escribiendo.
+- ✅ `apply_migration fase1c_compat_views_security_invoker`: cierra los 4 ERRORs `security_definer_view` (también la vista heredada `crm_asistente_top_no_respondidas`). `set search_path = public` en functions legacy.
+- ✅ `apply_migration fix_normalizar_nombre_retailer_search_path`: search_path fijo en función residual del sprint 4.
+
+### Acciones — Fase 2 🟡 PREPARADA, JUAN EJECUTA
+
+- ✅ Schema `_potencia_staging` creado en CRM (16 tablas espejo Potencias).
+- ✅ Bridge cross-project demostrado funcional: 58 filas migradas vía MCP en una sesión de prueba (profiles, comercializadoras, regulated_rates, email_templates, comercializadora_docs, documentacion, clients).
+- ⏸️ **Bridge full vía MCP descartado** por consumo de contexto (cada tabla 30-100K tokens entre dump+insert). Para 516 filas restantes: token-prohibitivo en una sola sesión.
+- ✅ Staging vacío reset (drop schema) — Juan parte de fresh con `pg_dump+psql` siguiendo `scripts/unificacion_fase2_protocolo.md`.
+
+### Acciones — Fase 3 ✅ APLICADA (FE)
+
+- ✅ `src/features/admin/AdminPage.tsx`: 5 cambios. RetailersTab + OffersTab usan `comercializadoras`/`comercializadora_ofertas`. Form `retailer_id`→`comercializadora_id` (state, value, onChange). Nested select `retailers(name)`→`comercializadoras(name)`. Display `o.retailers?.name`→`o.comercializadoras?.name`.
+- ✅ `src/features/analisis/AnalisisPage.tsx`: 4 cambios. `from('retailer_offers')`→`from('comercializadora_ofertas')`, `select '*, retailers(name)'`→`select '*, comercializadoras(name)'`, `from('boe_regulated_prices')`→`from('precios_regulados_boe')`, `offer.retailers?.name`→`offer.comercializadoras?.name`.
+- ⏸️ **proposals** (decisión Juan): `AnalisisPage:248` `supabase.from('proposals').insert`, `TrackingPage`, `PropuestasEnergiaPage` — no tocados, tabla viva.
+- ✅ Tipos TS regenerados post-rename via `mcp__generate_typescript_types`. Reemplazado `src/core/types/database.ts` (3727 líneas — ahora con `comercializadoras`/`comercializadora_ofertas`/`precios_regulados_boe` como tablas reales + `retailers`/`retailer_offers`/`boe_regulated_prices` como views).
+
+### Cambios de seguridad y advisors
+
+- **Antes Fase 1**: 1 WARN (auth Pro) + N ERRORs sobre tablas vacías (no contaba).
+- **Después Fase 1+vistas**: 4 ERRORs (security_definer_view en compat views + heredada).
+- **Después fixes**: 0 ERRORs + 9 WARNs (8 RLS USING(true) heredados sprint 4 + auth Pro). Las RLS USING(true) son intencionales hasta que la Fase 2 datos esté completa y se pueda definir RLS granular por `comercial_id`/`asignado_a`.
+
+### Pendientes inmediatos para Juan
+
+1. **Ejecutar Fase 2 datos** vía PowerShell (`scripts/unificacion_fase2_protocolo.md`):
+   - Backups completos de los 2 proyectos (`pg_dump`).
+   - Recrear `_potencia_staging` en CRM (script `scripts/unificacion_fase2_a_staging.sql` o el migration `fase2a_staging_schema` ya aplicado — drop+recreate desde el script).
+   - `pg_dump --data-only` Potencias filtrado por las 16 tablas relevantes → load en `_potencia_staging`.
+   - Ejecutar `scripts/unificacion_fase2_b_dedupe_y_transform.sql` con ROLLBACK primero (validar counts, 0 orphans, 0 duplicados via `_c_verificacion.sql`).
+   - Si OK, repetir con COMMIT.
+2. **Revisar PR (cuando exista)**: el FE refactor + tipos canónicos van al PR #6 vía script PowerShell.
+3. **Smoke test manual**: tras refactor FE, login → Admin/Comercializadoras y Admin/Ofertas → Análisis → propuesta. Confirmar no roturas visibles.
+4. **Sprint futuro: drop legacy compat views** (`retailers`, `retailer_offers`, `boe_regulated_prices`) cuando esté seguro que no quedan refs.
+5. **Sprint futuro: tightening RLS** sobre las 7 tablas con `USING(true)`.
+6. **Sprint futuro: consolidar `proposals`** bajo `propuestas` canónica + drop tabla.
+
+### Pendientes heredados
+- Backup Arsys (Claude web).
+- Refactor Potencias app a serverless.
+- Migración Auth → Google Identity.
+- Inventario Gemini cross-app (script PowerShell en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
+- Sprint anterior pending: ejecutar el script PowerShell de cierre del sprint 5+6 (rm chat-ia + commit + push).
+
+
+## Sesión 2026-04-26 (anterior) — Sprint autónomo 6 (Unificación Supabase Fase 1+2 listas)
+
+**Contexto inicial**: Sprint 4 (madrugada) había diseñado el schema canónico Fase 0. Pendiente: ejecutar Fases 1-5 del plan unificación (~7-9d). Sprint 5 (mañana) verificó asistente RAG y dejó pendiente. Juan pide arrancar 6º sprint para iniciar la unificación de los 2 proyectos Supabase.
+
+### Acciones
+
+#### Audit y decisión arquitectónica
+- ✅ **Audit completo de los 2 proyectos** vía MCP. CRM (`gtphkowfcuiqbvfkwjxb`, eu-west-1, 36 tablas, datos test): empresas (3 test), cups (1 test), user_profiles (3), retailers (6), boe_regulated_prices (29). Potencias (`alesfvxqtwlrwlmkoosg`, eu-central-1, 18 tablas, **datos prod**): 30 clients (24 CIFs únicos, 6 dups internos), 75 supplies (72 CUPS únicos, 3 dups), 41 expedientes/ciclos/power_requests/savings_calc, 70 client_documents, 91 status_log, etc. = **~408 filas a migrar**.
+- ✅ **Hallazgo crítico**: la migration `unificacion_potencias_aditiva` del sprint 4 ya añadió en el CRM las 10 tablas que venían de Potencias (expedientes, ciclos, solicitudes_potencia, savings_calculations, comercializadora_docs, comunicaciones_cliente, alertas, email_templates, excel_import_templates, status_log). Todas vacías esperando datos.
+- ✅ **Decisión arquitectónica documentada**: migración **IN-PLACE sobre CRM** (no nuevo proyecto). Razones: CRM ya está en eu-west-1 (objetivo), schema casi completo, sin coste de proyecto nuevo, rollback trivial. Sprint pasa de 7-9d a ~3-5d gracias a esto.
+- ⏸️ **Branch Supabase** intentado pero requiere Pro plan ($25/mo). Pivotada estrategia: dry-run de migrations vía transacción ROLLBACK contra prod, archivos `.sql` en repo para Juan aplicar.
+
+#### Fase 1 — schema renames (lista para aplicar)
+- ✅ `supabase/migrations/20260426_fase1_unificacion_renames_schema.sql` (no aplicada todavía):
+  - Drop `proposals` (0 rows, residuo Calculadora pre-fusión).
+  - Renames: `retailers`→`comercializadoras`, `retailer_offers`→`comercializadora_ofertas`, `boe_regulated_prices`→`precios_regulados_boe`.
+  - Rename FK col `retailer_id`→`comercializadora_id`.
+  - Add columns a `precios_regulados_boe`: `tariff_type`, `rate_eur_kw_day`, `valid_from`, `valid_to`, `updated_by`, `updated_at`, `legacy_potencia_id`. Backfill 29/29 filas.
+- ✅ Validado vía `BEGIN…ROLLBACK` contra prod: 0 vistas/funciones referencian las tablas a renombrar (solo policies, que se auto-renombran con la tabla).
+
+#### Fase 2 — data import cross-proyecto (preparada, no ejecutada)
+- ✅ `scripts/unificacion_fase2_protocolo.md` — runbook PowerShell con backups + pg_dump + load + transform + verificación + plan rollback.
+- ✅ `scripts/unificacion_fase2_a_staging.sql` — schema `_potencia_staging` con 18 tablas espejo de Potencias.
+- ✅ `scripts/unificacion_fase2_b_dedupe_y_transform.sql` (~400 líneas) — funciones `norm_cif/cups/nombre`, 7 tablas mapping legacy→canonical, dedupe interno+vs CRM, FK re-mapeadas. Polimórfico documentos (consolidación de 3 tablas Potencias en una `documentos`). Todo en transacción única.
+- ✅ `scripts/unificacion_fase2_c_verificacion.sql` — counters esperados, integridad, duplicados, mapping cardinality.
+- 🟡 **NO ejecutados**: requieren backups completos + connection strings de los 2 proyectos + decisión de Juan (operación destructiva sobre prod).
+
+#### Fase 3 — refactor FE (mapeado, no ejecutado)
+- ✅ `docs/REFACTOR_FE_FASE3_2026-04-26.md` — mapping antes/después + 8 archivos a tocar:
+  - `src/features/admin/AdminPage.tsx` (3 refs + uso de `retailer_id`).
+  - `src/features/analisis/AnalisisPage.tsx` (3 refs).
+  - `src/features/tracking/TrackingPage.tsx`, `src/features/propuestas-energia/PropuestasEnergiaPage.tsx` (1 ref cada uno, sobre `proposals` — caso especial: decidir consolidar bajo `propuestas` canónica o conservar `proposals` viva).
+  - `src/types/database.ts` y `src/core/types/database.ts` (regenerar tras Fase 1).
+- ✅ Recomendación documentada: **comentar el `DROP TABLE proposals`** en Fase 1 hasta limpiar el FE, así no se rompe nada al aplicar.
+
+#### Tipos TS canónicos
+- ✅ `src/core/types/database_canonical_2026-04-26.ts` (115KB, 3520 líneas) — generado vía MCP desde el estado actual del CRM. Incluye las tablas Potencias añadidas en sprint 4. Reemplaza `database.ts` cuando Juan haga sprint FE refactor (después de Fase 1 aplicada — regenerar entonces para que aparezcan los nombres canónicos `comercializadoras`/`comercializadora_ofertas`/`precios_regulados_boe`).
+
+### Lo que NO hizo este sprint (y por qué)
+
+- ❌ **Aplicar Fase 1 en prod** — el sprint dijo "operaciones destructivas en prod sin rollback claro" requieren tu OK. Aunque la migration es reversible, prefiero entregar el SQL y que tú decidas el momento. Aplicación: `mcp__apply_migration` o `psql` desde PowerShell.
+- ❌ **Ejecutar Fase 2** — requiere connection strings y backups previos (no disponibles en sandbox).
+- ❌ **Ejecutar Fase 3 (FE refactor)** — depende de Fase 1 estar aplicada y de la decisión sobre `proposals`. Trabajo de 1-2 días persona.
+- ❌ **Branch Supabase para test** — Pro plan requerido.
+
+### Pendientes inmediatos para Juan
+
+1. **Revisar `supabase/migrations/20260426_fase1_unificacion_renames_schema.sql`**. Si OK:
+   - Decidir si conservar tabla `proposals` (comentar el `drop`) o limpiarla — depende de si quieres limpiar el FE en este sprint o el siguiente.
+   - Aplicar via `psql` o desde Supabase Dashboard SQL Editor.
+2. **Ejecutar protocolo Fase 2** (`scripts/unificacion_fase2_protocolo.md`):
+   - `pg_dump` backup de los 2 proyectos.
+   - `pg_dump --data-only` Potencias.
+   - Cargar staging → run transform → verificar.
+   - Esto es el grueso (1-2 horas).
+3. **Sprint FE refactor** (`docs/REFACTOR_FE_FASE3_2026-04-26.md`) — 1-2 días persona.
+4. **Apuntar Potencias y Excedentes apps al CRM** (cambio env vars + tests). Día 4-5.
+5. **Limpieza Fase 5**: tras 1 semana estable, pausar/borrar proyecto Potencias.
+
+### Pendientes heredados (sin tocar hoy)
+- ⏳ Backup Arsys terminando (Claude web).
+- ⏳ Refactor Potencias app a serverless (`docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md`).
+- ⏳ Migración Auth → Google Identity (cuando Workspace estable).
+- ⏳ Inventario Gemini cross-app (script en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
+- ⏳ Ejecutar script PowerShell sprint 5 (rm chat-ia + commit + push PR #6).
+
+
+## Sesión 2026-04-25 (mañana) — Sprint autónomo 5 (verificación + sync + inventario)
+
+**Contexto inicial**: Juan pide arrancar 5º sprint autónomo, prioridades (1) activación operativa asistente RAG, (2) commit + push sprint 4 al PR #6, (3) inventario Gemini cross-app, (4) si margen: chat-ia huérfano + limpieza raíz. Repositorio con corrupción Windows en `.git/` (null bytes en config/HEAD/refs + index.lock huérfano). Working tree con ruido CRLF/LF (no real).
+
+### Acciones
+- ✅ **Reparada corrupción git**: stripped null bytes de `.git/config`, `HEAD`, `packed-refs`, todos los `refs/`, `ORIG_HEAD`, `FETCH_HEAD`. Movido `index.lock` huérfano + `index` corrupto, reconstruido con `git reset`. `.git/config.lock` y `HEAD.lock` que aparecieron tras un `git switch` fallido también renombrados. Git lee bien ahora; las escrituras siguen fallando ocasionalmente por ACLs Windows → commits delegados a PowerShell de Juan (patrón ya establecido).
+- ✅ **Asistente RAG verificado end-to-end**:
+  - Edge Function `ask-crm-docs` v9 ACTIVE en Supabase (vía `mcp__list_edge_functions`).
+  - Código desplegado incluye `logAsistente()` del sprint 4.
+  - Tabla `crm_help_embeddings`: **216 chunks** indexados (pipeline ya ejecutado al menos una vez).
+  - Tabla `crm_asistente_log`: **12 consultas reales** hoy 2026-04-25 entre 10:49-11:02 UTC, todas con `encontrada_respuesta=true`, `num_chunks=5`, similarities 0.56-0.90, durations 1.2-10s, provider=gemini.
+  - Edge logs: ~13 POSTs en v9, mayoría 200, 1 transient 500 a las 11:02 UTC (siguientes peticiones recuperan).
+- ✅ **Drift repo↔deployed corregido en `supabase/functions/_shared/ai-adapter.ts`**:
+  - `text-embedding-004` → `gemini-embedding-001` con `outputDimensionality: 768` (modelo deprecado para cuentas nuevas en abril 2026).
+  - `gemini-2.0-flash` → `gemini-2.5-flash` (idem).
+  - Si no se sincroniza, el siguiente redeploy desde repo regresaría a modelos rotos.
+- ✅ **Inventario Gemini valere-v2** completo en `docs/INVENTARIO_GEMINI_2026-04-25.md`:
+  - 5 ubicaciones, todas server-side (Edge Functions + script CI). `ChatIAPanel.tsx` invoca Edge Function (no expone key).
+  - Cero exposición en bundle frontend de valere-v2.
+- 🟡 **Inventario apps satélite pendiente** — sandbox no tiene mounted los repos `valere-gestion-potencias`, `valere-gestion-excedentes`, `valere-gestion-energetica`. Script PowerShell preparado en el inventario para que Juan lo cierre en 30 segundos.
+- ✅ **Decisión `chat-ia` huérfano**: **eliminar**. `src/features/chat-ia/ChatIAPanel.tsx` no tiene ningún import en `src/`. `chat-consultor` Edge Function en Supabase (v7 ACTIVE) inalcanzable. Asistente RAG cubre la función con doc grounding (sin hallucinations). Reduce attack surface de `GEMINI_API_KEY`. Comandos `rm` y delete Edge Function preparados en handoff.
+- 🟡 **Commit + push al PR #6 pendiente** — sandbox no puede commitear (las escrituras a `.git/` corrompen por ACLs Windows). Script PowerShell completo preparado en el handoff (incluye reset CRLF noise + add nuevos archivos + delete + commit + push). Verificado que `public/_redirects`, `docs/PLAN_UNIFICACION_SUPABASE_FASE_0.md`, `docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md`, `supabase/migrations/20260425_asistente_log.sql` **ya están en `origin/claude/docs-cierre-2026-04-23`** (sprint 4 ya pusheado).
+
+### Entregables nuevos del sprint
+- `docs/INVENTARIO_GEMINI_2026-04-25.md` — inventario completo + script PowerShell satélite + estrategia revocación.
+- `supabase/functions/_shared/ai-adapter.ts` — modelos actualizados para no regresionar al redeploy.
+- `.cowork/outbox/2026-04-25T<TS>-sprint-autonomo-5-rag-verificado-y-sync.md` — handoff con script PowerShell de cierre.
+
+### Pendientes inmediatos para Juan (PowerShell, ~10-15 min)
+1. Cerrar inventario Gemini en apps satélite (script en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
+2. Ejecutar script de cierre del sprint 5 (limpieza + delete chat-ia + commit + push).
+3. Borrar Edge Function `chat-consultor` desde Supabase Dashboard (MCP no expone delete).
+4. Confirmar (vía Dashboard) qué key concreta está como `GEMINI_API_KEY` en Supabase secrets — esa es la que NO se puede revocar.
+
+### Pendientes heredados (sin tocar hoy)
+- ⏳ Backup Arsys terminando (Claude web).
+- ⏳ Refactor Potencias a serverless (`docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md`) — bloquea revocación segura keys Gemini.
+- ⏳ Migration unificación `oportunidades.etapa` (`ganada` vs `cerrada_ganada`).
+- ⏳ Sprint dedicado Unificación Supabase (7-9d con Fase 0 lista).
+- ⏳ Migración Auth → Google Identity (4-6h cuando Workspace estable).
+- ⏳ Subir excedentes Drive a GitHub (agente browser).
+
 
 ## Sesión 2026-04-24 (tarde) — Migración Cloudflare + 2ª fuga de credencial
 

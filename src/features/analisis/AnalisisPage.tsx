@@ -155,14 +155,14 @@ export default function Analysis() {
     try {
       // Fetch offers — FILTER BY MATCHING TARIFF
       const { data: offers } = await supabase
-        .from('retailer_offers')
-        .select('*, retailers(name)')
+        .from('comercializadora_ofertas')
+        .select('*, comercializadoras(name)')
         .eq('include_in_comparison', true)
         .eq('access_rate', selectedSP.tariff);
 
       // Fetch BOE prices
       const { data: boePrices } = await supabase
-        .from('boe_regulated_prices')
+        .from('precios_regulados_boe')
         .select('*')
         .eq('tariff', selectedSP.tariff);
 
@@ -221,7 +221,7 @@ export default function Analysis() {
 
         compResults.push({
           offerName: offer.product_name || 'Sin nombre',
-          retailerName: offer.retailers?.name || 'Desconocido',
+          retailerName: offer.comercializadoras?.name || 'Desconocido',
           annualCost,
           savings,
           savingsPct,
