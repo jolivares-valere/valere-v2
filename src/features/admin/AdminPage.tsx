@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   ShieldCheck, Users, Plus, Loader2, Trash2, Edit2,
-  Settings, DollarSign, Building2, Save, Sliders
+  Settings, DollarSign, Building2, Save, Sliders,
+  UserPlus, Check, X
 } from 'lucide-react';
 import CustomFieldsManager from './components/CustomFieldsManager';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,10 +14,23 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import EmptyState from '@/core/components/EmptyState';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { useSupabaseQuery, useSupabaseMutation } from '@/core/hooks/useSupabaseQuery';
-import type { UserProfile, Retailer, RetailerOffer, GlobalConfig } from '@/types/database';
+import type { UserProfile, Retailer, RetailerOffer, SurplusModel, GlobalConfig } from '@/types/database';
 import { supabase } from '@/core/supabase/client';
 import { toast } from 'sonner';
 import { getTariffConfig } from '@/core/energia/tariffs';
+
+// ─── Tipos derivados para esta página ──────────────────────────────────────
+
+/** Form de comercializadora (subset editable) */
+type RetailerFormState = Partial<Retailer>;
+
+/** Oferta con la relación a comercializadora resuelta por el join `select '*, comercializadoras(name)'` */
+type OfferWithRetailer = RetailerOffer & {
+  comercializadoras: Pick<Retailer, 'name'> | null;
+};
+
+/** Form para crear/editar una oferta. Igual que RetailerOffer pero sin id/created_at */
+type OfferFormState = Omit<RetailerOffer, 'id' | 'created_at'>;
 
 export default function AdminPanel() {
   return (
@@ -30,6 +44,9 @@ export default function AdminPanel() {
         <TabsList className="bg-white rounded-xl shadow-sm border border-slate-100 p-1">
           <TabsTrigger value="users" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
             <Users className="w-4 h-4" /> Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="pendientes" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
+            <UserPlus className="w-4 h-4" /> Pendientes
           </TabsTrigger>
           <TabsTrigger value="retailers" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
             <Building2 className="w-4 h-4" /> Comercializadoras
@@ -46,6 +63,7 @@ export default function AdminPanel() {
         </TabsList>
 
         <TabsContent value="users"><UsersTab /></TabsContent>
+        <TabsContent value="pendientes"><PendientesTab /></TabsContent>
         <TabsContent value="retailers"><RetailersTab /></TabsContent>
         <TabsContent value="offers"><OffersTab /></TabsContent>
         <TabsContent value="config"><ConfigTab /></TabsContent>
@@ -148,10 +166,10 @@ function UsersTab() {
 
 function RetailersTab() {
   const { data: retailers, loading, refetch } = useSupabaseQuery<Retailer>({
-    table: 'retailers',
+    table: 'comercializadoras',
     order: { column: 'name', ascending: true },
   });
-  const mutation = useSupabaseMutation('retailers');
+  const mutation = useSupabaseMutation('comercializadoras');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -160,11 +178,13 @@ function RetailersTab() {
 
   const save = async () => {
     if (!form.name?.trim()) { toast.error('Nombre es obligatorio'); return; }
+    // Excluir campos generados por la BD si vienen del registro en edición
+    const { id: _id, created_at: _created, ...payload } = form;
+    void _id; void _created;
     if (isEditing && editingId) {
-      const { id, created_at, ...updateData } = form as any;
-      await mutation.update(editingId, updateData, 'Comercializadora actualizada');
+      await mutation.update(editingId, payload as Record<string, unknown>, 'Comercializadora actualizada');
     } else {
-      await mutation.insert(form as any, 'Comercializadora creada');
+      await mutation.insert(payload as Record<string, unknown>, 'Comercializadora creada');
     }
     setDialogOpen(false);
     setIsEditing(false);
@@ -296,34 +316,51 @@ function RetailersTab() {
 }
 
 function OffersTab() {
-  const { data: offers, loading, refetch } = useSupabaseQuery<any>({
-    table: 'retailer_offers',
-    select: '*, retailers(name)',
+  const { data: offers, loading, refetch } = useSupabaseQuery<OfferWithRetailer>({
+    table: 'comercializadora_ofertas',
+    select: '*, comercializadoras(name)',
     order: { column: 'created_at', ascending: false },
   });
-  const { data: retailers } = useSupabaseQuery<Retailer>({ table: 'retailers' });
-  const mutation = useSupabaseMutation('retailer_offers');
+  const { data: retailers } = useSupabaseQuery<Retailer>({ table: 'comercializadoras' });
+  const mutation = useSupabaseMutation('comercializadora_ofertas');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [offerToDelete, setOfferToDelete] = useState<any | null>(null);
-  const defaultTariff = '2.0TD';
-  const defaultCfg = getTariffConfig(defaultTariff);
-  const [form, setForm] = useState<any>({
-    retailer_id: '', product_name: '', access_rate: defaultTariff, surplus_model: 'compensacion_simple',
-    energy_prices: Array(defaultCfg.energia).fill(0), power_prices: Array(defaultCfg.potencia).fill(0),
-    surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
-    allow_zero_invoice: false, include_in_comparison: true,
-  });
+  const [offerToDelete, setOfferToDelete] = useState<OfferWithRetailer | null>(null);
+
+  const buildEmptyForm = (tariff: string = '2.0TD'): OfferFormState => {
+    const cfg = getTariffConfig(tariff);
+    return {
+      comercializadora_id: '',
+      product_name: '',
+      access_rate: tariff,
+      surplus_model: 'compensacion_simple',
+      energy_prices: Array(cfg.energia).fill(0),
+      power_prices: Array(cfg.potencia).fill(0),
+      surplus_price_per_kwh: 0,
+      entry_fee_eur: 0,
+      entry_fee_per_kw: 0,
+      annual_management_fee_eur: 0,
+      tender_fee_pct: 0,
+      activation_fee_eur: 0,
+      battery_fee_per_kwp_eur: 0,
+      allow_zero_invoice: false,
+      min_contract_months: 0,
+      include_in_comparison: true,
+      show_tolls_separately: false,
+      notes: '',
+    };
+  };
+
+  const [form, setForm] = useState<OfferFormState>(() => buildEmptyForm());
 
   const save = async () => {
-    if (!form.retailer_id) { toast.error('Selecciona una comercializadora'); return; }
+    if (!form.comercializadora_id) { toast.error('Selecciona una comercializadora'); return; }
     if (isEditing && editingId) {
-      const { id, created_at, retailers, ...updateData } = form;
-      await mutation.update(editingId, updateData, 'Oferta actualizada');
+      await mutation.update(editingId, form as unknown as Record<string, unknown>, 'Oferta actualizada');
     } else {
-      await mutation.insert(form, 'Oferta creada');
+      await mutation.insert(form as unknown as Record<string, unknown>, 'Oferta creada');
     }
     setDialogOpen(false);
     setIsEditing(false);
@@ -331,20 +368,27 @@ function OffersTab() {
     refetch();
   };
 
-  const startEditOffer = (o: any) => {
+  const startEditOffer = (o: OfferWithRetailer) => {
     const cfg = getTariffConfig(o.access_rate || '2.0TD');
     setForm({
-      retailer_id: o.retailer_id ?? '',
+      comercializadora_id: o.comercializadora_id ?? '',
       product_name: o.product_name ?? '',
       access_rate: o.access_rate ?? '2.0TD',
-      surplus_model: o.surplus_model ?? 'compensacion_simple',
+      surplus_model: (o.surplus_model ?? 'compensacion_simple') as SurplusModel,
       energy_prices: o.energy_prices ?? Array(cfg.energia).fill(0),
       power_prices: o.power_prices ?? Array(cfg.potencia).fill(0),
       surplus_price_per_kwh: o.surplus_price_per_kwh ?? 0,
-      battery_fee_per_kwp_eur: o.battery_fee_per_kwp_eur ?? 0,
+      entry_fee_eur: o.entry_fee_eur ?? 0,
+      entry_fee_per_kw: o.entry_fee_per_kw ?? 0,
+      annual_management_fee_eur: o.annual_management_fee_eur ?? 0,
       tender_fee_pct: o.tender_fee_pct ?? 0,
+      activation_fee_eur: o.activation_fee_eur ?? 0,
+      battery_fee_per_kwp_eur: o.battery_fee_per_kwp_eur ?? 0,
       allow_zero_invoice: o.allow_zero_invoice ?? false,
+      min_contract_months: o.min_contract_months ?? 0,
       include_in_comparison: o.include_in_comparison ?? true,
+      show_tolls_separately: o.show_tolls_separately ?? false,
+      notes: o.notes ?? '',
     });
     setIsEditing(true);
     setEditingId(o.id);
@@ -368,13 +412,7 @@ function OffersTab() {
           <CardTitle className="text-lg font-display text-valere-blue-dark">Ofertas de Comercializadoras</CardTitle>
           <button
             onClick={() => {
-              const cfg = getTariffConfig('2.0TD');
-              setForm({
-                retailer_id: '', product_name: '', access_rate: '2.0TD', surplus_model: 'compensacion_simple',
-                energy_prices: Array(cfg.energia).fill(0), power_prices: Array(cfg.potencia).fill(0),
-                surplus_price_per_kwh: 0, battery_fee_per_kwp_eur: 0, tender_fee_pct: 0,
-                allow_zero_invoice: false, include_in_comparison: true,
-              });
+              setForm(buildEmptyForm('2.0TD'));
               setIsEditing(false);
               setEditingId(null);
               setDialogOpen(true);
@@ -400,9 +438,9 @@ function OffersTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {offers.map((o: any) => (
+                {offers.map((o) => (
                   <TableRow key={o.id} className="border-slate-50 hover:bg-slate-50/30">
-                    <TableCell className="pl-6 font-semibold text-valere-blue-dark">{o.retailers?.name || '—'}</TableCell>
+                    <TableCell className="pl-6 font-semibold text-valere-blue-dark">{o.comercializadoras?.name || '—'}</TableCell>
                     <TableCell>{o.product_name || '—'}</TableCell>
                     <TableCell><Badge variant="outline">{o.access_rate}</Badge></TableCell>
                     <TableCell className="text-sm text-valere-ink/60">{o.surplus_model}</TableCell>
@@ -436,8 +474,8 @@ function OffersTab() {
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Comercializadora *</label>
               <select
-                value={form.retailer_id}
-                onChange={e => setForm((p: any) => ({ ...p, retailer_id: e.target.value }))}
+                value={form.comercializadora_id}
+                onChange={e => setForm((p) =>({ ...p, comercializadora_id: e.target.value }))}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
               >
                 <option value="">— Seleccionar —</option>
@@ -446,14 +484,14 @@ function OffersTab() {
             </div>
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Producto</label>
-              <input value={form.product_name} onChange={e => setForm((p: any) => ({ ...p, product_name: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+              <input value={form.product_name} onChange={e => setForm((p) =>({ ...p, product_name: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
             </div>
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Tarifa</label>
               <select value={form.access_rate} onChange={e => {
                 const newTariff = e.target.value;
                 const cfg = getTariffConfig(newTariff);
-                setForm((p: any) => ({
+                setForm((p) =>({
                   ...p,
                   access_rate: newTariff,
                   energy_prices: Array.from({ length: cfg.energia }, (_, i) => p.energy_prices[i] ?? 0),
@@ -470,7 +508,7 @@ function OffersTab() {
             </div>
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Modelo excedentes</label>
-              <select value={form.surplus_model} onChange={e => setForm((p: any) => ({ ...p, surplus_model: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white">
+              <select value={form.surplus_model} onChange={e => setForm((p) =>({ ...p, surplus_model: e.target.value as SurplusModel }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white">
                 <option value="compensacion_simple">Compensación Simplificada</option>
                 <option value="bateria_virtual_kwh">Batería Virtual</option>
                 <option value="gestion_silver">Gestión Silver</option>
@@ -491,7 +529,7 @@ function OffersTab() {
                       onChange={e => {
                         const arr = [...form.energy_prices];
                         arr[i] = parseFloat(e.target.value) || 0;
-                        setForm((p: any) => ({ ...p, energy_prices: arr }));
+                        setForm((p) =>({ ...p, energy_prices: arr }));
                       }}
                       className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center"
                     />
@@ -512,7 +550,7 @@ function OffersTab() {
                       onChange={e => {
                         const arr = [...form.power_prices];
                         arr[i] = parseFloat(e.target.value) || 0;
-                        setForm((p: any) => ({ ...p, power_prices: arr }));
+                        setForm((p) =>({ ...p, power_prices: arr }));
                       }}
                       className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center"
                     />
@@ -524,23 +562,23 @@ function OffersTab() {
 
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Precio Excedente (€/kWh)</label>
-              <input type="number" step="0.001" value={form.surplus_price_per_kwh} onChange={e => setForm((p: any) => ({ ...p, surplus_price_per_kwh: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+              <input type="number" step="0.001" value={form.surplus_price_per_kwh} onChange={e => setForm((p) =>({ ...p, surplus_price_per_kwh: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
             </div>
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Fee Batería (€/kWp/mes)</label>
-              <input type="number" step="0.01" value={form.battery_fee_per_kwp_eur} onChange={e => setForm((p: any) => ({ ...p, battery_fee_per_kwp_eur: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+              <input type="number" step="0.01" value={form.battery_fee_per_kwp_eur} onChange={e => setForm((p) =>({ ...p, battery_fee_per_kwp_eur: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
             </div>
             <div>
               <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Fee Licitación (%)</label>
-              <input type="number" step="0.1" value={form.tender_fee_pct} onChange={e => setForm((p: any) => ({ ...p, tender_fee_pct: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+              <input type="number" step="0.1" value={form.tender_fee_pct} onChange={e => setForm((p) =>({ ...p, tender_fee_pct: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
             </div>
             <div className="flex items-end gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.allow_zero_invoice} onChange={e => setForm((p: any) => ({ ...p, allow_zero_invoice: e.target.checked }))} className="rounded" />
+                <input type="checkbox" checked={form.allow_zero_invoice} onChange={e => setForm((p) =>({ ...p, allow_zero_invoice: e.target.checked }))} className="rounded" />
                 Factura a cero
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.include_in_comparison} onChange={e => setForm((p: any) => ({ ...p, include_in_comparison: e.target.checked }))} className="rounded" />
+                <input type="checkbox" checked={form.include_in_comparison} onChange={e => setForm((p) =>({ ...p, include_in_comparison: e.target.checked }))} className="rounded" />
                 Comparar
               </label>
             </div>
@@ -624,6 +662,222 @@ function ConfigTab() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Guardar
         </button>
       </CardContent>
+    </Card>
+  );
+}
+
+// ─── Pendientes de aprobación ──────────────────────────────────────────────
+
+interface PendingUserRow {
+  id: string;
+  email: string | null;
+  nombre: string | null;
+  apellidos: string | null;
+  full_name: string | null;
+  status: string | null;
+  approved: boolean | null;
+  created_at: string | null;
+}
+
+const NOTIFY_USER_FN = 'notify-user-approval-decision';
+
+function PendientesTab() {
+  const [rows, setRows] = useState<PendingUserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [rolesByUser, setRolesByUser] = useState<Record<string, string>>({});
+  const [toReject, setToReject] = useState<PendingUserRow | null>(null);
+
+  const fetchPendientes = React.useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('id, email, nombre, apellidos, full_name, status, approved, created_at')
+      .eq('approved', false)
+      .order('created_at', { ascending: false });
+    if (error) {
+      toast.error('Error al cargar pendientes');
+      setRows([]);
+    } else {
+      const list = (data ?? []) as PendingUserRow[];
+      setRows(list);
+      setRolesByUser((prev) => {
+        const next = { ...prev };
+        for (const u of list) if (!next[u.id]) next[u.id] = 'client';
+        return next;
+      });
+    }
+    setLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    void fetchPendientes();
+  }, [fetchPendientes]);
+
+  const aprobar = async (u: PendingUserRow) => {
+    const role = rolesByUser[u.id] ?? 'client';
+    setActingId(u.id);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ approved: true, status: 'active', role })
+        .eq('id', u.id);
+      if (error) throw error;
+      toast.success(`Usuario aprobado como ${role}`);
+      // Notificar al usuario (best effort)
+      try {
+        await supabase.functions.invoke(NOTIFY_USER_FN, {
+          body: {
+            userId: u.id,
+            decision: 'approved',
+            userEmail: u.email,
+            userName: u.full_name ?? `${u.nombre ?? ''} ${u.apellidos ?? ''}`.trim(),
+          },
+        });
+      } catch {
+        toast.info('Aprobado. El email de notificación falló (revisa logs).');
+      }
+      await fetchPendientes();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al aprobar';
+      toast.error(msg);
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const rechazar = async () => {
+    if (!toReject) return;
+    const u = toReject;
+    setActingId(u.id);
+    try {
+      // Capturamos email + nombre ANTES de borrar para poder mandar el email
+      const userEmail = u.email;
+      const userName = u.full_name ?? `${u.nombre ?? ''} ${u.apellidos ?? ''}`.trim();
+
+      // admin_reject_user añadido en migration 20260426_signup_aprobacion_manual.
+      // Cast a never porque los tipos Database no se han regenerado todavía
+      // (próximo paso: supabase gen types). El cast es seguro: la fn existe en prod.
+      const rpcFn = supabase.rpc as unknown as (
+        name: string,
+        args: Record<string, unknown>
+      ) => Promise<{ error: { message: string } | null }>;
+      const { error } = await rpcFn('admin_reject_user', { p_user_id: u.id });
+      if (error) throw error;
+
+      toast.success('Usuario rechazado');
+      try {
+        await supabase.functions.invoke(NOTIFY_USER_FN, {
+          body: { userId: u.id, decision: 'rejected', userEmail, userName },
+        });
+      } catch {
+        toast.info('Rechazado. El email de notificación falló (revisa logs).');
+      }
+      setToReject(null);
+      await fetchPendientes();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al rechazar';
+      toast.error(msg);
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+        <table className="w-full">
+          <tbody>
+            {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} cols={5} />)}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <Card className="border-none shadow-md bg-white mt-4 overflow-hidden">
+      <CardContent className="p-0">
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={<UserPlus className="w-8 h-8" />}
+            title="No hay solicitudes pendientes"
+            description="Cuando alguien solicite acceso desde /signup aparecerá aquí."
+          />
+        ) : (
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="border-none hover:bg-transparent">
+                <TableHead className="font-bold text-valere-blue-dark pl-6">Nombre</TableHead>
+                <TableHead className="font-bold text-valere-blue-dark">Email</TableHead>
+                <TableHead className="font-bold text-valere-blue-dark">Solicitado</TableHead>
+                <TableHead className="font-bold text-valere-blue-dark">Rol al aprobar</TableHead>
+                <TableHead className="font-bold text-valere-blue-dark pr-6 text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((u) => {
+                const composedName = `${u.nombre ?? ''} ${u.apellidos ?? ''}`.trim();
+                const displayName = (u.full_name ?? composedName) || '—';
+                const fecha = u.created_at
+                  ? new Date(u.created_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—';
+                const isActing = actingId === u.id;
+                return (
+                  <TableRow key={u.id} className="border-slate-50 hover:bg-slate-50/30">
+                    <TableCell className="pl-6 font-semibold text-valere-blue-dark">{displayName}</TableCell>
+                    <TableCell className="text-valere-ink/70 text-sm">{u.email ?? '—'}</TableCell>
+                    <TableCell className="text-valere-ink/60 text-xs">{fecha}</TableCell>
+                    <TableCell>
+                      <select
+                        value={rolesByUser[u.id] ?? 'client'}
+                        onChange={(e) => setRolesByUser((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                        disabled={isActing}
+                        className="px-3 py-1 rounded-lg text-xs font-bold border border-slate-200 cursor-pointer"
+                      >
+                        <option value="client">Cliente</option>
+                        <option value="consultant">Consultor</option>
+                        <option value="manager">Manager</option>
+                        <option value="master">Master</option>
+                      </select>
+                    </TableCell>
+                    <TableCell className="pr-6">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => aprobar(u)}
+                          disabled={isActing}
+                          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-valere-green-dark text-white rounded-lg hover:bg-valere-green-medium disabled:opacity-50"
+                        >
+                          {isActing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => setToReject(u)}
+                          disabled={isActing}
+                          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" /> Rechazar
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <ConfirmDialog
+        isOpen={!!toReject}
+        title="Rechazar solicitud"
+        message={`¿Seguro que quieres rechazar la solicitud de ${toReject?.email ?? 'este usuario'}? Se borrará la cuenta y se le enviará un email.`}
+        confirmLabel="Rechazar"
+        variant="danger"
+        submitting={actingId === toReject?.id}
+        onConfirm={rechazar}
+        onCancel={() => setToReject(null)}
+      />
     </Card>
   );
 }

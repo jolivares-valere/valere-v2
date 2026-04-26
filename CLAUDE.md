@@ -275,6 +275,56 @@ Entrada rápida para orientarte. Todos los planes vivos en `docs/`:
 | `docs/SESIONES/` | Resúmenes históricos de sesiones |
 | `docs/help/` | **Documentación de ayuda consumida por el asistente RAG del CRM** |
 
+## 🔐 Auth & Signup (añadido 2026-04-26)
+
+El CRM tiene flujo de alta pública con aprobación manual. Reemplaza las invitaciones por email de Supabase (rate-limited y con coste implícito).
+
+### Rutas públicas
+- `/signup` — formulario de alta (`src/features/auth/SignupPage.tsx`).
+- `/pending-approval` — landing para usuarios autenticados sin aprobar (`src/features/auth/PendingApprovalPage.tsx`).
+- `/login` — link a `/signup` añadido.
+
+### Lógica auth
+- `AuthGuard` en `src/App.tsx`: si `profileLoaded && user.approved !== true` → redirige a `/pending-approval`.
+- `LoginRoute` idem para usuarios que ya tienen sesión activa.
+- Master único hardcoded: `jolivares@valereconsultores.com` se aprueba automáticamente al registrarse.
+
+### Flujo signup
+1. Usuario rellena nombre/apellido/email/password en `/signup`.
+2. `supabase.auth.signUp({options:{data:{nombre, apellidos, full_name}}})`.
+3. Trigger DB `handle_new_user` crea fila en `user_profiles` con `approved=false`, `status='pendiente'`.
+4. Frontend invoca Edge Function `notify-admin-pending-user` → email a `jolivares@valereconsultores.com`.
+5. Usuario queda en `/pending-approval`.
+
+### Flujo aprobación admin
+- Admin → tab **"Pendientes"** en `src/features/admin/AdminPage.tsx` (componente `PendientesTab`).
+- **Aprobar**: update `approved=true, status='active', role=X` + invoca `notify-user-approval-decision` con `decision='approved'`.
+- **Rechazar**: rpc `admin_reject_user(p_user_id)` (borra de `auth.users`, cascade a `user_profiles`) + invoca con `decision='rejected'` (capturando email/nombre antes para fallback).
+
+### Edge Functions
+- `notify-admin-pending-user` (verify_jwt=true) — envía email al admin tras signup.
+- `notify-user-approval-decision` (verify_jwt=true, valida caller=master) — envía email al usuario tras aprobación/rechazo.
+- Provider: **Resend** (plan Free, 100/día, 3000/mes).
+- From: `Valere CRM <noreply@valereconsultores.com>` (dominio verificado).
+
+### Secret necesario
+- `RESEND_API_KEY` configurado en Supabase Edge Functions Secrets. Configurar via Dashboard o `npx supabase secrets set RESEND_API_KEY=re_xxx --project-ref gtphkowfcuiqbvfkwjxb`.
+
+### Cron de auto-rechazo
+- Job `cleanup_pending_users_daily` schedule `0 3 * * *` (03:00 UTC).
+- Función `cleanup_pending_users_older_than_7_days()` borra de `auth.users` los pendientes >7d con `status='pendiente'`. Cascade a `user_profiles`.
+- Idempotente, devuelve count de borrados.
+
+### Migration de referencia
+`supabase/migrations/20260426_signup_aprobacion_manual.sql` (aplicada en prod).
+
+### Limitaciones aceptadas
+- Defensa por `approved` solo en frontend AuthGuard. Helper `is_approved()` SQL creado para futuras RLS, no aplicado todavía.
+- `ADMIN_EMAIL` env var hardcoded a `jolivares@valereconsultores.com`. Para múltiples admins requiere refactor a array.
+- Migración futura `From: noreply@valere.es` pendiente — DNS está en Arsys (`dns45/46.servidoresdns.net`), requiere acceso al panel.
+
+---
+
 ## 💬 Asistente RAG del CRM
 
 El CRM tiene un widget flotante de ayuda (`AsistentePanel`) accesible desde todas las páginas autenticadas. Arquitectura:

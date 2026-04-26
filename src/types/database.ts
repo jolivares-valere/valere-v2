@@ -77,7 +77,7 @@ export type SurplusModel =
 
 export interface RetailerOffer {
   id: string;
-  retailer_id: string;
+  comercializadora_id: string; // renombrado desde retailer_id en Fase 1 unificación 2026-04-26
   product_name: string;
   access_rate: string;
   surplus_model: SurplusModel;
@@ -159,7 +159,8 @@ export interface ProposalWithDetails extends Proposal {
 }
 
 export interface RetailerOfferWithName extends RetailerOffer {
-  retailers: Pick<Retailer, 'name'>;
+  // Join alias renombrado en Fase 1 unificación: retailers → comercializadoras
+  comercializadoras: Pick<Retailer, 'name'>;
 }
 
 // ============================================================
