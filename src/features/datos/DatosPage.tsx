@@ -99,10 +99,10 @@ export default function DataCapture() {
     const newPowers: Record<string, number> = {};
     for (let i = 1; i <= config.potencia; i++) {
       const key = `p${i}`;
-      newPowers[key] = (spForm.powers as any)?.[key] || 0;
+      newPowers[key] = (spForm.powers as Record<string, number | undefined> | undefined)?.[key] || 0;
     }
     // Reset energy fields beyond the new tariff's range
-    const updates: Record<string, any> = { tariff: newTariff, powers: newPowers };
+    const updates: Record<string, unknown> = { tariff: newTariff, powers: newPowers };
     for (let i = 1; i <= 6; i++) {
       const key = `e${i}_kwh`;
       if (i > config.energia) {
@@ -188,11 +188,15 @@ export default function DataCapture() {
 
   const startEditInv = (inv: InvoiceHistory) => {
     const numPeriods = invTariffConfig.energia;
+    // Las columnas consumption_p1..p6 / surplus_p1..p6 son dinámicas y no
+    // forman parte del tipo `InvoiceHistory` declarado en src/types/database.ts.
+    // Cast puntual a Record<string, number> para acceso indexado.
+    const invIndexed = inv as unknown as Record<string, number | undefined>;
     setInvConsumptionPeriods(
-      Array.from({ length: numPeriods }, (_, i) => (inv as any)[`consumption_p${i + 1}`] || 0)
+      Array.from({ length: numPeriods }, (_, i) => invIndexed[`consumption_p${i + 1}`] || 0)
     );
     setInvSurplusPeriods(
-      Array.from({ length: numPeriods }, (_, i) => (inv as any)[`surplus_p${i + 1}`] || 0)
+      Array.from({ length: numPeriods }, (_, i) => invIndexed[`surplus_p${i + 1}`] || 0)
     );
     setInvForm({
       cups_id: inv.cups_id ?? selectedSPId,
@@ -247,11 +251,12 @@ export default function DataCapture() {
       surplus_kwh: totalSurplus,
     };
     if (isEditingInv && editingInvId) {
-      const { id, created_at, cups_id, supply_point_id, ...updateData } = payload as any;
+      const { id, created_at, cups_id, supply_point_id, ...updateData } =
+        payload as Partial<InvoiceHistory>;
       void id; void created_at; void cups_id; void supply_point_id;
-      await invMutation.update(editingInvId, updateData, 'Factura actualizada');
+      await invMutation.update(editingInvId, updateData as Record<string, unknown>, 'Factura actualizada');
     } else {
-      await invMutation.insert(payload as any, 'Factura registrada');
+      await invMutation.insert(payload as Record<string, unknown>, 'Factura registrada');
     }
     setInvDialogOpen(false);
     setIsEditingInv(false);
@@ -544,12 +549,13 @@ export default function DataCapture() {
                       <label className="block text-[10px] text-center text-valere-ink/40 mb-1">{label}</label>
                       <input
                         type="number"
-                        value={(spForm.powers as any)?.[pk] || ''}
+                        value={(spForm.powers as Record<string, number | undefined> | undefined)?.[pk] || ''}
                         onChange={e => {
                           setSpForm(p => ({
                             ...p,
-                            powers: { ...(p.powers as any || {}), [pk]: parseFloat(e.target.value) || 0 }
-                          }));
+                            powers: { ...((p.powers as unknown as Record<string, number> | undefined) || {}), [pk]: parseFloat(e.target.value) || 0 }
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          }) as any);
                           if (spErrors.powers) setSpErrors(prev => ({ ...prev, powers: '' }));
                         }}
                         className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center"
@@ -579,7 +585,7 @@ export default function DataCapture() {
                       <label className="block text-[10px] text-center text-valere-ink/40 mb-1">{label}</label>
                       <input
                         type="number"
-                        value={(spForm as any)[ek] || ''}
+                        value={(spForm as unknown as Record<string, number | undefined>)[ek] || ''}
                         onChange={e => setSpForm(p => ({ ...p, [ek]: parseFloat(e.target.value) || 0 }))}
                         className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center"
                       />

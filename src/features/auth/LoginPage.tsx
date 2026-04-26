@@ -1,4 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../core/hooks/useAuth'
 
 export default function LoginPage() {
@@ -71,6 +72,13 @@ export default function LoginPage() {
         >
           {submitting ? 'Entrando...' : 'Entrar'}
         </button>
+
+        <p className="text-center text-xs text-slate-500">
+          ¿No tienes cuenta?{' '}
+          <Link to="/signup" className="font-medium text-slate-900 underline">
+            Solicitar acceso
+          </Link>
+        </p>
       </form>
     </div>
   )

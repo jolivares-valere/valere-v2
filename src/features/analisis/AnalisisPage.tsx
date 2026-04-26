@@ -75,7 +75,7 @@ export default function Analysis() {
     // Check 1: Powers configured
     const powers = selectedSP.powers || {};
     const powersConfigured = Array.from({ length: tariffConfig.potencia }, (_, i) =>
-      safeNum((powers as any)[`p${i + 1}`])
+      safeNum((powers as unknown as Record<string, number | undefined>)[`p${i + 1}`])
     );
     const hasPowers = powersConfigured.some(p => p > 0);
     checks.push({
@@ -143,7 +143,7 @@ export default function Analysis() {
     const powers = selectedSP.powers || {};
     const tariffConfig = getTariffConfig(selectedSP.tariff);
     const hasPowers = Array.from({ length: tariffConfig.potencia }, (_, i) =>
-      safeNum((powers as any)[`p${i + 1}`])
+      safeNum((powers as unknown as Record<string, number | undefined>)[`p${i + 1}`])
     ).some(p => p > 0);
 
     if (!hasPowers) {

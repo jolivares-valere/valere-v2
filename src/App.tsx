@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './core/hooks/useAuth'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
+import SignupPage from './features/auth/SignupPage'
+import PendingApprovalPage from './features/auth/PendingApprovalPage'
 import { ErrorBoundary } from './core/components/ErrorBoundary'
 
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage'))
@@ -41,6 +43,12 @@ function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: str
   if (!session || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
+  // Bloquear usuarios pendientes de aprobación. Esperamos a que el perfil real
+  // esté cargado para no actuar sobre el bootstrap (que pone approved=false por
+  // defecto). Si el perfil ya está cargado y approved !== true → /pending-approval.
+  if (profileLoaded && user.approved !== true) {
+    return <Navigate to="/pending-approval" replace />
+  }
   // Cuando la ruta depende del rol, esperamos a que el perfil real se haya cargado
   // (bootstrapFromSession mete role='client' por defecto; sin esta espera un master
   // sería redirigido en el primer render).
@@ -66,21 +74,46 @@ function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: str
 }
 
 function LoginRoute() {
-  const { user, session, loading } = useAuth()
+  const { user, session, loading, profileLoaded } = useAuth()
   const location = useLocation()
 
   if (loading) return <LoadingScreen />
   if (session && user) {
+    // Si la sesión está activa pero el usuario no está aprobado → /pending-approval.
+    // Si profileLoaded aún no está true, esperamos para evitar parpadeo.
+    if (profileLoaded && user.approved !== true) {
+      return <Navigate to="/pending-approval" replace />
+    }
     const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
     return <Navigate to={from} replace />
   }
   return <LoginPage />
 }
 
+/**
+ * Ruta para usuarios autenticados pero NO aprobados todavía. No usa AuthGuard
+ * (que redirigiría aquí en bucle). Si llega un usuario aprobado, lo manda
+ * al dashboard.
+ */
+function PendingApprovalRoute() {
+  const { user, session, loading, profileLoaded } = useAuth()
+
+  if (loading) return <LoadingScreen />
+  if (!session || !user) {
+    return <Navigate to="/login" replace />
+  }
+  if (profileLoaded && user.approved === true) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return <PendingApprovalPage />
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/pending-approval" element={<PendingApprovalRoute />} />
 
       <Route path="/" element={<AuthGuard><Navigate to="/dashboard" replace /></AuthGuard>} />
       <Route path="/dashboard" element={<AuthGuard><DashboardPage /></AuthGuard>} />
