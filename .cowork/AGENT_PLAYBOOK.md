@@ -2,7 +2,7 @@
 
 > **Audiencia**: agentes Claude (Cowork, Code, Plan) que retoman un sprint autónomo en este repo sin contexto previo.
 > **Objetivo**: condensar las convenciones, workarounds y patrones aprendidos en los ~10 sprints autónomos previos para que el siguiente arranque a velocidad y evite los errores ya cometidos.
-> **Última actualización**: 2026-04-25 (sprint paralelo C).
+> **Última actualización**: 2026-04-26 (sprint domingo lane 3 — lecciones noche 25-26).
 
 ---
 
@@ -254,6 +254,191 @@ Riesgo identificado en sprint 8: `client_documents.storage_path` apunta al bucke
 
 ---
 
+## 8.bis. PowerShell 5.1 — el lenguaje real de los scripts entregados a Juan
+
+> Sección extendida tras la noche del 25-26 abril 2026. Varios scripts de cierre se rompieron en el Windows de Juan a pesar de pasar `pwsh 7` localmente. Conclusiones consolidadas:
+
+### Regla de oro: validar contra **PS 5.1**, no contra pwsh 7
+
+PowerShell 5.1 (la versión incluida con Windows 10/11 por defecto) es **estricta y diferente** a pwsh 7. Comprobar siempre antes de entregar:
+
+```powershell
+# Validación obligatoria pre-entrega:
+Invoke-ScriptAnalyzer -Path .\script.ps1 `
+  -IncludeRule PSUseCompatibleSyntax `
+  -Settings @{Rules=@{PSUseCompatibleSyntax=@{Enable=$true; TargetVersions=@('5.1')}}}
+
+# Adicionalmente:
+Invoke-ScriptAnalyzer -Path .\script.ps1 -Severity Error
+```
+
+**`pwsh -File script.ps1` pasando** ≠ **`powershell -File script.ps1` pasando**. La que importa es la segunda (la del Windows de Juan).
+
+### Errores específicos detectados en sprint 9 que NO debe repetirse
+
+#### 1. `Funcion (expr)` con espacio interpretado como dos statements
+
+PS 5.1 con strict mode interpreta `Write-Host (Get-Date)` o `Write-Host ($var.Trim())` mejor de forma rara cuando el espacio está antes de `(`. Patrón seguro:
+
+```powershell
+# 🔴 ROMPE en PS 5.1 strict en algunos contextos:
+Write-Host "[Hora] " (Get-Date -Format 'HH:mm')
+
+# 🟢 OK siempre:
+Write-Host "[Hora] $(Get-Date -Format 'HH:mm')"
+# o:
+$hora = Get-Date -Format 'HH:mm'
+Write-Host "[Hora] $hora"
+```
+
+Norma: usar **expansión `"$()"`** o **variable preconstruida** dentro de strings.
+
+#### 2. `[DRY-RUN]` literal al inicio de string interpretado como tipo
+
+PS 5.1 interpreta `[CualquierCosa]` al inicio de un literal como expresión de tipo (`[type]`). Esto rompe:
+
+```powershell
+# 🔴 ROMPE:
+Write-Host "[DRY-RUN] Skipping git rm $file"
+# Error: "Unable to find type [DRY-RUN]"
+
+# 🟢 OK — tres opciones:
+Write-Host "(DRY-RUN) Skipping git rm $file"               # paréntesis
+Write-Host "DRY-RUN: Skipping git rm $file"                # sin corchetes
+Write-Host ('[' + 'DRY-RUN' + '] Skipping git rm') $file   # concatenación (feo pero funciona)
+Write-Host "$([char]91)DRY-RUN$([char]93) Skipping..."     # escape (peor)
+```
+
+Norma: **NO empezar strings con `[Algo]`**. Si quieres prefijos visibles, usa paréntesis o `:`.
+
+#### 3. `??` y `??=` (null-coalescing) NO existen en PS 5.1
+
+Solo en pwsh 7+. Sustituir:
+
+```powershell
+# 🔴 PS 7 only:
+$rama = $cli ?? (git branch --show-current)
+
+# 🟢 PS 5.1:
+$rama = if ([string]::IsNullOrWhiteSpace($cli)) { git branch --show-current } else { $cli }
+```
+
+#### 4. `&&` y `||` (operadores pipeline) NO existen en PS 5.1
+
+Solo pwsh 7+. Sustituir:
+
+```powershell
+# 🔴 PS 7 only:
+git pull && git push
+
+# 🟢 PS 5.1:
+git pull
+if ($LASTEXITCODE -eq 0) { git push }
+```
+
+### Locks de git huérfanos — inventario completo
+
+`index.lock` no es el único. Cualquier escritura concurrente puede dejar un `.lock`:
+
+```powershell
+# Lista de locks huérfanos a verificar y eliminar (mover a .bak):
+$locks = @(
+  '.git\index.lock',
+  '.git\config.lock',
+  '.git\HEAD.lock',
+  '.git\ORIG_HEAD.lock',
+  '.git\FETCH_HEAD.lock',
+  '.git\packed-refs.lock'
+)
+# Más todos los `refs/heads/<rama>.lock` y `refs/remotes/<remote>/<rama>.lock`:
+Get-ChildItem -Path .git\refs -Recurse -Filter '*.lock' -ErrorAction SilentlyContinue | ForEach-Object {
+  $bak = "$($_.FullName).bak.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+  Move-Item -LiteralPath $_.FullName -Destination $bak -Force
+  Write-Host "Lock movido: $($_.Name) -> $bak"
+}
+```
+
+**Específicamente importantes**:
+- `refs/heads/<rama>.lock` — bloquea el avance/reset de la rama. Sucede tras un `git push` interrumpido.
+- `refs/remotes/<remote>/<rama>.lock` — bloquea `git fetch`. Sucede tras un `git fetch` interrumpido.
+
+Sin limpiar estos, los siguientes `git fetch`/`git push` fallan con mensajes crípticos de "unable to update ref" o "cannot lock ref".
+
+### Verificar git remote/branch ANTES de generar scripts que los usen
+
+Sprint 9 entregó un script que asumía:
+- Existe remote `origin`.
+- La rama actual es `claude/docs-cierre-2026-04-23`.
+
+Ninguna de las dos era cierta en el sandbox cuando Juan ejecutó. **Reglas**:
+
+```powershell
+# Antes de hardcodear nombres en scripts:
+$origin = git remote -v | Select-String '^origin'
+$rama   = git branch --show-current
+
+if (-not $origin) {
+  Write-Host "Sin remote origin. El script no hará push."
+  $hasOrigin = $false
+} else {
+  $hasOrigin = $true
+}
+
+# El script DEBE detectar y adaptarse, NO asumir.
+# Patrón en RUNBOOK_FLAT.ps1: $hasOrigin + $workingBranch detectados al inicio.
+```
+
+### Validación en 4 capas antes de entregar un .ps1
+
+Sprint 9 falló por entregar un script sin validar. Sprint domingo (lane 3) recomienda:
+
+1. **Parser puro**: `[System.Management.Automation.PSParser]::Tokenize($content, [ref]$null)` — detecta sintaxis inválida sin ejecutar.
+2. **PSScriptAnalyzer compat 5.1**: `Invoke-ScriptAnalyzer -IncludeRule PSUseCompatibleSyntax -Settings @{Rules=@{PSUseCompatibleSyntax=@{Enable=$true; TargetVersions=@('5.1')}}}` — detecta features no disponibles en 5.1.
+3. **PSScriptAnalyzer severity Error**: `Invoke-ScriptAnalyzer -Severity Error` — detecta antipatrones críticos.
+4. **Dry-run en pwsh + flag `-DryRun`**: ejecutar el script con un flag `-DryRun` que no toca nada, solo imprime.
+5. **Hash MD5/SHA256** que Juan puede comprobar antes de ejecutar:
+   ```powershell
+   # En sandbox (al generar):
+   md5sum script.ps1
+   # En Windows Juan (antes de ejecutar):
+   Get-FileHash script.ps1 -Algorithm MD5
+   # Si NO coincide, NO ejecutar — el script viajó corrupto.
+   ```
+
+Si las 5 capas pasan, el script tiene >95% de probabilidad de ejecutar limpio en Windows real.
+
+### Patrón fallback: secuencia plana de comandos copiables
+
+Si el `.ps1` envuelve algo, **acompaña SIEMPRE** con la secuencia plana de comandos copy-paste. Si el script falla, Juan puede copiar los comandos a mano sin debugging.
+
+```markdown
+## Si el script falla, ejecuta estos comandos a mano:
+
+```powershell
+cd C:\Users\joliv\valere-v2
+git pull origin main
+git rm src/legacy/foo.ts
+git add docs/PLAN_X.md
+git commit -m "..."
+git push origin main
+```
+```
+
+Es 5 minutos extra de redacción por sprint y ahorra muchas horas cuando el script se rompe en producción.
+
+### Encoding y BOM
+
+Los .ps1 generados desde sandbox Linux (UTF-8 sin BOM) a veces fallan en PS 5.1 con caracteres no-ASCII (acentos, emojis). Patrón seguro:
+
+```powershell
+# Al escribir desde sandbox: usar UTF-8 con BOM si hay caracteres no-ASCII.
+# Alternativa: limitar el script a ASCII puro y poner los textos en español en variables fuera del script.
+```
+
+Para Cowork: si el script va a tener `[Cargado]` o "ñ" o emojis, considerar generar versión sin caracteres especiales o forzar BOM.
+
+---
+
 ## 9. Anti-patrones y errores ya cometidos
 
 ### "Asumir que está deployado/configurado"
@@ -276,6 +461,15 @@ Tras renombrar una tabla, **grep exhaustivo** en `src/` para detectar refs legac
 
 ### Asumir que `npm install` o `npm test` funcionan en sandbox
 No corren. Cualquier verificación con Node se delega a Juan (PowerShell). El handoff debe incluir `npx tsc --noEmit` y `npm test -- --run` como pasos del script PowerShell.
+
+### Asumir que existe remote `origin` o que la rama actual es la del PR
+Sprint 9 generó un script que `git fetch origin` + `git checkout claude/docs-cierre-2026-04-23` ciegamente. En el repo de Juan ese momento NO había `origin` configurado y la rama actual era `main`. Resultado: script fallaba al primer `git fetch`. **Antes de generar cualquier script que toque git remote/branch**: asume nada, detecta primero (`git remote -v`, `git branch --show-current`) y diseña el script para adaptarse a ambos casos (con y sin remote). El patrón está implementado en `RUNBOOK_FLAT.ps1` — copiar de ahí.
+
+### Entregar `.ps1` sin validar contra PS 5.1
+Pasar `pwsh 7` no garantiza nada para Windows real. Validar con `Invoke-ScriptAnalyzer -IncludeRule PSUseCompatibleSyntax -Settings @{...TargetVersions=@('5.1')}`. Ver §8.bis.
+
+### `[PREFIJO]` literal al inicio de un Write-Host string
+PS 5.1 lo interpreta como `[type]`. Usar `(PREFIJO)` o `PREFIJO:` o expansión `"$prefijo"`.
 
 ---
 
@@ -313,4 +507,8 @@ Este documento es una **memoria operativa compartida**. Las primeras versiones d
 - `docs/AGENTES_Y_SPRINTS.md` — sistema de 4 agentes.
 - `docs/RUNBOOK_PENDIENTE_JUAN.md` — runbook consolidado de bloques pendientes.
 - `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` — plan vivo de unificación.
+- `docs/PLAN_UNIFICACION_FASE_6_2026-04-26.md` — cutover real + decommissioning gradual.
+- `docs/CHECKLIST_RELEASE_CUTOVER.md` — operativo del día del cutover (go/no-go + smoke + rollback).
+- `docs/AUDIT_RLS_DEBIL_2026-04-26.md` — auditoría RLS con 3 tablas adicionales fuera del draft 8-tables.
+- `docs/RUNBOOK_FLAT.md` — runbook adaptativo (sustituye a `RUNBOOK.ps1`).
 - `.cowork/outbox/` — handoffs (los últimos 3-4 son los relevantes).

@@ -64,12 +64,13 @@ from public.documentos d where d.empresa_id is not null and not exists (select 1
 -- Todos deben ser 0.
 
 -- ───────── 3. Duplicados ─────────
+-- Normalizers v2 (alineados con script B post dry-run 2026-04-26)
 select 'duplicados CIF en empresas' as check, count(*) as filas
 from (
-  select upper(regexp_replace(coalesce(nif,''), '[\s\-\.]', '', 'g')) as nif_norm, count(*) as n
+  select upper(regexp_replace(coalesce(nif,''), '[\s\-\.\\/]', '', 'g')) as nif_norm, count(*) as n
     from public.empresas
    where nif is not null and nif != ''
-   group by upper(regexp_replace(coalesce(nif,''), '[\s\-\.]', '', 'g'))
+   group by upper(regexp_replace(coalesce(nif,''), '[\s\-\.\\/]', '', 'g'))
   having count(*) > 1
 ) d
 union all
@@ -84,9 +85,13 @@ from (
 union all
 select 'duplicados nombre comercializadora', count(*)
 from (
-  select upper(regexp_replace(regexp_replace(coalesce(coalesce(nombre_normalizado, name),''), '[\.\s]', '', 'g'), 'S\.A\.|S\.L\.|SA|SL', '', 'g')) as norm, count(*) as n
+  select upper(regexp_replace(regexp_replace(translate(coalesce(coalesce(nombre_normalizado, name),''),
+            'áéíóúÁÉÍÓÚüÜñÑàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛ','aeiouAEIOUuUnNaeiouAEIOUaeiouAEIOU'),
+            '[\.\s,\(\)\-]', '', 'g'), '(SAU|SLU|SCOOP|SCP|SCL|SA|SL)$', '', 'i')) as norm, count(*) as n
     from public.comercializadoras
-   group by upper(regexp_replace(regexp_replace(coalesce(coalesce(nombre_normalizado, name),''), '[\.\s]', '', 'g'), 'S\.A\.|S\.L\.|SA|SL', '', 'g'))
+   group by upper(regexp_replace(regexp_replace(translate(coalesce(coalesce(nombre_normalizado, name),''),
+            'áéíóúÁÉÍÓÚüÜñÑàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛ','aeiouAEIOUuUnNaeiouAEIOUaeiouAEIOU'),
+            '[\.\s,\(\)\-]', '', 'g'), '(SAU|SLU|SCOOP|SCP|SCL|SA|SL)$', '', 'i'))
   having count(*) > 1
 ) d;
 

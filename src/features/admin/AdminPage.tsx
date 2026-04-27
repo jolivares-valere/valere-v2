@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import {
   ShieldCheck, Users, Plus, Loader2, Trash2, Edit2,
   Settings, DollarSign, Building2, Save, Sliders,
-  UserPlus, Check, X
+  UserPlus, Check, X, Plug
 } from 'lucide-react';
 import CustomFieldsManager from './components/CustomFieldsManager';
+import HoldedTab from './components/HoldedTab';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -60,6 +61,9 @@ export default function AdminPanel() {
           <TabsTrigger value="campos" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
             <Sliders className="w-4 h-4" /> Campos
           </TabsTrigger>
+          <TabsTrigger value="holded" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
+            <Plug className="w-4 h-4" /> Holded
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users"><UsersTab /></TabsContent>
@@ -68,6 +72,7 @@ export default function AdminPanel() {
         <TabsContent value="offers"><OffersTab /></TabsContent>
         <TabsContent value="config"><ConfigTab /></TabsContent>
         <TabsContent value="campos"><CustomFieldsManager /></TabsContent>
+        <TabsContent value="holded"><HoldedTab /></TabsContent>
       </Tabs>
     </div>
   );

@@ -8,10 +8,12 @@
  *   useDatadisSync(cupsId, ...)    → mutación principal: autentica + descarga datos
  *   useDatadisConsumptions(cupsId) → consumos horarios ya descargados en DB
  *
- * Nota sobre tipos: las tablas datadis_tokens y datadis_consumptions son nuevas
- * (migración 20260422_datadis_integracion.sql) y aún no están en el tipo Database
- * generado. Se usa `as any` en las llamadas a .from() hasta que se regeneren los tipos
- * con `supabase gen types typescript`. Esta es la convención del proyecto para tablas nuevas.
+ * Nota sobre tipos: las tablas datadis_tokens y datadis_consumptions ya están
+ * incluidas en el tipo Database regenerado (post-Unificación Fase 1+3, sprint 7-8).
+ * Las llamadas a .from() están totalmente tipadas. Si en el futuro algún campo
+ * deja de cuadrar tras una migración, regenerar tipos con
+ *   supabase gen types typescript --project-id gtphkowfcuiqbvfkwjxb
+ * antes de añadir cualquier `as any`.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -27,15 +29,18 @@ import {
   aggregateConsumptionByPeriod,
   clearToken,
 } from '../services/datadis'
+import type { Database } from '../types/database'
 import type {
   DatadisToken,
-  DatadisTokenInsert,
   DatadisConsumption,
 } from '../types/entities'
 
-// ─── Alias tipado para tablas nuevas (no están en Database aún) ─────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
+// ─── Tipos derivados del schema generado ───────────────────────────────────
+
+type DatadisTokenDbInsert = Database['public']['Tables']['datadis_tokens']['Insert']
+type DatadisConsumptionDbInsert = Database['public']['Tables']['datadis_consumptions']['Insert']
+type CupsUpdate = Database['public']['Tables']['cups']['Update']
+type FacturaInsert = Database['public']['Tables']['facturas']['Insert']
 
 // ─── Query keys ────────────────────────────────────────────────────────────
 
@@ -53,15 +58,15 @@ export function useDatadisToken(empresaId: string | null | undefined) {
   return useQuery({
     queryKey: QK.token(empresaId ?? ''),
     enabled: !!empresaId,
-    queryFn: async (): Promise<DatadisToken | null> => {
-      const { data, error } = await db
+    queryFn: async (): Promise<Omit<DatadisToken, 'password_enc' | 'token_cache'> | null> => {
+      const { data, error } = await supabase
         .from('datadis_tokens')
         .select('id, empresa_id, username, autorizado, ultimo_error, token_expira, created_at, updated_at')
-        .eq('empresa_id', empresaId)
+        .eq('empresa_id', empresaId!)
         .maybeSingle()
 
       if (error) { logError(error, 'useDatadisToken'); throw error }
-      return (data ?? null) as DatadisToken | null
+      return data ?? null
     },
   })
 }
@@ -77,7 +82,7 @@ export function useGuardarToken(empresaId: string) {
 
   return useMutation({
     mutationFn: async (payload: { username: string; password: string }) => {
-      const insert: DatadisTokenInsert = {
+      const insert: DatadisTokenDbInsert = {
         empresa_id: empresaId,
         username: payload.username.trim().toUpperCase(),
         // En producción: Edge Function cifra la contraseña.
@@ -89,7 +94,7 @@ export function useGuardarToken(empresaId: string) {
         ultimo_error: null,
       }
 
-      const { error } = await db
+      const { error } = await supabase
         .from('datadis_tokens')
         .upsert(insert, { onConflict: 'empresa_id' })
 
@@ -113,7 +118,7 @@ export function useEliminarToken(empresaId: string) {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await db
+      const { error } = await supabase
         .from('datadis_tokens')
         .delete()
         .eq('empresa_id', empresaId)
@@ -143,10 +148,10 @@ export function useDatadisConsumptions(
     queryKey: [...QK.consumptions(cupsId ?? ''), fechaDesde, fechaHasta],
     enabled: !!cupsId,
     queryFn: async (): Promise<DatadisConsumption[]> => {
-      let q = db
+      let q = supabase
         .from('datadis_consumptions')
         .select('*')
-        .eq('cups_id', cupsId)
+        .eq('cups_id', cupsId!)
         .order('fecha', { ascending: false })
         .order('hora', { ascending: true })
 
@@ -155,6 +160,8 @@ export function useDatadisConsumptions(
 
       const { data, error } = await q
       if (error) { logError(error, 'useDatadisConsumptions'); throw error }
+      // El campo `metodo_obtencion` está tipado como string en el schema generado,
+      // pero en runtime es siempre 'real' | 'estimada' (constraint a nivel de servicio).
       return (data ?? []) as DatadisConsumption[]
     },
   })
@@ -211,7 +218,7 @@ export function useDatadisSync() {
       const fechaDesde = opts.fechaDesde ?? hace12Meses.toISOString().slice(0, 10)
 
       // ── Paso 1: leer credenciales de DB ──────────────────────────────────
-      const { data: tokenRow, error: tokenErr } = await db
+      const { data: tokenRow, error: tokenErr } = await supabase
         .from('datadis_tokens')
         .select('username, password_enc')
         .eq('empresa_id', empresaId)
@@ -221,14 +228,14 @@ export function useDatadisSync() {
         throw new Error('No hay credenciales Datadis configuradas para esta empresa.')
       }
 
-      const password = (tokenRow.password_enc as string).startsWith('plain:')
-        ? (tokenRow.password_enc as string).slice(6)
-        : (tokenRow.password_enc as string)
+      const password = tokenRow.password_enc.startsWith('plain:')
+        ? tokenRow.password_enc.slice(6)
+        : tokenRow.password_enc
 
       // ── Paso 2: autenticar ────────────────────────────────────────────────
-      const authResult = await authenticate(tokenRow.username as string, password)
+      const authResult = await authenticate(tokenRow.username, password)
       if (!authResult.ok) {
-        await db
+        await supabase
           .from('datadis_tokens')
           .update({ autorizado: false, ultimo_error: authResult.error ?? 'Error de autenticación' })
           .eq('empresa_id', empresaId)
@@ -237,7 +244,7 @@ export function useDatadisSync() {
       }
 
       // Marcar como autorizado
-      await db
+      await supabase
         .from('datadis_tokens')
         .update({ autorizado: true, ultimo_error: null })
         .eq('empresa_id', empresaId)
@@ -250,17 +257,16 @@ export function useDatadisSync() {
 
       if (!supply) {
         throw new Error(
-          `El CUPS ${codigoCups} no aparece en la cuenta Datadis de ${tokenRow.username as string}. ` +
+          `El CUPS ${codigoCups} no aparece en la cuenta Datadis de ${tokenRow.username}. ` +
           `Asegúrate de que el titular ha autorizado el acceso a este suministro.`,
         )
       }
 
       // ── Paso 4: actualizar datos técnicos del CUPS ────────────────────────
-      const cupsUpdate = supplyRawToCupsFields(supply)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cupsUpdate: CupsUpdate = supplyRawToCupsFields(supply)
       const { error: cupsErr } = await supabase
         .from('cups')
-        .update(cupsUpdate as any)
+        .update(cupsUpdate)
         .eq('id', cupsId)
 
       if (cupsErr) throw new Error(`Error actualizando CUPS: ${cupsErr.message}`)
@@ -278,9 +284,11 @@ export function useDatadisSync() {
       let consumosDescargados = 0
 
       if (rawConsumptions.length > 0) {
-        const inserts = rawConsumptions.map(r => consumptionRawToInsert(r, cupsId))
+        const inserts: DatadisConsumptionDbInsert[] = rawConsumptions.map(
+          r => consumptionRawToInsert(r, cupsId),
+        )
 
-        const { error: consErr } = await db
+        const { error: consErr } = await supabase
           .from('datadis_consumptions')
           .upsert(inserts, { onConflict: 'cups_id,fecha,hora' })
 
@@ -308,23 +316,21 @@ export function useDatadisSync() {
           const totalKwh = monthConsumptions.reduce((s, c) => s + (c.consumptionKWh ?? 0), 0)
           const totalExc = monthConsumptions.reduce((s, c) => s + (c.surplusEnergyKWh ?? 0), 0)
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const facturaUpsert: FacturaInsert = {
+            cups_id: cupsId,
+            month,
+            year,
+            consumption_kwh: Math.round(totalKwh * 100) / 100,
+            surplus_kwh: Math.round(totalExc * 100) / 100,
+            total_amount_eur: 0,
+            surplus_compensation_eur: 0,
+            retailer: supply.marketer ?? '',
+            billed_days: daysInMonth(year, month),
+          }
+
           const { error: facErr } = await supabase
             .from('facturas')
-            .upsert(
-              {
-                cups_id: cupsId,
-                month,
-                year,
-                consumption_kwh: Math.round(totalKwh * 100) / 100,
-                surplus_kwh: Math.round(totalExc * 100) / 100,
-                total_amount_eur: 0,
-                surplus_compensation_eur: 0,
-                retailer: supply.marketer ?? '',
-                billed_days: daysInMonth(year, month),
-              } as any,
-              { onConflict: 'cups_id,month,year' },
-            )
+            .upsert(facturaUpsert, { onConflict: 'cups_id,month,year' })
 
           if (!facErr) facturasGeneradas++
         }
@@ -332,17 +338,17 @@ export function useDatadisSync() {
         // ── Paso 7: actualizar energías anuales en cups ───────────────────
         const tarifa = supply.accessTariff ?? '2.0TD'
         const byPeriod = aggregateConsumptionByPeriod(rawConsumptions, tarifa)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const energiasUpdate: CupsUpdate = {
+          energia_p1_kwh: Math.round((byPeriod.p1 ?? 0) * 100) / 100,
+          energia_p2_kwh: Math.round((byPeriod.p2 ?? 0) * 100) / 100,
+          energia_p3_kwh: Math.round((byPeriod.p3 ?? 0) * 100) / 100,
+          energia_p4_kwh: Math.round((byPeriod.p4 ?? 0) * 100) / 100,
+          energia_p5_kwh: Math.round((byPeriod.p5 ?? 0) * 100) / 100,
+          energia_p6_kwh: Math.round((byPeriod.p6 ?? 0) * 100) / 100,
+        }
         await supabase
           .from('cups')
-          .update({
-            energia_p1_kwh: Math.round((byPeriod.p1 ?? 0) * 100) / 100,
-            energia_p2_kwh: Math.round((byPeriod.p2 ?? 0) * 100) / 100,
-            energia_p3_kwh: Math.round((byPeriod.p3 ?? 0) * 100) / 100,
-            energia_p4_kwh: Math.round((byPeriod.p4 ?? 0) * 100) / 100,
-            energia_p5_kwh: Math.round((byPeriod.p5 ?? 0) * 100) / 100,
-            energia_p6_kwh: Math.round((byPeriod.p6 ?? 0) * 100) / 100,
-          } as any)
+          .update(energiasUpdate)
           .eq('id', cupsId)
       }
 
@@ -364,7 +370,7 @@ export function useDatadisSync() {
     onError: (err: Error, opts) => {
       logError(err, 'useDatadisSync')
       toast.error(`Error sincronizando con Datadis: ${err.message}`)
-      void db
+      void supabase
         .from('datadis_tokens')
         .update({ ultimo_error: err.message })
         .eq('empresa_id', opts.empresaId)

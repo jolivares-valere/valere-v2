@@ -1,15 +1,42 @@
 -- ═══════════════════════════════════════════════════════════════════
--- DRAFT — Hardening RLS para las 8 tablas con USING(true)
+-- PENDIENTE DECISIÓN JUAN — Hardening RLS 8 tablas USING(true)
 -- ═══════════════════════════════════════════════════════════════════
--- NO aplicada todavía. Esperando a que Fase 2 (datos) esté completa
--- y a revisión Juan. El patrón sigue las decisiones del CRM:
+--
+-- ⚠️  NO APLICADA EN PROD. El sprint del domingo 2026-04-26 (lane 1)
+--     explícitamente saltó esta migration. Las 8 tablas (alertas, ciclos,
+--     comercializadora_docs, comunicaciones_cliente, excel_import_templates,
+--     expedientes, savings_calculations, solicitudes_potencia) siguen
+--     con `X_authenticated_all USING(true) WITH CHECK(true)`.
+--
+-- BLOQUEO: Juan AÚN no ha decidido si acepta el riesgo de los comerciales
+-- post-Fase-2 (cuando los datos reales de Potencias estén importados).
+-- El patrón granular de abajo cierra el acceso write a "creador o
+-- manager+", lo que puede impedir flujos legítimos del rol "comercial" si:
+--   - los datos importados de Potencias no traen `created_by` poblado
+--   - o si el comercial necesita modificar registros que no creó él
+--
+-- DECISIÓN PENDIENTE Juan (responder antes de aplicar):
+--   1) ¿OK que un comercial NO pueda editar `expedientes`/`ciclos` ajenos?
+--   2) ¿OK que solo manager+ pueda crear `comercializadora_docs` y
+--      `excel_import_templates`?
+--   3) ¿OK el caso especial `alertas` donde cualquier authed puede marcar leída?
+--
+-- TRÁMITE PARA APLICAR (cuando Juan diga sí):
+--   1) Validar con un user comercial real (post-Fase-2) que puede operar
+--      normalmente: leer expedientes asignados + crear sus propios ciclos.
+--   2) `mcp__apply_migration` con name='rls_hardening_8_tables_<fecha>'
+--      y este contenido como query (sin BEGIN/COMMIT).
+--   3) Verificar advisors: las 8 WARN `rls_policy_always_true` deben ir a 0.
+--   4) Renombrar este archivo a `20260xxx_rls_hardening_8_tables.sql`.
+--
+-- Estado advisors al cerrar sprint domingo 2026-04-26 lane 1:
+--   - 8 WARN `rls_policy_always_true` siguen activos en estas 8 tablas.
+--   - +1 WARN `auth_leaked_password_protection` (toggle dashboard, fuera SQL).
+--   - Total security WARN = 9 (sin cambio respecto al snapshot inicial).
+--
+-- Patrón propuesto:
 --   - SELECT abierto a authed (info compartida del equipo Valere)
 --   - INSERT/UPDATE/DELETE solo creador o manager+
---
--- Sustituye las USING(true) policies actuales (alertas_authenticated_all etc.).
---
--- Aplicar via: mcp__apply_migration con name = "rls_hardening_8_tables"
--- y este contenido como query (sin el begin;/commit;).
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ───────── expedientes (potencias) ─────────

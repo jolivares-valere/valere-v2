@@ -11,10 +11,11 @@
 
 begin;
 
--- ───────── Funciones helper ─────────
+-- ───────── Funciones helper (v2 — endurecidas tras dry-run 2026-04-26) ─────────
+-- norm_cif: ahora también elimina `/` (defensivo)
 create or replace function pg_temp.norm_cif(input text) returns text
 language sql immutable as $$
-  select nullif(upper(regexp_replace(coalesce(input,''), '[\s\-\.]', '', 'g')), '');
+  select nullif(upper(regexp_replace(coalesce(input,''), '[\s\-\.\\/]', '', 'g')), '');
 $$;
 
 create or replace function pg_temp.norm_cups(input text) returns text
@@ -22,9 +23,28 @@ language sql immutable as $$
   select nullif(upper(regexp_replace(coalesce(input,''), '\s', '', 'g')), '');
 $$;
 
+-- norm_nombre v2:
+--   • TRANSLATE() para quitar acentos (sin requerir extension unaccent)
+--   • Quita comas, paréntesis, guiones además de puntos/espacios
+--   • Soporta SAU/SLU/SCOOP/SCP/SCL/SA/SL al final del string (no en medio)
 create or replace function pg_temp.norm_nombre(input text) returns text
 language sql immutable as $$
-  select nullif(upper(regexp_replace(regexp_replace(coalesce(input,''), '[\.\s]', '', 'g'), 'S\.A\.|S\.L\.|SA|SL', '', 'g')), '');
+  select nullif(
+    upper(
+      regexp_replace(
+        regexp_replace(
+          translate(
+            coalesce(input, ''),
+            'áéíóúÁÉÍÓÚüÜñÑàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛ',
+            'aeiouAEIOUuUnNaeiouAEIOUaeiouAEIOU'
+          ),
+          '[\.\s,\(\)\-]', '', 'g'
+        ),
+        '(SAU|SLU|SCOOP|SCP|SCL|SA|SL)$', '', 'i'
+      )
+    ),
+    ''
+  );
 $$;
 
 -- ───────── Tablas de mapeo (legacy → canonical) ─────────
@@ -80,7 +100,8 @@ join public.comercializadoras c
   on pg_temp.norm_nombre(coalesce(c.nombre_normalizado, c.name)) = pg_temp.norm_nombre(sc.nombre);
 
 -- Insertar las que NO matchean
-insert into public.comercializadoras (id, name, nombre_normalizado, notas, activa, created_at, legacy_potencia_com_id)
+-- FIX dry-run 2026-04-26: la columna en CRM se llama `notes` (no `notas`)
+insert into public.comercializadoras (id, name, nombre_normalizado, notes, activa, created_at, legacy_potencia_com_id)
 select gen_random_uuid(), sc.nombre, pg_temp.norm_nombre(sc.nombre), sc.notas, sc.activa, sc.created_at, sc.id
   from _potencia_staging.comercializadoras sc
  where not exists (
@@ -102,10 +123,12 @@ select c.legacy_potencia_com_id, c.id
 -- regulated_rates de Potencias tiene valid_from/valid_to que CRM no tiene aún (queda NULL).
 -- Para evitar duplicar, append solo los (period, tariff_type, valid_from) nuevos.
 
+-- FIX dry-run 2026-04-26: precios_regulados_boe.tariff es NOT NULL en CRM (columna legacy);
+-- duplicamos tariff_type → tariff para satisfacer la constraint hasta que Fase 1.5 la elimine.
 insert into public.precios_regulados_boe (
-  id, period, tariff_type, rate_eur_kw_day, valid_from, valid_to, updated_by, updated_at, legacy_potencia_id
+  id, tariff, period, tariff_type, rate_eur_kw_day, valid_from, valid_to, updated_by, updated_at, legacy_potencia_id
 )
-select rr.id, rr.period, rr.tariff_type, rr.rate_eur_kw_day, rr.valid_from, rr.valid_to,
+select rr.id, rr.tariff_type, rr.period, rr.tariff_type, rr.rate_eur_kw_day, rr.valid_from, rr.valid_to,
        (select canonical_id from _migration_user_map where legacy_potencia_id = rr.updated_by),
        rr.updated_at, rr.id
   from _potencia_staging.regulated_rates rr
@@ -187,6 +210,33 @@ select sc.id, m.canonical_id, true
  where not exists (
    select 1 from _migration_empresa_map mm where mm.legacy_potencia_id = sc.id
  );
+
+-- 4e. FIX dry-run 2026-04-26: clientes con CIF NULL — insertar como empresa propia (sin dedup).
+-- Si NO se hace esto, los clients con CIF NULL se pierden y sus supplies/expedientes
+-- quedan huérfanos por falta de entrada en _migration_empresa_map.
+-- (En prod actual de Potencias, no hay clients con CIF NULL — pero defensivo.)
+insert into public.empresas (
+  id, nombre, nif, persona_contacto, email_principal, telefono_principal,
+  direccion, ciudad, cp, comercial_id, asesor_id, notas, activo, legacy_potencia_id,
+  created_by, created_at
+)
+select gen_random_uuid(), sc.nombre_fiscal, sc.cif, sc.persona_contacto, sc.email_contacto, sc.telefono,
+       sc.direccion_fiscal, sc.ciudad, sc.codigo_postal,
+       (select canonical_id from _migration_user_map where legacy_potencia_id = sc.gestor_id),
+       (select canonical_id from _migration_user_map where legacy_potencia_id = sc.asesor_id),
+       sc.notas, coalesce(sc.activo, true), sc.id,
+       (select canonical_id from _migration_user_map where legacy_potencia_id = sc.created_by),
+       sc.created_at
+  from _potencia_staging.clients sc
+ where pg_temp.norm_cif(sc.cif) is null
+   and not exists (select 1 from _migration_empresa_map m where m.legacy_potencia_id = sc.id);
+
+insert into _migration_empresa_map (legacy_potencia_id, canonical_id, fusionada)
+select sc.id, e.id, false
+  from _potencia_staging.clients sc
+  join public.empresas e on e.legacy_potencia_id = sc.id
+ where pg_temp.norm_cif(sc.cif) is null
+   and not exists (select 1 from _migration_empresa_map m where m.legacy_potencia_id = sc.id);
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 5. CUPS (supplies → cups) — dedupe por código normalizado
@@ -395,6 +445,17 @@ select gen_random_uuid(),
 -- ═══════════════════════════════════════════════════════════════════
 -- 11. DOCUMENTOS (consolidación polimórfica de 3 tablas)
 -- ═══════════════════════════════════════════════════════════════════
+-- FIX dry-run 2026-04-26: el CHECK constraint de `documentos.entidad_tipo`
+-- y `documentos.tipo` actualmente solo permiten valores CRM. Para alojar
+-- entidad_tipo='expediente'/'general' y tipo='autorizacion' (de Potencias),
+-- extendemos las constraints. Estas constraints también se podrían extender
+-- en una migración Fase 1.5 separada — el ALTER es idempotente.
+alter table public.documentos drop constraint if exists documentos_entidad_tipo_check;
+alter table public.documentos add constraint documentos_entidad_tipo_check
+  check (entidad_tipo = any (array['empresa','contrato','oportunidad','contacto','expediente','general']));
+alter table public.documentos drop constraint if exists documentos_tipo_check;
+alter table public.documentos add constraint documentos_tipo_check
+  check (tipo is null or tipo = any (array['contrato','factura','documentacion','otro','autorizacion','autorizacion_firmada','licencia','informe']));
 
 -- 11a. client_documents → documentos (entidad_tipo='empresa')
 insert into public.documentos (

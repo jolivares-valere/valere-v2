@@ -1,11 +1,18 @@
 // ═══════════════════════════════════════════════════════════════════
-// Edge Function: ask-crm-docs
+// Edge Function: ask-crm-docs (v10 — umbral de similitud)
 // ═══════════════════════════════════════════════════════════════════
 //
 // Endpoint del asistente del CRM. Recibe una pregunta del usuario,
 // hace búsqueda semántica (RAG) sobre docs/help/ indexados en
 // crm_help_embeddings, y devuelve una respuesta con citas a las
 // fuentes.
+//
+// v10 (2026-04-26): umbral de similitud configurable.
+// - Si top_similarity < STRICT_MIN_SIMILARITY (0.50 default) → fallback fijo
+//   sin llamar al LLM (mata bug "responde a cualquier off-topic").
+// - Si STRICT ≤ top_similarity < MIN_SIMILARITY (0.62 default) → contesta
+//   pero loggea encontrada_respuesta=false para análisis de gaps.
+// - Ver docs/PATCH_ASISTENTE_RAG_2026-04-25.md.
 //
 // Requiere JWT válido (autenticación Supabase) — solo usuarios
 // logueados del CRM pueden usarlo.
@@ -30,6 +37,13 @@ const ALLOWED_ORIGINS = [
 
 const MAX_QUESTION_LENGTH = 500
 const DEFAULT_MATCH_COUNT = 5
+
+// Umbrales de similitud (configurables por env var):
+// - STRICT_MIN_SIMILARITY: por debajo de esto NO se llama al LLM (fallback fijo).
+// - MIN_SIMILARITY: por encima del strict pero por debajo de esto, se contesta
+//   pero se loggea como `encontrada_respuesta=false` para análisis de gaps.
+const MIN_SIMILARITY = Number(Deno.env.get('MIN_SIMILARITY') ?? '0.62')
+const STRICT_MIN_SIMILARITY = Number(Deno.env.get('STRICT_MIN_SIMILARITY') ?? '0.50')
 
 // ───────────── CORS ─────────────
 
@@ -160,14 +174,19 @@ serve(async (req) => {
       )
     }
 
-    if (!chunks || chunks.length === 0) {
-      // Log: pregunta no respondida (gap de doc)
+    const topSim = chunks?.[0]?.similarity ?? 0
+
+    // Caso (a): sin chunks O similitud catastrófica → NO llamamos al LLM.
+    // Devolvemos fallback fijo + log con encontrada_respuesta=false.
+    // Esto mata el bug "responde a cualquier pregunta off-topic" detectado en
+    // docs/PATCH_ASISTENTE_RAG_2026-04-25.md (e.g. "recomiéndame un restaurante" → sim 0.559).
+    if (!chunks || chunks.length === 0 || topSim < STRICT_MIN_SIMILARITY) {
       await logAsistente(supabaseService, {
         pregunta: question,
         seccion: section,
         encontrada_respuesta: false,
-        num_chunks: 0,
-        top_similarity: null,
+        num_chunks: chunks?.length ?? 0,
+        top_similarity: topSim || null,
         provider: ai.provider,
         duracion_ms: Date.now() - startedAt,
       })
@@ -177,11 +196,17 @@ serve(async (req) => {
           answer:
             'No encuentro información sobre eso en la documentación. Pregunta al administrador del CRM.',
           sources: [],
+          no_match: true,
         },
         200,
         corsHeaders,
       )
     }
+
+    // Caso (b): similitud baja (entre strict y min) → seguimos al LLM, pero
+    // marcamos `encontrada_respuesta=false` para hacer visibles las queries
+    // borrosas en el análisis de gaps de doc.
+    const encontradaRespuesta = topSim >= MIN_SIMILARITY
 
     // 3. Construir prompt con contexto
     const context = chunks
@@ -206,13 +231,14 @@ ${question}
     // 4. Generar respuesta
     const answer = await ai.generate(fullPrompt)
 
-    // 4.5. Log de la consulta exitosa
+    // 4.5. Log de la consulta exitosa.
+    // `encontrada_respuesta` se decide por umbral, NO por "el LLM contestó algo".
     await logAsistente(supabaseService, {
       pregunta: question,
       seccion: section,
-      encontrada_respuesta: true,
+      encontrada_respuesta: encontradaRespuesta,
       num_chunks: chunks.length,
-      top_similarity: chunks[0]?.similarity ?? null,
+      top_similarity: topSim,
       provider: ai.provider,
       duracion_ms: Date.now() - startedAt,
     })

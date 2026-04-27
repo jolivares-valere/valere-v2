@@ -86,8 +86,9 @@ export function useSupabaseMutation(table: string) {
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { data, error: null };
-    } catch (err: any) {
-      toast.error(err.message || 'Error al guardar');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al guardar';
+      toast.error(msg);
       return { data: null, error: err };
     } finally {
       setLoading(false);
@@ -101,8 +102,9 @@ export function useSupabaseMutation(table: string) {
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { data, error: null };
-    } catch (err: any) {
-      toast.error(err.message || 'Error al actualizar');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al actualizar';
+      toast.error(msg);
       return { data: null, error: err };
     } finally {
       setLoading(false);
@@ -116,8 +118,9 @@ export function useSupabaseMutation(table: string) {
       if (error) throw error;
       if (successMsg) toast.success(successMsg);
       return { error: null };
-    } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al eliminar';
+      toast.error(msg);
       return { error: err };
     } finally {
       setLoading(false);

@@ -20,6 +20,17 @@ import { formatDate } from '@/core/utils/dates';
 import type { ProposalWithDetails } from '@/types/database';
 import { toast } from 'sonner';
 
+/**
+ * Forma de cada fila almacenada en `proposals.comparison_results` (JSONB).
+ * Contrato establecido por el motor de comparación en `core/energia/calculator`.
+ */
+interface ComparisonResultRow {
+  retailerName: string;
+  offerName: string;
+  annualCost: number;
+  savings: number;
+}
+
 export default function Proposals() {
   const { data: proposals, loading, refetch } = useSupabaseQuery<ProposalWithDetails>({
     table: 'proposals',
@@ -265,7 +276,7 @@ export default function Proposals() {
                 <div>
                   <h4 className="text-sm font-bold text-valere-blue-dark mb-3">Todas las ofertas comparadas</h4>
                   <div className="space-y-2">
-                    {(selectedProposal.comparison_results as any[]).map((r: any, i: number) => (
+                    {(selectedProposal.comparison_results as ComparisonResultRow[]).map((r, i) => (
                       <div key={i} className={`flex items-center justify-between p-3 rounded-xl ${i === 0 ? 'bg-valere-green-light/10 border border-valere-green-medium/20' : 'bg-slate-50'}`}>
                         <div>
                           <span className="font-semibold text-sm">{r.retailerName}</span>

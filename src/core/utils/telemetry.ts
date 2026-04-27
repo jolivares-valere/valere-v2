@@ -141,3 +141,14 @@ export function trackRouteChange(path: string): void {
 export function getTelemetryBuffer(): TelemetryEvent[] {
   return typeof window !== 'undefined' ? (window.__valereTelemetry ?? []) : []
 }
+
+/**
+ * Reset interno SOLO para tests — limpia el buffer y rearma `initialized`.
+ * No exportar/usar fuera de archivos `*.test.ts`.
+ */
+export function __resetTelemetryForTests(): void {
+  initialized = false
+  if (typeof window !== 'undefined') {
+    window.__valereTelemetry = []
+  }
+}

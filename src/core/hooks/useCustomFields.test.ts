@@ -26,8 +26,9 @@ const { fromMock, currentChain, makeChain } = vi.hoisted(() => {
 })
 
 vi.mock('../supabase/client', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: { from: fromMock as any },
+  // Boundary con tipo SupabaseClient<Database>: el mock no replica el shape completo.
+  // `unknown` es estructuralmente equivalente sin perder soundness en producción.
+  supabase: { from: fromMock as unknown as typeof fromMock },
 }))
 
 import {
