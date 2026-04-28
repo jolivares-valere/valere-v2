@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import BackButton from '../../core/components/BackButton'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
