@@ -1,5 +1,5 @@
-﻿import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+﻿import { useParams } from 'react-router-dom'
+import BackButton from '../../core/components/BackButton'
 import { useContratoById } from './api'
 import EstadoBadge from './components/EstadoBadge'
 import PrioridadBadge from './components/PrioridadBadge'
@@ -21,9 +21,7 @@ export default function ContratoDetailPage() {
 
   return (
     <div className="p-8">
-      <Link to="/contratos" className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
-        <ArrowLeft className="h-4 w-4" /> Contratos
-      </Link>
+      <BackButton to="/contratos" label="Volver a Contratos" />
 
       <div className="mb-6 flex items-start justify-between">
         <div>
