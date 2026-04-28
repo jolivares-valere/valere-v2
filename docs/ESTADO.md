@@ -1,29 +1,33 @@
 ﻿# Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-04-28 por Cowork (Sprint A — 4 features + Plan Datadis)**
+> **Última actualización: 2026-04-28 por Cowork (Sprint A mergeado + Gestión de Potencias integrada)**
 >
-> **Sprint A completado.** 4 ramas creadas y pusheadas, listas para PR:
+> ## ✅ Sprint A — COMPLETADO Y EN MAIN
 >
-> | Rama | Feature | Estado CI |
+> Todas las ramas mergeadas a main y pusheadas. Cloudflare Pages desplegando.
+>
+> | Feature | Commit en main | Notas |
 > |---|---|---|
-> | `claude/back-button-contextual` | BackButton prominente (BackButton.tsx + EmpresaDetailPage + ContratoDetailPage) | ✅ fix pusheado (restaurar import Link) |
-> | `claude/importador-xlsx-tarifas` | Tab "Importar tarifas" en Admin + XLSXImportadorTarifas.tsx | 🟡 pendiente CI |
-> | `claude/audit-log` | Tabla audit_log + triggers 5 tablas CRM + AuditoriaTab (solo master) | 🟡 pendiente CI — **aplicar migration en Supabase** |
-> | `claude/kanban-oportunidades` | Kanban drag&drop ya implementado en main (documentado, sin código nuevo) | ✅ empty commit |
+> | BackButton contextual | ✅ `feat(sprint-a): BackButton contextual en Empresa y Contrato` | BackButton.tsx + EmpresaDetailPage + ContratoDetailPage |
+> | Importador XLSX tarifas | ✅ `feat(fase20.7): importador XLSX tarifas + tab Admin` | XLSXImportadorTarifas.tsx + AdminPage tab |
+> | Audit Log | ✅ `feat(fase20.7): audit log - tabla, triggers, RLS, tab Auditoria` | AuditoriaTab.tsx + migration SQL + triggers 5 tablas |
+> | Kanban Oportunidades | ✅ ya estaba en main | Rama eliminada |
+> | Gestión de Potencias (sidebar) | ✅ `feat: sidebar con sección Gestión de Potencias` | Sidebar dividido en 2 secciones |
 >
-> **Datadis:** `docs/PLAN_INTEGRACION_DATADIS.md` redactado (Ruta A portal + Ruta B documento firmado). Estimación 10-12 días. Pendiente que Juan inicie el trámite de registro como terciario autorizado.
+> **Migration audit_log**: aplicada en Supabase prod vía MCP en sesión anterior. Triggers activos en empresas, contratos, oportunidades, contactos, user_profiles.
 >
-> **Migration pendiente de aplicar en Supabase:**
-> ```
-> supabase/migrations/20260428_audit_log.sql
-> ```
-> Aplicar via Supabase Dashboard → SQL Editor, o MCP `apply_migration`. Contiene: tabla `audit_log`, RLS (SELECT solo master/manager), función helper SECURITY DEFINER, trigger `trg_audit_log` instalado en empresas/contratos/oportunidades/contactos/user_profiles, cron cleanup 180d.
+> ## 📦 Estado de datos Potencias → CRM
 >
-> **Próximos pasos:**
-> 1. Aplicar la migration `20260428_audit_log.sql` en Supabase.
-> 2. Abrir los 4 PRs en GitHub.
-> 3. Hacer merge de los 4 PRs cuando CI esté verde.
-> 4. Iniciar trámite Datadis (ver `docs/PLAN_INTEGRACION_DATADIS.md` §Registro).
+> - **clients → empresas**: ✅ migrado (27 empresas en CRM, todas coinciden por NIF)
+> - **supplies → cups**: ✅ migrado (73 cups en CRM, 72 con `legacy_potencia_id`)
+> - **Páginas Potencias**: ya leen de `empresas` + `cups` del CRM. Sin cambios de diseño.
+>
+> ## 🎯 Próximos pasos sugeridos
+>
+> 1. **Verificar CI** en GitHub Actions (build Cloudflare) — debería estar verde
+> 2. **Integración Datadis Fase 1** — requiere trámite de registro como terciario (ver `docs/PLAN_INTEGRACION_DATADIS.md`)
+> 3. **Hardening RLS** — draft en `supabase/migrations/_draft_rls_hardening_8_tables.sql`
+> 4. **Deuda técnica**: script PowerShell limpieza sprints 5+6+7+8 (git rm + commit + push)
 
 > Última actualización: 2026-04-26 por Cowork (sprint signup-aprobacion-manual) — **Flujo de alta pública con aprobación manual desplegado en prod**. (1) Migration `signup_aprobacion_manual_2026_04_26` aplicada via MCP: `handle_new_user()` reescrito para capturar nombre+apellidos del metadata + status='pendiente'/approved=false (excepto master `jolivares@valereconsultores.com` auto-aprobado), `is_approved()` helper, `admin_reject_user(uuid)` SECURITY DEFINER (callable solo por master), `cleanup_pending_users_older_than_7_days()` idempotente, extensión pg_cron instalada, cron `cleanup_pending_users_daily` schedule `0 3 * * *` ACTIVE. (2) Edge Functions v1 ACTIVE: `notify-admin-pending-user` (verify_jwt=true) y `notify-user-approval-decision` (verify_jwt=true, valida caller=master). (3) FE: `SignupPage.tsx` (/signup público con zod), `PendingApprovalPage.tsx` (landing usuario sin aprobar), AuthGuard bloquea `approved=false`→`/pending-approval`, link "Solicitar acceso" en LoginPage, tab Pendientes en AdminPage con tabla + selector rol + Aprobar/Rechazar. (4) Provider email: Resend plan Free (100/día, 3000/mes), dominio `valereconsultores.com` ya verificado, `From=Valere CRM <noreply@valereconsultores.com>`, `To admin=jolivares@valereconsultores.com`. **Pendiente Juan (~15 min)**: configurar `RESEND_API_KEY` secret en Supabase + smoke test + TSC/tests/build + commit en rama `claude/signup-aprobacion-manual` + push + PR. Detalle completo en `.cowork/outbox/2026-04-26T15-18-22-signup-aprobacion-manual-handoff.md` + `docs/SESIONES/2026-04-26-signup-aprobacion.md`.
 
