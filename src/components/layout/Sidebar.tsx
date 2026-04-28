@@ -7,59 +7,117 @@ import { useAuth } from '../../core/hooks/useAuth'
 
 type Item = { to: string; label: string; icon: typeof LayoutDashboard; roles?: string[] }
 
-const items: Item[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/empresas', label: 'Empresas', icon: Building2 },
-  { to: '/contactos', label: 'Contactos', icon: Users },
-  { to: '/actividades', label: 'Actividades', icon: Activity },
-  { to: '/calendario', label: 'Calendario', icon: Calendar },
-  { to: '/contratos', label: 'Contratos', icon: FileText },
-  { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
-  { to: '/informes', label: 'Informes', icon: BarChart3 },
-  { to: '/incidencias', label: 'Incidencias', icon: AlertTriangle },
-  { to: '/renovaciones', label: 'Renovaciones', icon: RefreshCw },
-  { to: '/importador', label: 'Importador', icon: Upload },
-  { to: '/datos', label: 'Datos Energía', icon: FileUp },
-  { to: '/analisis', label: 'Análisis', icon: BarChart3 },
-  { to: '/propuestas-energia', label: 'Propuestas Energía', icon: Zap },
-  { to: '/tracking', label: 'Seguimiento', icon: Send },
+const crmItems: Item[] = [
+  { to: '/dashboard',    label: 'Dashboard',      icon: LayoutDashboard },
+  { to: '/empresas',     label: 'Empresas',        icon: Building2 },
+  { to: '/contactos',    label: 'Contactos',       icon: Users },
+  { to: '/actividades',  label: 'Actividades',     icon: Activity },
+  { to: '/calendario',   label: 'Calendario',      icon: Calendar },
+  { to: '/contratos',    label: 'Contratos',       icon: FileText },
+  { to: '/oportunidades',label: 'Oportunidades',   icon: GitBranch },
+  { to: '/informes',     label: 'Informes',        icon: BarChart3 },
+  { to: '/incidencias',  label: 'Incidencias',     icon: AlertTriangle },
+  { to: '/renovaciones', label: 'Renovaciones',    icon: RefreshCw },
+  { to: '/importador',   label: 'Importador',      icon: Upload },
+]
+
+const potenciasItems: Item[] = [
+  { to: '/datos',             label: 'Datos de suministro', icon: FileUp },
+  { to: '/analisis',          label: 'Análisis comparativo', icon: BarChart3 },
+  { to: '/propuestas-energia',label: 'Propuestas',          icon: Zap },
+  { to: '/tracking',          label: 'Seguimiento',         icon: Send },
+]
+
+const adminItems: Item[] = [
   { to: '/admin', label: 'Admin', icon: ShieldCheck, roles: ['master', 'manager'] },
 ]
 
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <p className="mb-1 mt-3 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+      {label}
+    </p>
+  )
+}
+
+function NavItem({ to, label, icon: Icon }: Item) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+          isActive
+            ? 'bg-valere-blue-dark text-white'
+            : 'text-slate-700 hover:bg-slate-100'
+        }`
+      }
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {label}
+    </NavLink>
+  )
+}
+
 export default function Sidebar() {
   const { user, signOut } = useAuth()
-  const visibleItems = items.filter(it => !it.roles || (user?.role && it.roles.includes(user.role)))
+  const isMasterOrManager = user?.role === 'master' || user?.role === 'manager'
+
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-slate-200 bg-white">
+    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
+      {/* Cabecera */}
       <div className="px-5 pb-3 pt-6">
-        <h1 className="text-lg font-bold text-slate-900">Valere CRM</h1>
-        <p className="text-xs text-slate-500">
-          {user?.full_name ?? 'Usuario'} · {user?.role ?? '—'}
-        </p>
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-valere-blue-dark">
+            <Zap className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-900 leading-tight">Valere CRM</h1>
+            <p className="text-[10px] text-slate-400 leading-tight">{user?.full_name ?? 'Usuario'}</p>
+          </div>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1 px-3">
-        {visibleItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${
-                isActive
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`
-            }
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </NavLink>
-        ))}
+
+      {/* Navegación */}
+      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+        {/* Sección CRM */}
+        <SectionLabel label="CRM Comercial" />
+        <div className="space-y-0.5">
+          {crmItems.map(item => <NavItem key={item.to} {...item} />)}
+        </div>
+
+        {/* Sección Potencias */}
+        <div className="mt-2 border-t border-slate-100 pt-2">
+          <div className="mb-1 flex items-center gap-2 px-3">
+            <Zap className="h-3 w-3 text-amber-500" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Gestión de Potencias
+            </p>
+          </div>
+          <div className="space-y-0.5">
+            {potenciasItems.map(item => <NavItem key={item.to} {...item} />)}
+          </div>
+        </div>
+
+        {/* Admin */}
+        {isMasterOrManager && (
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <div className="space-y-0.5">
+              {adminItems.map(item => <NavItem key={item.to} {...item} />)}
+            </div>
+          </div>
+        )}
       </nav>
+
+      {/* Footer */}
       <div className="border-t border-slate-200 p-3">
+        <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2">
+          <p className="text-xs font-medium text-slate-700">{user?.full_name ?? '—'}</p>
+          <p className="text-[10px] text-slate-400 capitalize">{user?.role ?? '—'}</p>
+        </div>
         <button
           type="button"
           onClick={() => void signOut()}
-          className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-100"
+          className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
         >
           Cerrar sesión
         </button>
