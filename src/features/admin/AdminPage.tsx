@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import {
   ShieldCheck, Users, Plus, Loader2, Trash2, Edit2,
   Settings, DollarSign, Building2, Save, Sliders,
-  UserPlus, Check, X
+  UserPlus, Check, X, Upload
 } from 'lucide-react';
+import XLSXImportadorTarifas from './components/XLSXImportadorTarifas';
+import AuditoriaTab from './components/AuditoriaTab';
+import { useAuth } from '@/core/hooks/useAuth';
 import CustomFieldsManager from './components/CustomFieldsManager';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,6 +36,9 @@ type OfferWithRetailer = RetailerOffer & {
 type OfferFormState = Omit<RetailerOffer, 'id' | 'created_at'>;
 
 export default function AdminPanel() {
+  const { user } = useAuth()
+  const isMaster = user?.role === 'master'
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
@@ -60,6 +66,14 @@ export default function AdminPanel() {
           <TabsTrigger value="campos" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
             <Sliders className="w-4 h-4" /> Campos
           </TabsTrigger>
+          <TabsTrigger value="importar" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
+            <Upload className="w-4 h-4" /> Importar tarifas
+          </TabsTrigger>
+          {isMaster && (
+            <TabsTrigger value="auditoria" className="data-[state=active]:bg-valere-blue-dark data-[state=active]:text-white rounded-lg gap-2">
+              <ShieldCheck className="w-4 h-4" /> Auditoría
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="users"><UsersTab /></TabsContent>
@@ -68,6 +82,8 @@ export default function AdminPanel() {
         <TabsContent value="offers"><OffersTab /></TabsContent>
         <TabsContent value="config"><ConfigTab /></TabsContent>
         <TabsContent value="campos"><CustomFieldsManager /></TabsContent>
+        <TabsContent value="importar"><XLSXImportadorTarifas /></TabsContent>
+        {isMaster && <TabsContent value="auditoria"><AuditoriaTab /></TabsContent>}
       </Tabs>
     </div>
   );
