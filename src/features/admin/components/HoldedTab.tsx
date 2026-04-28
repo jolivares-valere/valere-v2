@@ -28,7 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import { Skeleton } from '@/components/ui/Skeleton'
+import Skeleton from '@/components/ui/Skeleton'
 import { supabase } from '@/core/supabase/client'
 import { useAuth } from '@/core/hooks/useAuth'
 
@@ -82,17 +82,25 @@ export default function HoldedTab() {
   const loadAll = async () => {
     setLoading(true)
     try {
+      // Cast a any: las tablas holded_* y la vista holded_audit_resumen existen en BD
+      // (migrations 20260427_holded_*.sql aplicadas en prod 2026-04-27) pero aún no
+      // están en src/core/types/database.ts. Se regeneran en Fase 2 con
+      // `supabase gen types typescript --project-id gtphkowfcuiqbvfkwjxb` y este
+      // cast desaparece. Patrón aceptable según convenciones del proyecto cuando
+      // Database types están desactualizados respecto al schema real.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const supa = supabase as any
       const [{ data: cfg }, { data: queueRows }, { data: auditRow }] = await Promise.all([
-        supabase.from('holded_config').select('*').eq('id', 'singleton').maybeSingle(),
-        supabase.from('holded_sync_queue').select('status, processed_at'),
-        supabase.from('holded_audit_resumen').select('*').maybeSingle(),
+        supa.from('holded_config').select('*').eq('id', 'singleton').maybeSingle(),
+        supa.from('holded_sync_queue').select('status, processed_at'),
+        supa.from('holded_audit_resumen').select('*').maybeSingle(),
       ])
 
-      setConfig(cfg as HoldedConfig | null)
+      setConfig(cfg as unknown as HoldedConfig | null)
 
       const newCounts = { ...initialCounts }
       const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-      for (const row of (queueRows ?? []) as { status: string; processed_at: string | null }[]) {
+      for (const row of (queueRows ?? []) as unknown as { status: string; processed_at: string | null }[]) {
         if (row.status === 'pending') newCounts.pending += 1
         else if (row.status === 'processing') newCounts.processing += 1
         else if (row.status === 'error') newCounts.error += 1
@@ -122,7 +130,10 @@ export default function HoldedTab() {
     if (!config) return
     setBusy('toggle')
     try {
-      const { error } = await supabase
+      // Cast a any por la misma razón que loadAll: tipos no regenerados aún.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const supa = supabase as any
+      const { error } = await supa
         .from('holded_config')
         .update({ enabled: !config.enabled, updated_by: user?.id ?? null })
         .eq('id', 'singleton')

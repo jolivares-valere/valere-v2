@@ -58,7 +58,7 @@ describe('clasificaNifCif', () => {
 })
 
 describe('validaNifCif — casos válidos', () => {
-  it.each([
+  it.each<[string, string]>([
     ['B10759520', 'Valere Consultores SL (CIF letra inicial → dígito o letra)'],
     ['12345678Z', 'NIF persona estándar'],
     ['00000000T', 'NIF con todo ceros (T es la letra para 0)'],
@@ -66,20 +66,20 @@ describe('validaNifCif — casos válidos', () => {
     ['A12345674', 'CIF con control numérico (letra A obliga dígito)'],
     ['ESB10759520', 'VAT intracom ES'],
     ['PT123456789', 'VAT intracom PT'],
-  ])('%s → true (%s)', (nif) => {
+  ])('%s → true (%s)', (nif, _desc) => {
     expect(validaNifCif(nif)).toBe(true)
   })
 })
 
 describe('validaNifCif — casos inválidos', () => {
-  it.each([
+  it.each<[string | null, string]>([
     ['B10759521', 'CIF Valere con último dígito alterado'],
     ['12345678A', 'NIF con letra de control mal'],
     ['', 'string vacío'],
     [null, 'null'],
     ['1234', 'demasiado corto'],
     ['XX99999999', 'VAT con prefijo no válido'],
-  ])('%s → false (%s)', (nif) => {
+  ])('%s → false (%s)', (nif, _desc) => {
     expect(validaNifCif(nif)).toBe(false)
   })
 })
