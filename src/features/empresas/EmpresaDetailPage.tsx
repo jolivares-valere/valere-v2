@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import BackButton from '../../core/components/BackButton'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
@@ -40,9 +41,7 @@ export default function EmpresaDetailPage() {
 
   return (
     <div className="p-8">
-      <Link to="/empresas" className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
-        <ArrowLeft className="h-4 w-4" /> Empresas
-      </Link>
+      <BackButton to="/empresas" label="Volver a Empresas" />
 
       <div className="mb-6 flex items-start justify-between">
         <div>
