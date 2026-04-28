@@ -1,5 +1,30 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Última actualización: 2026-04-28 por Cowork (Sprint A — 4 features + Plan Datadis)**
+>
+> **Sprint A completado.** 4 ramas creadas y pusheadas, listas para PR:
+>
+> | Rama | Feature | Estado CI |
+> |---|---|---|
+> | `claude/back-button-contextual` | BackButton prominente (BackButton.tsx + EmpresaDetailPage + ContratoDetailPage) | ✅ fix pusheado (restaurar import Link) |
+> | `claude/importador-xlsx-tarifas` | Tab "Importar tarifas" en Admin + XLSXImportadorTarifas.tsx | 🟡 pendiente CI |
+> | `claude/audit-log` | Tabla audit_log + triggers 5 tablas CRM + AuditoriaTab (solo master) | 🟡 pendiente CI — **aplicar migration en Supabase** |
+> | `claude/kanban-oportunidades` | Kanban drag&drop ya implementado en main (documentado, sin código nuevo) | ✅ empty commit |
+>
+> **Datadis:** `docs/PLAN_INTEGRACION_DATADIS.md` redactado (Ruta A portal + Ruta B documento firmado). Estimación 10-12 días. Pendiente que Juan inicie el trámite de registro como terciario autorizado.
+>
+> **Migration pendiente de aplicar en Supabase:**
+> ```
+> supabase/migrations/20260428_audit_log.sql
+> ```
+> Aplicar via Supabase Dashboard → SQL Editor, o MCP `apply_migration`. Contiene: tabla `audit_log`, RLS (SELECT solo master/manager), función helper SECURITY DEFINER, trigger `trg_audit_log` instalado en empresas/contratos/oportunidades/contactos/user_profiles, cron cleanup 180d.
+>
+> **Próximos pasos:**
+> 1. Aplicar la migration `20260428_audit_log.sql` en Supabase.
+> 2. Abrir los 4 PRs en GitHub.
+> 3. Hacer merge de los 4 PRs cuando CI esté verde.
+> 4. Iniciar trámite Datadis (ver `docs/PLAN_INTEGRACION_DATADIS.md` §Registro).
+
 > Última actualización: 2026-04-26 por Cowork (sprint signup-aprobacion-manual) — **Flujo de alta pública con aprobación manual desplegado en prod**. (1) Migration `signup_aprobacion_manual_2026_04_26` aplicada via MCP: `handle_new_user()` reescrito para capturar nombre+apellidos del metadata + status='pendiente'/approved=false (excepto master `jolivares@valereconsultores.com` auto-aprobado), `is_approved()` helper, `admin_reject_user(uuid)` SECURITY DEFINER (callable solo por master), `cleanup_pending_users_older_than_7_days()` idempotente, extensión pg_cron instalada, cron `cleanup_pending_users_daily` schedule `0 3 * * *` ACTIVE. (2) Edge Functions v1 ACTIVE: `notify-admin-pending-user` (verify_jwt=true) y `notify-user-approval-decision` (verify_jwt=true, valida caller=master). (3) FE: `SignupPage.tsx` (/signup público con zod), `PendingApprovalPage.tsx` (landing usuario sin aprobar), AuthGuard bloquea `approved=false`→`/pending-approval`, link "Solicitar acceso" en LoginPage, tab Pendientes en AdminPage con tabla + selector rol + Aprobar/Rechazar. (4) Provider email: Resend plan Free (100/día, 3000/mes), dominio `valereconsultores.com` ya verificado, `From=Valere CRM <noreply@valereconsultores.com>`, `To admin=jolivares@valereconsultores.com`. **Pendiente Juan (~15 min)**: configurar `RESEND_API_KEY` secret en Supabase + smoke test + TSC/tests/build + commit en rama `claude/signup-aprobacion-manual` + push + PR. Detalle completo en `.cowork/outbox/2026-04-26T15-18-22-signup-aprobacion-manual-handoff.md` + `docs/SESIONES/2026-04-26-signup-aprobacion.md`.
 
 > Última actualización: 2026-04-26 por Cowork (investigación AI Studio + descubrimiento URL satélite mal configurada). **Veredicto AI Studio**: CRM y bundle Potencias en producción **limpios**, sin fingerprints. Origen Potencias **probable export AI Studio Build** (folder `musing-kalam/` patrón canónico) ya **completamente refactorizado** (cero `@google/genai` en cliente, /api/ Pages Functions desplegadas y respondiendo). 🚨 **Hallazgo crítico colateral**: `valere-gestion-potencias.pages.dev` apunta al CRM (`gtphkowfcuiqbvfkwjxb`) pero **faltan 7 tablas** en CRM (`clients`, `supplies`, `profiles`, `power_requests`, `regulated_rates`, `client_communications`, `client_documents`) y las que sí existen están **vacías** (Fase 2 datos no ejecutada). Resultado: el frontend Potencias está roto desde el cutover de URL — **explica los "datos no encontrados" del negocio**. Datos reales (~410 filas + 100 PDFs / 15 MB) confirmados sagrados por Juan, intactos en satélite. **Acción urgente**: rollback de `VITE_SUPABASE_URL` en Cloudflare Pages → satélite (5 min), no toca datos. Ver `docs/INVESTIGACION_AISTUDIO_2026-04-26.md` para informe completo, hipótesis, comandos PowerShell para Juan, y limpieza recomendada (🟢/🟡/🔴) sin tocar datos del negocio.
