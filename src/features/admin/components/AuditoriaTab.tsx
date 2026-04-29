@@ -68,7 +68,10 @@ export default function AuditoriaTab() {
   const fetchEntries = useCallback(async () => {
     setLoading(true)
     try {
-      let query = supabase
+      // audit_log no está en los tipos generados → cast a any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any
+      let query = db
         .from('audit_log')
         .select('id, created_at, actor_email, action, entity_type, entity_id, old_values, new_values, metadata', { count: 'exact' })
         .order('created_at', { ascending: false })
