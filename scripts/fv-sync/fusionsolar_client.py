@@ -155,8 +155,10 @@ class WebAuthClient(FusionSolarClient):
                     public_key = load_pem_public_key(pub_key_b64.encode())
                 else:
                     public_key = load_der_public_key(base64.b64decode(pub_key_b64))
+                # FusionSolar v3 requiere cifrar (password + timestamp), no solo password
+                plaintext_to_encrypt = self.password + str(timestamp)
                 encrypted_pw = public_key.encrypt(
-                    self.password.encode("utf-8"),
+                    plaintext_to_encrypt.encode("utf-8"),
                     asym_padding.PKCS1v15(),
                 )
                 password_to_send = base64.b64encode(encrypted_pw).decode("utf-8")
