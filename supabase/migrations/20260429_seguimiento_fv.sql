@@ -308,7 +308,6 @@ CREATE POLICY "fv_sync_log_read_authenticated"
 
 CREATE POLICY "fv_sync_log_write_admin"
   ON public.fv_sync_log FOR INSERT
-  USING (public.fv_is_admin())
   WITH CHECK (public.fv_is_admin());
 
 -- ──────────────────────────────────────────────
