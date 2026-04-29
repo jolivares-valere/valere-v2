@@ -5,26 +5,45 @@ import Sidebar from './Sidebar'
 import GlobalSearch from '../search/GlobalSearch'
 import NotificationBell from '../../features/notificaciones/NotificationBell'
 
+const STORAGE_KEY = 'valere_sidebar_collapsed'
+
+function getInitialCollapsed(): boolean {
+  try { return localStorage.getItem(STORAGE_KEY) === 'true' } catch { return false }
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(getInitialCollapsed)
+
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem(STORAGE_KEY, String(next)) } catch {}
+      return next
+    })
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Overlay móvil */}
-      {sidebarOpen && (
+      {mobileOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — móvil: drawer fijo; desktop: estático con ancho variable */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 transition-transform duration-300 lg:static lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 transition-all duration-300 lg:static lg:translate-x-0 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}
       >
-        <Sidebar onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapsed}
+          onClose={() => setMobileOpen(false)}
+        />
       </div>
 
       {/* Contenido principal */}
@@ -34,7 +53,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setMobileOpen(true)}
             aria-label="Abrir menú"
           >
             <Menu className="h-5 w-5" />
