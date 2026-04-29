@@ -21,6 +21,8 @@ const DatosPage = lazy(() => import('./features/datos/DatosPage'))
 const AnalisisPage = lazy(() => import('./features/analisis/AnalisisPage'))
 const PropuestasEnergiaPage = lazy(() => import('./features/propuestas-energia/PropuestasEnergiaPage'))
 const TrackingPage = lazy(() => import('./features/tracking/TrackingPage'))
+const PotenciasDashboardPage = lazy(() => import('./features/potencias/PotenciasDashboardPage'))
+const PotenciasPlaceholderPage = lazy(() => import('./features/potencias/PotenciasPlaceholderPage'))
 const InformesPage = lazy(() => import('./features/informes/InformesPage'))
 const IncidenciasPage = lazy(() => import('./features/incidencias/IncidenciasPage'))
 const RenovacionesPage = lazy(() => import('./features/renovaciones/RenovacionesPage'))
@@ -141,6 +143,12 @@ export default function App() {
       <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
 
       <Route path="/admin" element={<AuthGuard roles={['master', 'manager']}><AdminPage /></AuthGuard>} />
+      <Route path="/potencias" element={<AuthGuard><PotenciasDashboardPage /></AuthGuard>} />
+      <Route path="/potencias/expedientes" element={<AuthGuard><PotenciasPlaceholderPage titulo="Expedientes" descripcion="Gestión de expedientes de cambio de potencia. En implementación." /></AuthGuard>} />
+      <Route path="/potencias/comunicaciones" element={<AuthGuard><PotenciasPlaceholderPage titulo="Comunicaciones" descripcion="Historial de comunicaciones con clientes. En implementación." /></AuthGuard>} />
+      <Route path="/potencias/informes" element={<AuthGuard><PotenciasPlaceholderPage titulo="Informes de Potencias" descripcion="Informes y métricas de gestión de potencias. En implementación." /></AuthGuard>} />
+      <Route path="/potencias/documentacion" element={<AuthGuard><PotenciasPlaceholderPage titulo="Documentación" descripcion="Repositorio de documentos por cliente y expediente. En implementación." /></AuthGuard>} />
+      <Route path="/potencias/configuracion" element={<AuthGuard><PotenciasPlaceholderPage titulo="Configuración" descripcion="Parámetros de la sección de Gestión de Potencias. En implementación." /></AuthGuard>} />
       <Route path="/datos" element={<AuthGuard><DatosPage /></AuthGuard>} />
       <Route path="/analisis" element={<AuthGuard><AnalisisPage /></AuthGuard>} />
       <Route path="/propuestas-energia" element={<AuthGuard><PropuestasEnergiaPage /></AuthGuard>} />
