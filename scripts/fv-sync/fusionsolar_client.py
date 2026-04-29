@@ -140,15 +140,17 @@ class WebAuthClient(FusionSolarClient):
         # Paso 2: esperar que aparezca el formulario de login (campo password)
         self._page.wait_for_selector('input[type="password"]', timeout=15_000)
         logger.debug("Formulario de login detectado en %s", self._page.url)
+        # Pequeña pausa para que la animación CSS del SPA termine de renderizar
+        self._page.wait_for_timeout(1_500)
 
         # Paso 3: rellenar credenciales
-        # Limpiar el campo usuario (puede tener credenciales guardadas del browser)
+        # En CI headless el campo username puede estar en el DOM pero no visible aún.
+        # force=True bypasea el check de visibilidad de Playwright.
         username_field = self._page.locator('input[type="text"]').first
-        username_field.click()
-        username_field.select_text()
+        username_field.click(force=True)
         username_field.fill(self.username)
 
-        self._page.locator('input[type="password"]').first.fill(self.password)
+        self._page.locator('input[type="password"]').first.fill(self.password, force=True)
 
         # Paso 4: enviar el formulario
         submitted = False
