@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/core/supabase/client'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
+import { getNormativa } from './normativas.config'
 import { toast } from 'sonner'
 import { SkeletonRow } from '@/components/ui/Skeleton'
 
@@ -23,6 +24,7 @@ interface DocumentoRow {
 
 interface ExpedienteSimple {
   id: string
+  tipo_normativa: string
   empresas: { nombre: string } | null
   cups: { codigo_cups: string } | null
 }
@@ -58,7 +60,7 @@ export default function DocumentacionPage() {
   // Expedientes para selector de subida
   const { data: expedientes } = useSupabaseQuery<ExpedienteSimple>({
     table: 'expedientes',
-    select: `id, empresas(nombre), cups(codigo_cups)`,
+    select: `id, tipo_normativa, empresas(nombre), cups(codigo_cups)`,
     filters: [{ column: 'estado', op: 'eq', value: 'activo' }],
     order: { column: 'created_at', ascending: false },
   })
@@ -201,6 +203,25 @@ export default function DocumentacionPage() {
               Selecciona primero el expediente para activar la subida de archivos.
             </div>
           )}
+          {selectedExpId && (() => {
+            const expSel = expedientes.find(e => e.id === selectedExpId)
+            if (!expSel) return null
+            const normCfg = getNormativa(expSel.tipo_normativa)
+            return (
+              <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-xs font-semibold text-blue-700">Documentos requeridos — {normCfg.label}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {normCfg.documentosRequeridos.map(doc => (
+                    <span key={doc} className="inline-flex items-center rounded-full bg-white border border-blue-200 px-2 py-0.5 text-[10px] text-blue-700 font-medium">{doc}</span>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] text-blue-500 italic">{normCfg.referenciaLegal}</p>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Buscador */}

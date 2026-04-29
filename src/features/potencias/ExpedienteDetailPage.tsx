@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Building2, Zap, Calendar, FileText, Clock,
-  CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw, ChevronRight, Loader2
+  ArrowLeft, BookOpen, Building2, Zap, Calendar, FileText, Clock,
+  CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw, ChevronRight, Loader2, Save
 } from 'lucide-react'
 import { supabase } from '@/core/supabase/client'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
 import { toast } from 'sonner'
+import { getNormativa, getNormativaOptions, type NormativaConfig } from './normativas.config'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -291,6 +292,26 @@ function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCam
 
 export default function ExpedienteDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const [normativaValue, setNormativaValue] = useState<string>('')
+  const [savingNormativa, setSavingNormativa] = useState(false)
+
+  async function cambiarNormativa(newVal: string) {
+    if (!exp || newVal === exp.tipo_normativa) return
+    setSavingNormativa(true)
+    try {
+      const { error } = await (supabase as any)
+        .from('expedientes')
+        .update({ tipo_normativa: newVal })
+        .eq('id', exp.id)
+      if (error) throw error
+      toast.success('Normativa actualizada')
+      refetch()
+    } catch {
+      toast.error('Error al cambiar la normativa')
+    } finally {
+      setSavingNormativa(false)
+    }
+  }
 
   const { data, loading, refetch } = useSupabaseQuery<ExpedienteDetail>({
     table: 'expedientes',
@@ -352,8 +373,29 @@ export default function ExpedienteDetailPage() {
           <h1 className="text-xl font-bold text-slate-900">
             {exp.empresas?.nombre ?? 'Expediente'}
           </h1>
-          <p className="text-sm text-slate-500">
-            {exp.tipo_normativa} · {exp.anio}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500">{exp.anio}</span>
+            <span className="text-slate-300">·</span>
+            <div className="flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+              <select
+                value={normativaValue || exp.tipo_normativa}
+                onChange={e => {
+                  setNormativaValue(e.target.value)
+                  void cambiarNormativa(e.target.value)
+                }}
+                disabled={savingNormativa}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60 cursor-pointer"
+              >
+                {getNormativaOptions().map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {savingNormativa && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-slate-400 italic">
+            {getNormativa(normativaValue || exp.tipo_normativa).referenciaLegal}
           </p>
         </div>
         <div className="flex items-center gap-2">

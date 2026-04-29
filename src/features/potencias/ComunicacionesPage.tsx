@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
 import { SkeletonRow } from '@/components/ui/Skeleton'
+import { getNormativa } from './normativas.config'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ interface ExpedienteRow {
   id: string
   estado: string
   anio: number
+  tipo_normativa: string
   empresas: { nombre: string } | null
   cups: { codigo_cups: string; ciudad_suministro: string | null } | null
   ciclos: { id: string; estado: string; numero_ciclo: number; created_at: string }[]
@@ -103,7 +105,12 @@ function AccionRow({ exp, cicloEstado }: { exp: ExpedienteRow; cicloEstado: stri
             </span>
           )}
         </div>
-        <p className="text-sm font-semibold text-slate-900 truncate">{exp.empresas?.nombre ?? '—'}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-slate-900 truncate">{exp.empresas?.nombre ?? '—'}</p>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+            {getNormativa(exp.tipo_normativa).label}
+          </span>
+        </div>
         <p className="text-xs text-slate-400">
           {exp.cups?.codigo_cups ?? '—'} · {exp.cups?.ciudad_suministro ?? ''} · {exp.anio}
         </p>
@@ -125,7 +132,7 @@ export default function ComunicacionesPage() {
   const { data, loading, refetch } = useSupabaseQuery<ExpedienteRow>({
     table: 'expedientes',
     select: `
-      id, estado, anio,
+      id, estado, anio, tipo_normativa,
       empresas ( nombre ),
       cups ( codigo_cups, ciudad_suministro ),
       ciclos ( id, estado, numero_ciclo, created_at )
