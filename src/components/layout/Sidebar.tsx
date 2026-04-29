@@ -32,7 +32,7 @@ const crmItems: Item[] = [
 const potenciasItems: Item[] = [
   { to: '/potencias',                label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/empresas',                 label: 'Clientes',       icon: Users },
-  { to: '/datos',                    label: 'Suministros',    icon: Zap },
+  { to: '/potencias/suministros',    label: 'Suministros',    icon: Zap },
   { to: '/potencias/expedientes',    label: 'Expedientes',    icon: FileText },
   { to: '/calendario',               label: 'Calendario',     icon: Calendar },
   { to: '/potencias/comunicaciones', label: 'Comunicaciones', icon: Mail },

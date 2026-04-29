@@ -28,6 +28,7 @@ const ComunicacionesPage = lazy(() => import('./features/potencias/Comunicacione
 const InformesPotenciasPage = lazy(() => import('./features/potencias/InformesPotenciasPage'))
 const DocumentacionPage = lazy(() => import('./features/potencias/DocumentacionPage'))
 const ConfiguracionPotenciasPage = lazy(() => import('./features/potencias/ConfiguracionPotenciasPage'))
+const SuministrosPotenciasPage = lazy(() => import('./features/potencias/SuministrosPotenciasPage'))
 const InformesPage = lazy(() => import('./features/informes/InformesPage'))
 const IncidenciasPage = lazy(() => import('./features/incidencias/IncidenciasPage'))
 const RenovacionesPage = lazy(() => import('./features/renovaciones/RenovacionesPage'))
@@ -131,6 +132,7 @@ export default function App() {
       <Route path="/potencias/informes" element={<AuthGuard><InformesPotenciasPage /></AuthGuard>} />
       <Route path="/potencias/documentacion" element={<AuthGuard><DocumentacionPage /></AuthGuard>} />
       <Route path="/potencias/configuracion" element={<AuthGuard><ConfiguracionPotenciasPage /></AuthGuard>} />
+      <Route path="/potencias/suministros" element={<AuthGuard><SuministrosPotenciasPage /></AuthGuard>} />
 
       <Route path="/datos" element={<AuthGuard><DatosPage /></AuthGuard>} />
       <Route path="/analisis" element={<AuthGuard><AnalisisPage /></AuthGuard>} />
