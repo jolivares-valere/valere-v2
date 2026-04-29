@@ -14,6 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
+      _migration_ciclo_map: {
+        Row: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
+      _migration_comercializadora_map: {
+        Row: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
+      _migration_cups_map: {
+        Row: {
+          canonical_id: string
+          fusionada: boolean | null
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          fusionada?: boolean | null
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          fusionada?: boolean | null
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
+      _migration_empresa_map: {
+        Row: {
+          canonical_id: string
+          fusionada: boolean | null
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          fusionada?: boolean | null
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          fusionada?: boolean | null
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
+      _migration_expediente_map: {
+        Row: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
+      _migration_request_map: {
+        Row: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
+      _migration_user_map: {
+        Row: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Insert: {
+          canonical_id: string
+          legacy_potencia_id: string
+        }
+        Update: {
+          canonical_id?: string
+          legacy_potencia_id?: string
+        }
+        Relationships: []
+      }
       actividades: {
         Row: {
           adjunto_nombre: string | null
@@ -28,6 +139,9 @@ export type Database = {
           estado_tarea: string | null
           fecha_actividad: string
           fecha_vencimiento: string | null
+          holded_etag: string | null
+          holded_id: string | null
+          holded_synced_at: string | null
           id: string
           prioridad: string | null
           privada: boolean
@@ -49,6 +163,9 @@ export type Database = {
           estado_tarea?: string | null
           fecha_actividad?: string
           fecha_vencimiento?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           prioridad?: string | null
           privada?: boolean
@@ -70,6 +187,9 @@ export type Database = {
           estado_tarea?: string | null
           fecha_actividad?: string
           fecha_vencimiento?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           prioridad?: string | null
           privada?: boolean
@@ -188,6 +308,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "alertas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "alertas_expediente_id_fkey"
             columns: ["expediente_id"]
             isOneToOne: false
@@ -216,6 +343,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          new_values: Json | null
+          old_values: Json | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       ciclos: {
         Row: {
@@ -535,6 +707,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "comunicaciones_cliente_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "comunicaciones_cliente_enviado_por_fkey"
             columns: ["enviado_por"]
             isOneToOne: false
@@ -569,6 +748,9 @@ export type Database = {
           empresa_id: string
           es_decisor: boolean
           es_firmante: boolean
+          holded_etag: string | null
+          holded_id: string | null
+          holded_synced_at: string | null
           id: string
           movil: string | null
           nombre: string
@@ -588,6 +770,9 @@ export type Database = {
           empresa_id: string
           es_decisor?: boolean
           es_firmante?: boolean
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           movil?: string | null
           nombre: string
@@ -607,6 +792,9 @@ export type Database = {
           empresa_id?: string
           es_decisor?: boolean
           es_firmante?: boolean
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           movil?: string | null
           nombre?: string
@@ -637,6 +825,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contactos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contratos: {
@@ -659,6 +854,9 @@ export type Database = {
           fecha_fin: string | null
           fecha_firma: string | null
           fecha_inicio: string | null
+          holded_etag: string | null
+          holded_id: string | null
+          holded_synced_at: string | null
           id: string
           numero_contrato: string | null
           observaciones: string | null
@@ -689,6 +887,9 @@ export type Database = {
           fecha_fin?: string | null
           fecha_firma?: string | null
           fecha_inicio?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           numero_contrato?: string | null
           observaciones?: string | null
@@ -719,6 +920,9 @@ export type Database = {
           fecha_fin?: string | null
           fecha_firma?: string | null
           fecha_inicio?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           numero_contrato?: string | null
           observaciones?: string | null
@@ -771,6 +975,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
             referencedColumns: ["id"]
           },
           {
@@ -1033,6 +1244,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cups_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       custom_fields_schema: {
@@ -1214,6 +1432,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "datadis_tokens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       documentos: {
@@ -1322,6 +1547,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "documentos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "documentos_expediente_fk"
             columns: ["expediente_id"]
             isOneToOne: false
@@ -1397,6 +1629,9 @@ export type Database = {
           direccion: string | null
           email_principal: string | null
           external_id: string | null
+          holded_etag: string | null
+          holded_id: string | null
+          holded_synced_at: string | null
           id: string
           legacy_potencia_id: string | null
           nif: string | null
@@ -1425,6 +1660,9 @@ export type Database = {
           direccion?: string | null
           email_principal?: string | null
           external_id?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           legacy_potencia_id?: string | null
           nif?: string | null
@@ -1453,6 +1691,9 @@ export type Database = {
           direccion?: string | null
           email_principal?: string | null
           external_id?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           legacy_potencia_id?: string | null
           nif?: string | null
@@ -1744,6 +1985,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "expedientes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       facturas: {
@@ -1866,6 +2114,322 @@ export type Database = {
           updated_at?: string | null
           updated_by?: string | null
           vat_pct?: number | null
+        }
+        Relationships: []
+      }
+      holded_config: {
+        Row: {
+          api_base_url: string
+          created_at: string
+          enabled: boolean
+          excluded_nifs: string[]
+          functions_base_url: string
+          http_timeout_ms: number
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_full_sync_at: string | null
+          mode: string
+          notes: string | null
+          productos_sync_mode: string
+          rate_limit_req_per_sec: number
+          retry_initial_backoff_ms: number
+          retry_max_attempts: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          api_base_url?: string
+          created_at?: string
+          enabled?: boolean
+          excluded_nifs?: string[]
+          functions_base_url?: string
+          http_timeout_ms?: number
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_full_sync_at?: string | null
+          mode?: string
+          notes?: string | null
+          productos_sync_mode?: string
+          rate_limit_req_per_sec?: number
+          retry_initial_backoff_ms?: number
+          retry_max_attempts?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          api_base_url?: string
+          created_at?: string
+          enabled?: boolean
+          excluded_nifs?: string[]
+          functions_base_url?: string
+          http_timeout_ms?: number
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_full_sync_at?: string | null
+          mode?: string
+          notes?: string | null
+          productos_sync_mode?: string
+          rate_limit_req_per_sec?: number
+          retry_initial_backoff_ms?: number
+          retry_max_attempts?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holded_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holded_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard_comercial"
+            referencedColumns: ["comercial_id"]
+          },
+        ]
+      }
+      holded_conflicts: {
+        Row: {
+          detected_at: string
+          entity: string
+          entity_id: string | null
+          holded_id: string | null
+          holded_payload: Json | null
+          id: string
+          resolution: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          valere_payload: Json | null
+        }
+        Insert: {
+          detected_at?: string
+          entity: string
+          entity_id?: string | null
+          holded_id?: string | null
+          holded_payload?: Json | null
+          id?: string
+          resolution?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          valere_payload?: Json | null
+        }
+        Update: {
+          detected_at?: string
+          entity?: string
+          entity_id?: string | null
+          holded_id?: string | null
+          holded_payload?: Json | null
+          id?: string
+          resolution?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          valere_payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holded_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holded_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard_comercial"
+            referencedColumns: ["comercial_id"]
+          },
+        ]
+      }
+      holded_integration_logs: {
+        Row: {
+          direction: string
+          duration_ms: number | null
+          entity: string
+          entity_id: string | null
+          error: string | null
+          http_method: string | null
+          http_status: number | null
+          http_url: string | null
+          id: string
+          queue_id: string | null
+          request_payload: Json | null
+          response_body: Json | null
+          triggered_by: string | null
+          ts: string
+        }
+        Insert: {
+          direction: string
+          duration_ms?: number | null
+          entity: string
+          entity_id?: string | null
+          error?: string | null
+          http_method?: string | null
+          http_status?: number | null
+          http_url?: string | null
+          id?: string
+          queue_id?: string | null
+          request_payload?: Json | null
+          response_body?: Json | null
+          triggered_by?: string | null
+          ts?: string
+        }
+        Update: {
+          direction?: string
+          duration_ms?: number | null
+          entity?: string
+          entity_id?: string | null
+          error?: string | null
+          http_method?: string | null
+          http_status?: number | null
+          http_url?: string | null
+          id?: string
+          queue_id?: string | null
+          request_payload?: Json | null
+          response_body?: Json | null
+          triggered_by?: string | null
+          ts?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holded_integration_logs_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "holded_sync_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holded_integration_logs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holded_integration_logs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard_comercial"
+            referencedColumns: ["comercial_id"]
+          },
+        ]
+      }
+      holded_sync_queue: {
+        Row: {
+          action: string
+          attempts: number
+          created_at: string
+          direction: string
+          entity: string
+          entity_id: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          max_attempts: number
+          payload: Json | null
+          processed_at: string | null
+          scheduled_for: string
+          status: string
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          attempts?: number
+          created_at?: string
+          direction?: string
+          entity: string
+          entity_id?: string | null
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          max_attempts?: number
+          payload?: Json | null
+          processed_at?: string | null
+          scheduled_for?: string
+          status?: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          attempts?: number
+          created_at?: string
+          direction?: string
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          max_attempts?: number
+          payload?: Json | null
+          processed_at?: string | null
+          scheduled_for?: string
+          status?: string
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holded_sync_queue_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holded_sync_queue_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard_comercial"
+            referencedColumns: ["comercial_id"]
+          },
+        ]
+      }
+      holded_sync_state: {
+        Row: {
+          entity: string
+          items_synced: number
+          last_error: string | null
+          last_pull_at: string | null
+          last_pull_etag: string | null
+          last_pull_status: string | null
+          last_push_at: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          entity: string
+          items_synced?: number
+          last_error?: string | null
+          last_pull_at?: string | null
+          last_pull_etag?: string | null
+          last_pull_status?: string | null
+          last_push_at?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          entity?: string
+          items_synced?: number
+          last_error?: string | null
+          last_pull_at?: string | null
+          last_pull_etag?: string | null
+          last_pull_status?: string | null
+          last_push_at?: string | null
+          notes?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2000,6 +2564,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "incidencias_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notificaciones: {
@@ -2069,6 +2640,9 @@ export type Database = {
           etapa: string
           external_id: string | null
           fecha_cierre_prevista: string | null
+          holded_etag: string | null
+          holded_id: string | null
+          holded_synced_at: string | null
           id: string
           motivo_perdida: string | null
           nombre: string
@@ -2091,6 +2665,9 @@ export type Database = {
           etapa?: string
           external_id?: string | null
           fecha_cierre_prevista?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           motivo_perdida?: string | null
           nombre: string
@@ -2113,6 +2690,9 @@ export type Database = {
           etapa?: string
           external_id?: string | null
           fecha_cierre_prevista?: string | null
+          holded_etag?: string | null
+          holded_id?: string | null
+          holded_synced_at?: string | null
           id?: string
           motivo_perdida?: string | null
           nombre?: string
@@ -2192,6 +2772,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oportunidades_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
             referencedColumns: ["id"]
           },
         ]
@@ -2412,6 +2999,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "propuestas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "propuestas_oportunidad_id_fkey"
             columns: ["oportunidad_id"]
             isOneToOne: false
@@ -2517,6 +3111,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renovaciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
             referencedColumns: ["id"]
           },
           {
@@ -2798,6 +3399,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "solicitudes_potencia_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "solicitudes_potencia_expediente_id_fkey"
             columns: ["expediente_id"]
             isOneToOne: false
@@ -2970,6 +3578,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tareas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tareas_oportunidad_id_fkey"
             columns: ["oportunidad_id"]
             isOneToOne: false
@@ -3067,6 +3682,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contratos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       crm_asistente_top_no_respondidas: {
@@ -3075,6 +3697,121 @@ export type Database = {
           secciones: string[] | null
           ultima_vez: string | null
           veces: number | null
+        }
+        Relationships: []
+      }
+      holded_audit_duplicados_nif: {
+        Row: {
+          dup_count: number | null
+          empresa_ids: string[] | null
+          nif_normalizado: string | null
+          nombres: string[] | null
+        }
+        Relationships: []
+      }
+      holded_audit_empresas: {
+        Row: {
+          ciudad: string | null
+          comercial_id: string | null
+          cp: string | null
+          created_at: string | null
+          direccion: string | null
+          direccion_con_cp_embebido: boolean | null
+          direccion_holded_lista: boolean | null
+          email_formato_ok: boolean | null
+          email_principal: string | null
+          id: string | null
+          nif: string | null
+          nif_checksum_ok: boolean | null
+          nif_clase: string | null
+          nif_normalizado: string | null
+          nombre: string | null
+          pais: string | null
+          provincia: string | null
+          segmento: string | null
+          telefono_principal: string | null
+          tipo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ciudad?: string | null
+          comercial_id?: string | null
+          cp?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          direccion_con_cp_embebido?: never
+          direccion_holded_lista?: never
+          email_formato_ok?: never
+          email_principal?: string | null
+          id?: string | null
+          nif?: string | null
+          nif_checksum_ok?: never
+          nif_clase?: never
+          nif_normalizado?: never
+          nombre?: string | null
+          pais?: string | null
+          provincia?: string | null
+          segmento?: string | null
+          telefono_principal?: string | null
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ciudad?: string | null
+          comercial_id?: string | null
+          cp?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          direccion_con_cp_embebido?: never
+          direccion_holded_lista?: never
+          email_formato_ok?: never
+          email_principal?: string | null
+          id?: string | null
+          nif?: string | null
+          nif_checksum_ok?: never
+          nif_clase?: never
+          nif_normalizado?: never
+          nombre?: string | null
+          pais?: string | null
+          provincia?: string | null
+          segmento?: string | null
+          telefono_principal?: string | null
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresas_comercial_id_fkey"
+            columns: ["comercial_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresas_comercial_id_fkey"
+            columns: ["comercial_id"]
+            isOneToOne: false
+            referencedRelation: "v_dashboard_comercial"
+            referencedColumns: ["comercial_id"]
+          },
+        ]
+      }
+      holded_audit_resumen: {
+        Row: {
+          clase_cif: number | null
+          clase_invalid_format: number | null
+          clase_nie: number | null
+          clase_nif_persona: number | null
+          clase_vat_intracom: number | null
+          con_nif: number | null
+          direccion_con_cp_embebido: number | null
+          direccion_lista_para_holded: number | null
+          email_formato_ok: number | null
+          nif_checksum_invalidos: number | null
+          nif_checksum_validos: number | null
+          sin_nif: number | null
+          tipo_null: number | null
+          total_empresas: number | null
         }
         Relationships: []
       }
@@ -3285,6 +4022,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cups_empresa_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       v_contratos_activos: {
@@ -3364,6 +4108,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
             referencedColumns: ["id"]
           },
           {
@@ -3482,6 +4233,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contratos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contratos_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -3517,6 +4275,22 @@ export type Database = {
       }
     }
     Functions: {
+      admin_reject_user: { Args: { p_user_id: string }; Returns: undefined }
+      audit_log_insert: {
+        Args: {
+          p_action: string
+          p_actor_email: string
+          p_actor_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_metadata?: Json
+          p_new_values?: Json
+          p_old_values?: Json
+        }
+        Returns: undefined
+      }
+      clasifica_nif_cif: { Args: { p_input: string }; Returns: string }
+      cleanup_pending_users_older_than_7_days: { Args: never; Returns: number }
       get_resumen_vencimientos: {
         Args: { p_comercial_id?: string }
         Returns: {
@@ -3527,7 +4301,53 @@ export type Database = {
         }[]
       }
       get_user_rol: { Args: never; Returns: string }
+      holded_dispatch_worker: { Args: never; Returns: number }
+      holded_enqueue: {
+        Args: {
+          p_action: string
+          p_direction?: string
+          p_entity: string
+          p_entity_id: string
+          p_idempotency?: string
+          p_payload?: Json
+          p_scheduled_for?: string
+        }
+        Returns: string
+      }
+      holded_get_config: {
+        Args: never
+        Returns: {
+          api_base_url: string
+          created_at: string
+          enabled: boolean
+          excluded_nifs: string[]
+          functions_base_url: string
+          http_timeout_ms: number
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_full_sync_at: string | null
+          mode: string
+          notes: string | null
+          productos_sync_mode: string
+          rate_limit_req_per_sec: number
+          retry_initial_backoff_ms: number
+          retry_max_attempts: number
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "holded_config"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      holded_mask_iban: { Args: { p_iban: string }; Returns: string }
+      holded_mask_nif: { Args: { p_nif: string }; Returns: string }
+      is_approved: { Args: never; Returns: boolean }
       is_manager_or_above: { Args: never; Returns: boolean }
+      is_master: { Args: never; Returns: boolean }
       match_crm_help: {
         Args: {
           filter_section?: string
@@ -3543,7 +4363,9 @@ export type Database = {
           title: string
         }[]
       }
+      normaliza_nif_cif: { Args: { p_input: string }; Returns: string }
       normalizar_nombre_retailer: { Args: { input: string }; Returns: string }
+      valida_nif_cif: { Args: { p_input: string }; Returns: boolean }
     }
     Enums: {
       estado_incidencia:

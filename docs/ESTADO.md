@@ -1,6 +1,50 @@
-﻿# Estado actual del proyecto Valere v2
+# Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-04-28 por Cowork (Sprint A mergeado + Gestión de Potencias integrada)**
+> **Última actualización: 2026-04-29 por Cowork (Sprint autónomo — fases técnicas completadas)**
+>
+> ## ✅ COMPLETADO HOY (sesión 2026-04-29)
+>
+> | Fase | Estado | Detalle |
+> |---|---|---|
+> | Sidebar colapsable | ✅ | Icon-rail w-16 desktop, drawer móvil, localStorage |
+> | Normativa expedientes | ✅ | Catálogo + dropdown inline + badge Comunicaciones + docs Documentación |
+> | FASE 20.9 RLS hardening | ✅ | Ya activo en prod (verificado vía MCP) |
+> | FASE 20.1 Tipos Supabase | ✅ | 4549 líneas tipos reales regenerados, TSC=0 |
+> | FASE 20.8 Gemini server | ✅ | Ya en Edge Functions (chat-consultor + ask-crm-docs) |
+> | FASE 21.a Pipeline | ✅ | Kanban oportunidades con etapas energéticas ya activo |
+> | FASE 21.b Alertas contratos | ✅ | AlertaBadge + VencimientoList ya activo |
+> | FASE 21.c Timeline empresa | ✅ | RecentActivityCard en sidebar ficha empresa |
+>
+> **Pendiente ejecutar**: `COMMIT_HOY.ps1` en raíz del repo
+>
+> ## 📋 PENDIENTE REAL (no implementado)
+>
+> | Item | Bloqueador | Notas |
+> |---|---|---|
+> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
+> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
+> | Unificación Supabase Fase 2 | Datos reales cross-proyecto | Protocolo en scripts/unificacion_fase2_* |
+> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
+
+# Estado actual del proyecto Valere v2
+
+> **Última actualización: 2026-04-29 por Cowork (Integración completa Gestión de Potencias)**
+>
+> ## ✅ INTEGRACIÓN GESTIÓN DE POTENCIAS — COMPLETADA
+>
+> | Feature | Estado | Notas |
+> |---|---|---|
+> | PotenciasDashboardPage | ✅ real data | KPIs, alertas RDL, bajadas aprobadas, distribución estados |
+> | ComunicacionesPage | ✅ nueva | Expedientes agrupados por acción requerida |
+> | InformesPotenciasPage | ✅ nueva | Bar chart recharts + top clientes |
+> | DocumentacionPage | ✅ nueva | Upload/download Supabase Storage bucket `documentos` |
+> | ConfiguracionPotenciasPage | ✅ nueva | Parámetros RDL, distribuidoras, flujo, notificaciones |
+> | Sidebar collapsible | ✅ | "Gestion de Potencias" cerrado por defecto, abre al click |
+> | notify-expediente-estado | ✅ integrado | Wired en avanzarEstado() — fire-and-forget |
+> | MessageBubble sin fuentes | ✅ | SourcesCitation eliminado — sin enlaces GitHub en UI |
+> | docs/help/potencias/ | ✅ | README.md para RAG assistant |
+>
+> **Pendiente de ejecución por Juan**: `COMMIT_POTENCIAS.ps1` en raíz del repo (elimina lock, stages, commit, push)
 >
 > ## ✅ Sprint A — COMPLETADO Y EN MAIN
 >

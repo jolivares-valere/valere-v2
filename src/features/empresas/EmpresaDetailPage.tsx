@@ -1,17 +1,18 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Trash2, X, Phone, Mail, Users, CheckSquare, Activity } from 'lucide-react'
 import BackButton from '../../core/components/BackButton'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
 import DocumentosTab from '../documentos/components/DocumentosTab'
 import { useContactosPorEmpresa, useCreateContacto } from '../contactos/api'
+import { useActividadesPorEmpresa } from '../actividades/api'
 import ContactoForm from '../contactos/components/ContactoForm'
 import { formatDate } from '../../core/utils/dates'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import CustomFieldsPanel from '../../core/components/CustomFieldsPanel'
-import type { EmpresaUpdate, ContactoInsert } from '../../core/types/entities'
+import type { EmpresaUpdate, ContactoInsert, TipoActividad } from '../../core/types/entities'
 
 type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos'
 
@@ -108,6 +109,7 @@ export default function EmpresaDetailPage() {
             <InfoRow label="Segmento" value={empresa.segmento ?? '—'} />
             <InfoRow label="Creada" value={formatDate(empresa.created_at, 'long')} />
           </InfoCard>
+          <RecentActivityCard empresaId={empresa.id} />
         </aside>
       </div>
 
@@ -280,6 +282,69 @@ function ContactosSection({ empresaId }: { empresaId: string }) {
             </div>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+const iconByTipo: Record<TipoActividad, React.ComponentType<{ className?: string }>> = {
+  llamada: Phone,
+  email: Mail,
+  reunion: Users,
+  tarea: CheckSquare,
+  nota: Activity,
+  cambio_estado: Activity,
+  documento: Activity,
+  whatsapp: Activity,
+  visita: Activity,
+}
+
+function RecentActivityCard({ empresaId }: { empresaId: string }) {
+  const { data: actividades = [], isLoading } = useActividadesPorEmpresa(empresaId)
+  const recent = actividades.slice(0, 5)
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-3 text-sm font-semibold text-slate-900">Actividad reciente</h3>
+      {isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+      {!isLoading && recent.length === 0 && (
+        <p className="text-sm text-slate-500">Sin actividades</p>
+      )}
+      {!isLoading && recent.length > 0 && (
+        <ul className="space-y-2">
+          {recent.map((a) => {
+            const Icon = iconByTipo[a.tipo]
+            const badgeColor =
+              a.estado_tarea === 'completada' ? 'bg-green-100 text-green-700' :
+              a.estado_tarea === 'cancelada' ? 'bg-red-100 text-red-700' :
+              a.estado_tarea === 'pendiente' ? 'bg-slate-200 text-slate-700' :
+              'bg-slate-100 text-slate-600'
+            return (
+              <li key={a.id} className="flex gap-2 text-xs">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                  <Icon className="h-3 w-3" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-slate-900">{a.titulo}</p>
+                  <p className="text-slate-500">{formatDate(a.fecha_actividad, 'relative')}</p>
+                  {a.estado_tarea && (
+                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${badgeColor}`}>
+                      {a.estado_tarea}
+                    </span>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {!isLoading && actividades.length > 5 && (
+        <Link
+          to={`/actividades?entidad_tipo=empresa&entidad_id=${empresaId}`}
+          className="mt-3 block text-xs text-slate-600 hover:text-slate-900"
+        >
+          Ver todas las actividades →
+        </Link>
       )}
     </div>
   )
