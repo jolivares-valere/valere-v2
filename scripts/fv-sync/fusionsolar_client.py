@@ -109,23 +109,47 @@ class WebAuthClient(FusionSolarClient):
         roarand = self._client.cookies.get("roarand", "")
 
         # Detectar tipo de portal según la página de login
-        # - Portal EU (eu5): flujo CAS UNISSO → POST a /unisso/login.action con form-data
+        # - Portal EU (eu5): flujo CAS UNISSO → necesita parsear form para obtener
+        #   lt (login ticket), execution y action URL antes del POST
         # - Portal antiguo:  JSON → POST a /rest/neteco/oauthserver/account/authorize
         is_unisso = "unisso" in login_path
 
         if is_unisso:
-            # Flujo CAS: POST form-data al mismo endpoint
+            # Flujo CAS UNISSO: extraer campos ocultos del formulario HTML
+            import re as _re
+            html = resp.text
+
+            # Extraer action del form (puede tener jsessionid u otros params)
+            form_action_match = _re.search(r'<form[^>]+action=["\']([^"\']+)["\']', html)
+            form_action = form_action_match.group(1) if form_action_match else login_path
+
+            # Extraer campos ocultos: lt, execution, _eventId, etc.
+            hidden_fields = dict(_re.findall(
+                r'<input[^>]+type=["\']hidden["\'][^>]+name=["\']([^"\']+)["\'][^>]+value=["\']([^"\']*)["\']',
+                html
+            ))
+            # También el orden inverso name/value
+            hidden_fields.update(dict(_re.findall(
+                r'<input[^>]+name=["\']([^"\']+)["\'][^>]+type=["\']hidden["\'][^>]+value=["\']([^"\']*)["\']',
+                html
+            )))
+
             form_data = {
+                **hidden_fields,
                 "username": self.username,
                 "password": self.password,
-                "service":  "/unisess/v1/auth?service=%2Fnetecowebext%2Fhome%2Findex.html",
             }
-            headers = {"roarand": roarand} if roarand else {}
-            resp = self._client.post(login_path, data=form_data, headers=headers)
-            # UNISSO devuelve redirect 302 si el login es correcto
+            # Asegurar _eventId=submit si no viene en el form
+            if "_eventId" not in form_data:
+                form_data["_eventId"] = "submit"
+
+            headers = {"roarand": roarand, "Content-Type": "application/x-www-form-urlencoded"}
+            resp = self._client.post(form_action, data=form_data, headers=headers)
+            # CAS devuelve 302 redirect si el login es correcto
             if resp.status_code not in (200, 302):
-                resp.raise_for_status()
-            # Tras el redirect, las cookies de sesión ya están en self._client
+                raise RuntimeError(f"FusionSolar UNISSO login fallido: HTTP {resp.status_code}")
+            # Renovar roarand tras login
+            roarand = self._client.cookies.get("roarand", roarand)
         else:
             # Flujo antiguo JSON
             payload = {
