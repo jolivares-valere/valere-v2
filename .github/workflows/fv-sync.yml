@@ -39,7 +39,11 @@ jobs:
         run: pip install -r scripts/fv-sync/requirements.txt
 
       - name: Instalar Playwright + Chromium
-        run: playwright install chromium --with-deps
+        run: |
+          # Ubuntu 22/24: libasound2 fue renombrado a libasound2t64
+          # Pre-instalarlo evita el error "no installation candidate" de playwright --with-deps
+          sudo apt-get install -y libasound2t64 2>/dev/null || true
+          playwright install chromium --with-deps
 
       - name: Ejecutar sincronización
         working-directory: scripts/fv-sync
