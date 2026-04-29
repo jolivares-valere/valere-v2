@@ -1,12 +1,12 @@
 name: FV Sync — Sincronización plantas fotovoltaicas
 
 on:
-  # Cron diario a las 02:00 hora España (UTC+1 invierno = 01:00 UTC)
-  # En verano (UTC+2) serían las 03:00 España. Ajustar si se prefiere hora fija.
+  # Cada hora en punto (datos casi en tiempo real)
+  # El cron nocturno de las 01:00 UTC también cierra el KPI diario del día anterior
   schedule:
-    - cron: "0 1 * * *"
+    - cron: "0 * * * *"
 
-  # Permite lanzar manualmente desde GitHub Actions UI
+  # Lanzamiento manual desde GitHub Actions UI
   workflow_dispatch:
     inputs:
       empresa_id:
@@ -22,7 +22,7 @@ jobs:
   sync:
     name: Sincronizar plantas FV
     runs-on: ubuntu-latest
-    timeout-minutes: 20   # Si tarda más de 20 min, algo falla
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repo
@@ -35,8 +35,11 @@ jobs:
           cache: "pip"
           cache-dependency-path: "scripts/fv-sync/requirements.txt"
 
-      - name: Instalar dependencias
+      - name: Instalar dependencias Python
         run: pip install -r scripts/fv-sync/requirements.txt
+
+      - name: Instalar Playwright + Chromium
+        run: playwright install chromium --with-deps
 
       - name: Ejecutar sincronización
         working-directory: scripts/fv-sync
@@ -44,6 +47,7 @@ jobs:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           FV_ENCRYPTION_KEY:    ${{ secrets.FV_ENCRYPTION_KEY }}
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
         run: |
           ARGS=""
           if [ -n "${{ github.event.inputs.empresa_id }}" ]; then
@@ -54,7 +58,7 @@ jobs:
           fi
           python sync_job.py $ARGS
 
-      - name: Notificar fallo (opcional — requiere secret SLACK_WEBHOOK)
+      - name: Notificar fallo por Slack (opcional)
         if: failure() && vars.NOTIFY_SLACK == 'true'
         run: |
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK }}" \

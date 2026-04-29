@@ -1,30 +1,39 @@
 """
-fusionsolar_client.py — Cliente FusionSolar con dos implementaciones intercambiables.
+fusionsolar_client.py — Cliente FusionSolar via Playwright (headless browser).
 
-- WebAuthClient  → usa credenciales web normales (modo actual)
-- NorthboundClient → usa usuario Northbound oficial de Huawei (migración futura)
+Por qué Playwright en vez de httpx:
+  El portal FusionSolar EU5 usa cifrado RSA con parámetros dinámicos que cambian
+  entre sesiones. En vez de replicar ese protocolo, Playwright lanza un Chromium
+  headless que hace el login exactamente igual que un usuario real. Las cookies
+  (incluyendo HttpOnly como roarand/bspsession) se gestionan automáticamente.
 
-Ambos exponen el mismo interfaz:
-    client.get_station_list()      → list[dict]
-    client.get_station_kpi(code)   → dict
-    client.get_devices(code)       → list[dict]
-    client.get_alarms(code)        → list[dict]
-    client.get_daily_kpi(code, date) → dict
+Interfaz pública:
+    client = WebAuthClient(base_url, username, password)
+    client.login()
+    stations = client.get_station_list()     # lista de dicts con KPIs embebidos
+    kpi      = client.get_station_kpi(code)
+    devices  = client.get_devices(code)
+    alarms   = client.get_alarms(code)
+    day_kpi  = client.get_daily_kpi(code, date)
+    client.close()
+
+Integración futura con incidencias CRM:
+    Las alarmas FV de severidad "critica"/"mayor" se pueden vincular a la tabla
+    `incidencias` del CRM para seguimiento unificado. Ver sync_job.py para el
+    punto de extensión (TODO: INCIDENCIAS_CRM).
 """
 
 import logging
 import time
 from abc import ABC, abstractmethod
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
-
-import httpx
 
 logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────
-# Interfaz abstracta
+# Interfaz abstracta común
 # ─────────────────────────────────────────────────────────
 
 class FusionSolarClient(ABC):
@@ -36,367 +45,282 @@ class FusionSolarClient(ABC):
 
     @abstractmethod
     def get_station_list(self) -> list[dict]:
-        """Devuelve lista de plantas: [{'stationCode', 'stationName', 'capacity', 'status', ...}]"""
+        """Lista de plantas con KPIs embebidos."""
 
     @abstractmethod
     def get_station_kpi(self, station_code: str) -> dict:
-        """KPIs en tiempo real: {'currentPower', 'dayPower', 'monthPower', 'totalPower', 'dayIncome'}"""
+        """KPIs en tiempo real de una planta."""
 
     @abstractmethod
     def get_devices(self, station_code: str) -> list[dict]:
-        """Lista de dispositivos: [{'devSn', 'devName', 'devTypeId', 'softVer', 'runState'}]"""
+        """Dispositivos de una planta (inversores, baterías, etc.)."""
 
     @abstractmethod
     def get_alarms(self, station_code: str) -> list[dict]:
-        """Alarmas activas: [{'alarmId', 'alarmCode', 'alarmDesc', 'severity', 'raiseTime'}]"""
+        """Alarmas activas de una planta."""
 
     @abstractmethod
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
-        """Producción de un día: {'energy': float, 'incomeDay': float}"""
+        """Producción de un día concreto."""
+
+    def close(self) -> None:
+        """Libera recursos. Llamar siempre en un bloque finally."""
 
 
 # ─────────────────────────────────────────────────────────
-# Implementación 1: Web Auth (REST SPA autenticado)
+# Implementación con Playwright
 # ─────────────────────────────────────────────────────────
 
 class WebAuthClient(FusionSolarClient):
     """
-    Autenticación con credenciales web normales del portal FusionSolar EU5.
+    Autenticación mediante Playwright (Chromium headless).
 
-    Flujo real verificado (SPA React):
-      GET /unisso/pubkey → RSA encrypt password → POST /unisso/v3/validateUser.action
-      → follow redirectURL → cookies de sesión (roarand)
-
-    Ventaja: funciona con las credenciales que ya nos dieron los clientes.
-    Riesgo: los endpoints internos pueden cambiar sin aviso (bajo en la práctica).
+    Flujo de login:
+      1. Lanza Chromium headless
+      2. Navega a base_url  →  SSO redirige a /unisso/login.action
+      3. Rellena usuario + contraseña y hace clic en "Iniciar sesión"
+      4. Espera redirección al portal (/uniportal/…)
+      5. Todas las llamadas REST se ejecutan con page.evaluate(fetch(…))
+         Las cookies HttpOnly se incluyen automáticamente por el browser.
     """
 
-    # Endpoints internos identificados via inspección de red
-    _STATION_LIST   = "/rest/pvms/web/station/v1/station/station-list"
-    _TOTAL_KPI      = "/rest/pvms/web/station/v1/station/total-real-kpi"
-    _STATUS_COUNT   = "/rest/pvms/web/station/v1/station/station-status-count"
-    _ALARM_LIST     = "/rest/pvms/fm/v1/statistic"
-    _DEV_LIST       = "/rest/pvms/web/device/v1/device-list"
-    _DAILY_KPI      = "/rest/pvms/web/station/v1/station/day-real-kpi"
+    # Endpoints internos del portal EU5
+    _STATION_LIST = "/rest/pvms/web/station/v1/station/station-list"
+    _TOTAL_KPI    = "/rest/pvms/web/station/v1/station/total-real-kpi"
+    _ALARM_LIST   = "/rest/pvms/fm/v1/statistic"
+    _DEV_LIST     = "/rest/pvms/web/device/v1/device-list"
+    _DAILY_KPI    = "/rest/pvms/web/station/v1/station/day-real-kpi"
 
     def __init__(self, base_url: str, username: str, password: str, timeout: int = 30):
-        self.base_url = base_url.rstrip("/")
-        self.username = username
-        self.password = password
-        self.timeout  = timeout
-        self._client: httpx.Client | None = None
-        self._token: str = ""
+        self.base_url  = base_url.rstrip("/")
+        self.username  = username
+        self.password  = password
+        self.timeout   = timeout
+        self._pw_ctx   = None
+        self._pw       = None
+        self._browser  = None
+        self._page     = None
+        # Caché de datos de estación obtenidos en get_station_list()
+        self._station_cache: dict[str, dict] = {}
 
-    # ── Autenticación ──────────────────────────────────────
+    # ── Login ──────────────────────────────────────────────────────────────
 
     def login(self) -> None:
-        """
-        Login para portal EU5 (eu5.fusionsolar.huawei.com).
+        from playwright.sync_api import sync_playwright
 
-        Flujo real verificado (SPA React, no CAS form-data):
-          1. GET /  → redirect → /unisso/login.action?service=...  (extrae service URL)
-          2. GET /unisso/pubkey  → { pubKey, timeStamp, enableEncrypt }
-          3. Si enableEncrypt: cifrar password con RSA-2048 PKCS#1 v1.5
-          4. POST /unisso/v3/validateUser.action?timeStamp=...&decision=1&service=...
-             body JSON: { organizationName, username, password, verifycode }
-             respuesta OK: { errorCode: "0", redirectURL: "..." }
-          5. GET redirectURL → asienta cookies de sesión (roarand / bspsession)
+        self._pw_ctx = sync_playwright()
+        self._pw     = self._pw_ctx.__enter__()
 
-        Para portales antiguos (sin /unisso): flujo JSON legacy.
-        """
-        import base64
-        import urllib.parse
-        from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-        from cryptography.hazmat.primitives.serialization import (
-            load_der_public_key,
-            load_pem_public_key,
+        self._browser = self._pw.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
+        context = self._browser.new_context(
+            viewport={"width": 1280, "height": 720},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+        self._page = context.new_page()
+
+        # Paso 1: navegar al portal → redirige automáticamente al SSO
+        logger.info("Playwright: navegando a %s", self.base_url)
+        self._page.goto(
+            self.base_url + "/",
+            timeout=self.timeout * 1000,
+            wait_until="domcontentloaded",
         )
 
-        self._client = httpx.Client(
-            timeout=self.timeout,
-            follow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; ValereCRM/1.0)"},
+        # Paso 2: esperar que aparezca el formulario de login (campo password)
+        self._page.wait_for_selector('input[type="password"]', timeout=15_000)
+        logger.debug("Formulario de login detectado en %s", self._page.url)
+
+        # Paso 3: rellenar credenciales
+        # Limpiar el campo usuario (puede tener credenciales guardadas del browser)
+        username_field = self._page.locator('input[type="text"]').first
+        username_field.click()
+        username_field.select_text()
+        username_field.fill(self.username)
+
+        self._page.locator('input[type="password"]').first.fill(self.password)
+
+        # Paso 4: enviar el formulario
+        submitted = False
+        for selector in [
+            'button:has-text("Iniciar")',
+            'button[type="submit"]',
+            'input[type="submit"]',
+            'button:has-text("Login")',
+            'button:has-text("Log in")',
+        ]:
+            try:
+                self._page.click(selector, timeout=2_000)
+                submitted = True
+                break
+            except Exception:
+                continue
+        if not submitted:
+            # Fallback: Enter en el campo password
+            self._page.locator('input[type="password"]').first.press("Enter")
+
+        # Paso 5: esperar redirección al portal
+        self._page.wait_for_url("**/uniportal/**", timeout=25_000)
+        # Esperar a que el JS del SPA inicialice (networkidle puede ser largo)
+        try:
+            self._page.wait_for_load_state("networkidle", timeout=15_000)
+        except Exception:
+            # networkidle no es crítico; continuar si tarda demasiado
+            self._page.wait_for_timeout(3_000)
+
+        logger.info(
+            "FusionSolar login OK (Playwright) para %s @ %s",
+            self.username, self.base_url,
         )
 
-        # ── Paso 1: detectar tipo de portal ───────────────────
-        resp = self._client.get(self.base_url + "/")
-        resp.raise_for_status()
-        login_url = str(resp.url)   # URL final tras redirects (puede ser otro dominio SSO)
+    # ── Llamadas REST desde el contexto del navegador ─────────────────────
 
-        is_unisso_spa = "unisso" in login_url
+    def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
+        """
+        Ejecuta fetch() en el contexto de la página del portal.
+        Las cookies (incluidas las HttpOnly) se envían automáticamente.
+        Los datos se pasan como argumentos JS para evitar problemas de escape.
+        """
+        url = path if path.startswith("http") else self.base_url + path
+        result = self._page.evaluate(
+            """([method, url, payload]) =>
+                fetch(url, {
+                    method,
+                    headers: {"Content-Type": "application/json"},
+                    body: (method !== "GET" && payload !== null)
+                          ? JSON.stringify(payload)
+                          : undefined,
+                }).then(r => {
+                    if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
+                    return r.json();
+                })
+            """,
+            [method.upper(), url, payload],
+        )
+        return result
 
-        if is_unisso_spa:
-            # ── Extraer dominio SSO de la URL de login ────────
-            # uni003eu5.fusionsolar.huawei.com redirige al SSO en eu5.fusionsolar.huawei.com
-            # Todas las llamadas /unisso/* deben ir al dominio del SSO, no al portal
-            parsed_login = urllib.parse.urlparse(login_url)
-            sso_base = f"{parsed_login.scheme}://{parsed_login.netloc}"
+    def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
+        """Igual que _fetch pero captura excepciones y devuelve default."""
+        try:
+            return self._fetch(method, path, payload)
+        except Exception as e:
+            logger.warning("_fetch error [%s %s]: %s", method, path, e)
+            return default if default is not None else {}
 
-            # ── Extraer parámetro service= de la URL de login ─
-            qs      = urllib.parse.parse_qs(parsed_login.query)
-            service = qs.get("service", [""])[0]
-
-            # ── Paso 2: obtener clave pública RSA ─────────────
-            pk_resp = self._client.get(sso_base + "/unisso/pubkey")
-            pk_resp.raise_for_status()
-            pk_body = pk_resp.json()
-            # La respuesta puede ser plana o anidada bajo "data"
-            pk_data     = pk_body.get("data", pk_body)
-            pub_key_b64 = pk_data.get("pubKey", "")
-            timestamp   = pk_data.get("timeStamp", "")
-            enable_enc  = pk_data.get("enableEncrypt", True)
-
-            logger.debug("FusionSolar pubkey ts=%s encrypt=%s", timestamp, enable_enc)
-
-            # ── Paso 3: cifrar contraseña con RSA PKCS#1 v1.5 ─
-            if enable_enc and pub_key_b64:
-                # La clave puede venir como PEM o como DER base64 sin cabeceras
-                if "BEGIN" in pub_key_b64:
-                    public_key = load_pem_public_key(pub_key_b64.encode())
-                else:
-                    public_key = load_der_public_key(base64.b64decode(pub_key_b64))
-                # FusionSolar v3 requiere cifrar (password + timestamp), no solo password
-                plaintext_to_encrypt = self.password + str(timestamp)
-                encrypted_pw = public_key.encrypt(
-                    plaintext_to_encrypt.encode("utf-8"),
-                    asym_padding.PKCS1v15(),
-                )
-                password_to_send = base64.b64encode(encrypted_pw).decode("utf-8")
-            else:
-                password_to_send = self.password
-
-            # ── Paso 4: POST validateUser (al dominio SSO, no al portal) ─
-            validate_url = (
-                f"{sso_base}/unisso/v3/validateUser.action"
-                f"?timeStamp={timestamp}&decision=1"
-                + (f"&service={urllib.parse.quote(service, safe='')}" if service else "")
-            )
-            login_payload = {
-                "organizationName": "",
-                "username":          self.username,
-                "password":          password_to_send,
-                "verifycode":        "",
-            }
-            resp2 = self._client.post(
-                validate_url,
-                json=login_payload,
-                headers={
-                    "Content-Type": "application/json;charset=UTF-8",
-                    "Referer":      login_url,
-                },
-            )
-            resp2.raise_for_status()
-            body2 = resp2.json()
-
-            error_code = str(body2.get("errorCode", "")).strip()
-            if error_code not in ("0", ""):
-                raise RuntimeError(
-                    f"FusionSolar login fallido: errorCode={error_code} "
-                    f"msg={body2.get('errorMsg', body2.get('failCode', ''))}"
-                )
-
-            # ── Paso 5: seguir redirectURL para asentar cookies ─
-            redirect_url = body2.get("redirectURL", "")
-            if redirect_url:
-                resp3 = self._client.get(redirect_url)
-                logger.debug("Login redirect → %s (HTTP %s)", redirect_url, resp3.status_code)
-
-            self._token = self._client.cookies.get("roarand", "")
-
-        else:
-            # ── Portal antiguo: flujo JSON ─────────────────────
-            roarand = self._client.cookies.get("roarand", "")
-            payload = {"userName": self.username, "value": self.password}
-            resp2 = self._client.post(
-                self.base_url + "/rest/neteco/oauthserver/account/authorize",
-                json=payload,
-                headers={"roarand": roarand} if roarand else {},
-            )
-            resp2.raise_for_status()
-            body = resp2.json()
-            if body.get("failCode") not in (None, 0, "0", ""):
-                raise RuntimeError(f"FusionSolar login fallido: {body}")
-            self._token = self._client.cookies.get("roarand", roarand)
-
-        logger.info("FusionSolar login OK para %s@%s", self.username, self.base_url)
-
-    def _headers(self) -> dict:
-        return {"roarand": self._token} if self._token else {}
-
-    def _url(self, path: str) -> str:
-        """Convierte path relativo en URL absoluta usando base_url."""
-        if path.startswith("http"):
-            return path
-        return self.base_url + path
-
-    def _get(self, path: str, params: dict | None = None) -> Any:
-        assert self._client, "Debes llamar a login() primero"
-        resp = self._client.get(self._url(path), params=params, headers=self._headers())
-        resp.raise_for_status()
-        body = resp.json()
-        # FusionSolar devuelve {"success": true/false, "data": ...} en endpoints internos
-        if isinstance(body, dict) and body.get("success") is False:
-            raise RuntimeError(f"FusionSolar error en {path}: {body.get('failCode')} — {body.get('message')}")
-        return body
-
-    def _post(self, path: str, payload: dict | None = None) -> Any:
-        assert self._client, "Debes llamar a login() primero"
-        resp = self._client.post(self._url(path), json=payload or {}, headers=self._headers())
-        resp.raise_for_status()
-        body = resp.json()
-        if isinstance(body, dict) and body.get("success") is False:
-            raise RuntimeError(f"FusionSolar error en {path}: {body.get('failCode')} — {body.get('message')}")
-        return body
-
-    # ── Datos ──────────────────────────────────────────────
+    # ── API pública ────────────────────────────────────────────────────────
 
     def get_station_list(self) -> list[dict]:
-        body = self._post(self._STATION_LIST, {"pageNo": 1, "pageSize": 100})
-        stations = body.get("data", {})
-        if isinstance(stations, dict):
-            stations = stations.get("list", [])
-        return stations or []
+        """
+        Devuelve la lista de plantas con KPIs embebidos (potencia actual,
+        producción hoy, energía acumulada, estado).
+        """
+        data = self._fetch("POST", self._STATION_LIST, {
+            "pageNo":   1,
+            "pageSize": 100,
+            "locale":   "es_ES",
+        })
+
+        raw = data.get("data", data)
+        stations: list[dict] = []
+        if isinstance(raw, dict):
+            stations = raw.get("list", raw.get("pageList", []))
+        elif isinstance(raw, list):
+            stations = raw
+
+        # Cachear datos por station_code para reutilizar en get_station_kpi
+        for st in stations:
+            code = st.get("stationCode") or st.get("stationDn", "")
+            if code:
+                self._station_cache[code] = st
+
+        logger.debug("get_station_list: %d plantas", len(stations))
+        return stations
 
     def get_station_kpi(self, station_code: str) -> dict:
+        """
+        KPIs en tiempo real. Si station_code está en la caché de station_list
+        (que ya incluye currentPower / dayPower), devuelve esos datos directamente
+        sin llamada extra. Si no, consulta el endpoint de KPI total.
+        """
+        cached = self._station_cache.get(station_code, {})
+        # La respuesta de station-list incluye currentPower y dayPower directamente
+        if cached.get("currentPower") is not None or cached.get("dayPower") is not None:
+            return cached
+
+        # Fallback: endpoint de KPI total (no por planta, sino global)
         ts_ms = int(time.time() * 1000)
-        body = self._get(self._TOTAL_KPI, {
-            "stationCodes": station_code,
-            "queryTime": ts_ms,
-            "timeZone": 2,   # UTC+2 (España verano)
-        })
-        data = body.get("data", {})
-        if isinstance(data, list):
-            data = data[0] if data else {}
-        return data
+        return self._safe_fetch(
+            "GET",
+            f"{self._TOTAL_KPI}?queryTime={ts_ms}&timeZone=2",
+        ).get("data", {})
 
     def get_devices(self, station_code: str) -> list[dict]:
-        body = self._post(self._DEV_LIST, {
+        data = self._safe_fetch("POST", self._DEV_LIST, {
             "stationCodes": station_code,
-            "pageNo": 1,
-            "pageSize": 200,
-        })
-        data = body.get("data", {})
-        if isinstance(data, dict):
-            return data.get("list", [])
-        return data or []
+            "pageNo":   1,
+            "pageSize": 100,
+        }, default={"data": {}})
+        raw = data.get("data", data)
+        if isinstance(raw, dict):
+            return raw.get("list", [])
+        return raw or []
 
     def get_alarms(self, station_code: str) -> list[dict]:
-        body = self._get(self._ALARM_LIST, {
-            "stationCodes": station_code,
-            "alarmType": 1,  # 1 = activas
-        })
-        data = body.get("data", [])
-        return data if isinstance(data, list) else []
+        """
+        Alarmas activas de una planta.
+        El endpoint /fm/v1/statistic puede devolver alarmas globales o por planta
+        según parámetros. Se filtra por station_code si viene en la respuesta.
+        """
+        data = self._safe_fetch(
+            "GET",
+            f"{self._ALARM_LIST}?stationCode={station_code}",
+            default={"data": {}},
+        )
+        raw = data.get("data", data)
+        alarms: list[dict] = []
+        if isinstance(raw, dict):
+            alarms = raw.get("list", raw.get("alarmList", []))
+        elif isinstance(raw, list):
+            alarms = raw
+        return alarms
 
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
-        ts_ms = int(time.mktime(day.timetuple()) * 1000)
-        body = self._get(self._DAILY_KPI, {
+        """Producción de un día concreto para una planta."""
+        dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+        ts_ms = int(dt.timestamp() * 1000)
+        data  = self._safe_fetch("POST", self._DAILY_KPI, {
             "stationCodes": station_code,
-            "collectTime": ts_ms,
-        })
-        data = body.get("data", {})
-        if isinstance(data, list):
-            data = data[0] if data else {}
-        return data
+            "collectTime":  ts_ms,
+        }, default={})
+        raw = data.get("data", data)
+        if isinstance(raw, list):
+            return raw[0] if raw else {}
+        return raw or {}
 
-    def close(self):
-        if self._client:
-            self._client.close()
-
-
-# ─────────────────────────────────────────────────────────
-# Implementación 2: Northbound API (migración futura)
-# ─────────────────────────────────────────────────────────
-
-class NorthboundClient(FusionSolarClient):
-    """
-    Cliente oficial Northbound API de FusionSolar (/thirdData/).
-    Requiere usuario de tipo "Northbound" creado por el cliente en su portal.
-
-    Documentación Huawei: https://support.huawei.com/enterprise/...
-    Token válido ~30 min → renovación automática.
-    """
-
-    _LOGIN     = "/thirdData/login"
-    _STATIONS  = "/thirdData/getStationList"
-    _REAL_KPI  = "/thirdData/getStationRealKpi"
-    _DAY_KPI   = "/thirdData/getKpiStationDay"
-    _DEVICES   = "/thirdData/getDevList"
-    _ALARMS    = "/thirdData/getAlarmList"
-
-    def __init__(self, base_url: str, username: str, system_code: str, timeout: int = 30):
-        self.base_url    = base_url.rstrip("/")
-        self.username    = username
-        self.system_code = system_code   # systemCode = contraseña Northbound
-        self.timeout     = timeout
-        self._client: httpx.Client | None = None
-        self._xsrf: str = ""
-
-    def login(self) -> None:
-        self._client = httpx.Client(base_url=self.base_url, timeout=self.timeout)
-        resp = self._client.post(self._LOGIN, json={
-            "userName": self.username,
-            "systemCode": self.system_code,
-        })
-        resp.raise_for_status()
-        body = resp.json()
-        if body.get("success") is False:
-            raise RuntimeError(f"Northbound login fallido: {body.get('failCode')}")
-        self._xsrf = resp.cookies.get("XSRF-TOKEN", "")
-        logger.info("FusionSolar Northbound login OK para %s", self.username)
-
-    def _post(self, path: str, payload: dict) -> Any:
-        assert self._client, "Debes llamar a login() primero"
-        resp = self._client.post(path, json=payload,
-                                 headers={"XSRF-TOKEN": self._xsrf})
-        resp.raise_for_status()
-        body = resp.json()
-        if body.get("success") is False:
-            # Código 407 = token expirado → renovar y reintentar una vez
-            if body.get("failCode") == 407:
-                logger.warning("Token Northbound expirado, renovando...")
-                self.login()
-                resp = self._client.post(path, json=payload,
-                                         headers={"XSRF-TOKEN": self._xsrf})
-                resp.raise_for_status()
-                body = resp.json()
-        return body.get("data", {})
-
-    def get_station_list(self) -> list[dict]:
-        data = self._post(self._STATIONS, {})
-        return data if isinstance(data, list) else []
-
-    def get_station_kpi(self, station_code: str) -> dict:
-        data = self._post(self._REAL_KPI, {"stationCodes": station_code})
-        if isinstance(data, list):
-            return data[0] if data else {}
-        return data or {}
-
-    def get_devices(self, station_code: str) -> list[dict]:
-        data = self._post(self._DEVICES, {"stationCodes": station_code})
-        return data if isinstance(data, list) else []
-
-    def get_alarms(self, station_code: str) -> list[dict]:
-        data = self._post(self._ALARMS, {
-            "stationCodes": station_code,
-            "beginTime": 0,
-            "endTime": int(time.time() * 1000),
-        })
-        return data if isinstance(data, list) else []
-
-    def get_daily_kpi(self, station_code: str, day: date) -> dict:
-        ts_ms = int(time.mktime(day.timetuple()) * 1000)
-        data = self._post(self._DAY_KPI, {
-            "stationCodes": station_code,
-            "collectTime": ts_ms,
-        })
-        if isinstance(data, list):
-            return data[0] if data else {}
-        return data or {}
-
-    def close(self):
-        if self._client:
-            self._client.close()
+    def close(self) -> None:
+        try:
+            if self._browser:
+                self._browser.close()
+        except Exception as e:
+            logger.debug("browser.close() error: %s", e)
+        try:
+            if self._pw_ctx and self._pw:
+                self._pw_ctx.__exit__(None, None, None)
+        except Exception as e:
+            logger.debug("playwright.__exit__() error: %s", e)
+        self._browser = None
+        self._page    = None
+        self._pw      = None
 
 
 # ─────────────────────────────────────────────────────────
@@ -408,21 +332,18 @@ def make_client(
     base_url: str,
     username: str,
     password: str,
-    mode: str = "web",
+    mode: str = "web",       # reservado para futura implementación Northbound
 ) -> FusionSolarClient:
     """
-    Crea el cliente correcto según plataforma y modo.
+    Crea el cliente correcto según la plataforma.
 
     Args:
-        plataforma: 'fusionsolar' | 'goodwe' | ...  (solo fusionsolar implementado)
-        base_url:   URL base del portal (ej. 'https://uni003eu5.fusionsolar.huawei.com')
-        username:   usuario del portal
-        password:   contraseña en claro (ya descifrada por crypto.py)
-        mode:       'web' → WebAuthClient | 'northbound' → NorthboundClient
+        plataforma: "fusionsolar" (único implementado)
+        base_url:   URL del portal (ej. https://uni003eu5.fusionsolar.huawei.com)
+        username:   Usuario del portal
+        password:   Contraseña en claro (ya descifrada)
+        mode:       "web" (por ahora el único modo disponible)
     """
     if plataforma != "fusionsolar":
         raise NotImplementedError(f"Plataforma '{plataforma}' no implementada aún")
-
-    if mode == "northbound":
-        return NorthboundClient(base_url, username, password)
     return WebAuthClient(base_url, username, password)
