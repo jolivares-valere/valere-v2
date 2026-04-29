@@ -142,6 +142,20 @@ export interface Cups {
   datadis_ultima_sync: string | null
   datadis_distribuidor_cod: string | null
   datadis_punto_tipo: number | null
+  // Campos Potencias (potencias contratadas por período — módulo RDL)
+  p1_kw: number | null
+  p2_kw: number | null
+  p3_kw: number | null
+  p4_kw: number | null
+  p5_kw: number | null
+  p6_kw: number | null
+  // Metadatos adicionales
+  legacy_potencia_id: string | null
+  denominacion: string | null
+  tension_kv: number | null
+  potencia_maxima_disponible: number | null
+  channel: string | null
+  ciudad_suministro: string | null
   deleted_at: string | null
   created_at: string
 }

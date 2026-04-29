@@ -6,7 +6,7 @@ import { X, Loader2 } from 'lucide-react'
 import { supabase } from '@/core/supabase/client'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
 import { toast } from 'sonner'
-import type { Empresa } from '@/core/types/entities'
+import type { Empresa, Cups } from '@/core/types/entities'
 
 const schema = z.object({
   empresa_id: z.string().uuid('Selecciona una empresa'),
@@ -18,19 +18,26 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-interface CupsRow { id: string; codigo_cups: string; p1_kw: number | null; p2_kw: number | null; p3_kw: number | null }
+// Usa tipo Cups canónico (p1_kw..p6_kw ya incluidos en entities.ts)
+type CupsRow = Pick<Cups, 'id' | 'codigo_cups' | 'p1_kw' | 'p2_kw' | 'p3_kw'>
 
 interface Props {
   onClose: () => void
   onCreated: () => void
+  initialEmpresaId?: string
+  initialCupsId?: string
 }
 
-export default function NuevoExpedienteModal({ onClose, onCreated }: Props) {
+export default function NuevoExpedienteModal({ onClose, onCreated, initialEmpresaId, initialCupsId }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [cupsDisponibles, setCupsDisponibles] = useState<CupsRow[]>([])
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      empresa_id: initialEmpresaId ?? '',
+      cups_id: initialCupsId ?? '',
+    },
   })
 
   const empresaId = watch('empresa_id')
@@ -50,7 +57,15 @@ export default function NuevoExpedienteModal({ onClose, onCreated }: Props) {
       .select('id, codigo_cups, p1_kw, p2_kw, p3_kw')
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
-      .then(({ data }) => setCupsDisponibles((data ?? []) as CupsRow[]))
+      .then(({ data }) => {
+        const lista = (data ?? []) as CupsRow[]
+        setCupsDisponibles(lista)
+        // Si venimos con cups inicial y ya cargaron, aseguramos que esté seleccionado
+        if (initialCupsId && lista.some(c => c.id === initialCupsId)) {
+          setValue('cups_id', initialCupsId)
+        }
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaId])
 
   const cupsSeleccionado = cupsDisponibles.find(c => c.id === cupsId)
@@ -123,7 +138,7 @@ export default function NuevoExpedienteModal({ onClose, onCreated }: Props) {
           {/* Empresa */}
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Empresa *</label>
-            <select {...register('empresa_id')} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+            <select {...register('empresa_id')} disabled={!!initialEmpresaId} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-600">
               <option value="">Selecciona una empresa...</option>
               {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
@@ -133,7 +148,7 @@ export default function NuevoExpedienteModal({ onClose, onCreated }: Props) {
           {/* CUPS */}
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">CUPS *</label>
-            <select {...register('cups_id')} disabled={!empresaId} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+            <select {...register('cups_id')} disabled={!empresaId || !!initialCupsId} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-600">
               <option value="">Selecciona un CUPS...</option>
               {cupsDisponibles.map(c => <option key={c.id} value={c.id}>{c.codigo_cups}</option>)}
             </select>

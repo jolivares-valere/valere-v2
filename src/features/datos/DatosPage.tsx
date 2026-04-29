@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   FileUp, Plus, Search, Loader2, Trash2, Save, Building2, Zap, Calendar, AlertCircle, Edit2
 } from 'lucide-react';
@@ -18,13 +19,16 @@ import { toast } from 'sonner';
 import { getTariffConfig, validateCUPS, validatePowers } from '@/core/energia/tariffs';
 
 export default function DataCapture() {
+  const location = useLocation()
+  const locationState = location.state as { empresaId?: string; cupsId?: string } | null
+
   const { data: empresas } = useSupabaseQuery<Empresa>({
     table: 'empresas',
     filters: [{ column: 'deleted_at', op: 'eq', value: null }],
     order: { column: 'nombre', ascending: true },
   });
 
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedClientId, setSelectedClientId] = useState<string>(locationState?.empresaId ?? '');
 
   const { data: cupsRows, loading: loadingSP, refetch: refetchSP } = useSupabaseQuery<Cups>({
     table: 'cups',
@@ -40,6 +44,12 @@ export default function DataCapture() {
   const supplyPoints = useMemo(() => cupsRows.map(cupsToSupplyPoint), [cupsRows]);
 
   const [selectedSPId, setSelectedSPId] = useState<string>('');
+
+  // Si venimos de SuministrosPotenciasPage con state, pre-seleccionar CUPS
+  useEffect(() => {
+    if (locationState?.cupsId) setSelectedSPId(locationState.cupsId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data: invoices, loading: loadingInv, refetch: refetchInv } = useSupabaseQuery<InvoiceHistory>({
     table: 'facturas',

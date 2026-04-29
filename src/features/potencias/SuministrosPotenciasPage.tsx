@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Zap, CheckCircle2, XCircle, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react'
+import { Search, Zap, CheckCircle2, XCircle, AlertCircle, ExternalLink, RefreshCw, FilePlus } from 'lucide-react'
 import { supabase } from '@/core/supabase/client'
 import { useQuery } from '@tanstack/react-query'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { SkeletonRow } from '@/components/ui/Skeleton'
 import EmptyState from '@/core/components/EmptyState'
+import NuevoExpedienteModal from './components/NuevoExpedienteModal'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface SuministroRow {
   datadis_sincronizado: boolean | null
   empresa_id: string
   empresa_nombre: string
+  expedientes_activos: number
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -62,7 +64,8 @@ async function fetchSuministros(): Promise<SuministroRow[]> {
       id, codigo_cups, tarifa_acceso, estado, distribuidor,
       ciudad_suministro, p1_kw, p2_kw, p3_kw, datadis_sincronizado,
       empresa_id,
-      empresas ( nombre )
+      empresas ( nombre ),
+      expedientes ( estado )
     `)
     .is('deleted_at', null)
     .order('empresa_id', { ascending: true })
@@ -70,9 +73,13 @@ async function fetchSuministros(): Promise<SuministroRow[]> {
 
   if (error) throw error
 
+  const ESTADOS_CERRADOS = ['aprobada', 'rechazada', 'archivada']
   return (data ?? []).map((r: any) => ({
     ...r,
     empresa_nombre: r.empresas?.nombre ?? '—',
+    expedientes_activos: (r.expedientes ?? []).filter(
+      (e: any) => !ESTADOS_CERRADOS.includes(e.estado)
+    ).length,
   }))
 }
 
@@ -81,6 +88,7 @@ async function fetchSuministros(): Promise<SuministroRow[]> {
 export default function SuministrosPotenciasPage() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroEmpresa, setFiltroEmpresa] = useState('')
+  const [modalCups, setModalCups] = useState<{ empresaId: string; cupsId: string } | null>(null)
 
   const { data: rows = [], isLoading, error, refetch } = useQuery({
     queryKey: ['suministros-potencias'],
@@ -219,6 +227,7 @@ export default function SuministrosPotenciasPage() {
                   <TableHead className="text-center">P3</TableHead>
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead className="text-center">Exptes</TableHead>
                   <TableHead className="text-center">Datadis</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -249,18 +258,39 @@ export default function SuministrosPotenciasPage() {
                     </TableCell>
                     <TableCell>{estadoBadge(r.estado)}</TableCell>
                     <TableCell className="text-center">
+                      {r.expedientes_activos > 0 ? (
+                        <span className="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-semibold w-5 h-5">
+                          {r.expedientes_activos}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {datadisIcon(r.datadis_sincronizado)}
                     </TableCell>
                     <TableCell>
-                      <Link
-                        to="/datos"
-                        state={{ empresaId: r.empresa_id, cupsId: r.id }}
-                        className="inline-flex items-center gap-1 text-xs text-valere-blue-dark hover:underline"
-                        title="Ver en Captura de Datos"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        Datos
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to="/datos"
+                          state={{ empresaId: r.empresa_id, cupsId: r.id }}
+                          className="inline-flex items-center gap-1 text-xs text-valere-blue-dark hover:underline"
+                          title="Ver facturas en Captura de Datos"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Datos
+                        </Link>
+                        {r.expedientes_activos === 0 && (
+                          <button
+                            onClick={() => setModalCups({ empresaId: r.empresa_id, cupsId: r.id })}
+                            className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:underline"
+                            title="Crear expediente RDL para este CUPS"
+                          >
+                            <FilePlus className="w-3 h-3" />
+                            Expte.
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -269,6 +299,15 @@ export default function SuministrosPotenciasPage() {
           </div>
         )}
       </Card>
+      {/* Modal nuevo expediente desde CUPS */}
+      {modalCups && (
+        <NuevoExpedienteModal
+          initialEmpresaId={modalCups.empresaId}
+          initialCupsId={modalCups.cupsId}
+          onClose={() => setModalCups(null)}
+          onCreated={() => { setModalCups(null); refetch() }}
+        />
+      )}
     </div>
   )
 }

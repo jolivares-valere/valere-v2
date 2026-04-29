@@ -1,5 +1,70 @@
 # Estado actual del proyecto Valere v2
 
+> **Última actualización: 2026-04-29 por Cowork (sesión noche — Módulo Seguimiento Planta FV — COMPLETADO)**
+>
+> ## ✅ COMPLETADO EN ESTA SESIÓN (commits 032bbcd + 2d0185f en main)
+>
+> | Componente | Estado | Detalle |
+> |---|---|---|
+> | SQL migration fv_* | ✅ aplicada en prod | 7 tablas: fv_credenciales, fv_planta, fv_dispositivo, fv_kpi_realtime, fv_kpi_diario, fv_alarma, fv_sync_log + RLS granular |
+> | Conector Python FusionSolar | ✅ commiteado | scripts/fv-sync/: crypto.py (AES-256-GCM), fusionsolar_client.py (WebAuth+Northbound stub), sync_job.py |
+> | GitHub Actions cron | ✅ commiteado | .github/workflows/fv-sync.yml — diario 02:00 ES, dispatch manual con dry-run |
+> | Frontend feature seguimiento-fv | ✅ commiteado | SeguimientoFVPage (vista global), PlantaFVTab (tab empresa), api.ts hooks React Query |
+> | Sidebar + rutas | ✅ commiteado | Entrada "Plantas FV" en sidebar, ruta /seguimiento-fv, tab ☀️ en EmpresaDetailPage |
+> | GitHub Secrets | ✅ configurados | SUPABASE_URL, SUPABASE_SERVICE_KEY, FV_ENCRYPTION_KEY ya en repo |
+>
+> **COMMIT_FV.ps1 ejecutado**: commits 032bbcd (feature completa) + 2d0185f (fix SQL USING) pusheados a main ✅
+>
+> **⚠️ ACCIÓN PENDIENTE JUAN (~2 min)**: Ejecutar `CHECK_FV_FILES.ps1` en raíz — el sandbox detectó que
+> `src/App.tsx`, `src/components/layout/Sidebar.tsx`, `src/features/empresas/EmpresaDetailPage.tsx`
+> pueden mostrar como "modified" en Windows por un artefacto del mount. El script verifica y restaura si necesario.
+>
+> **Pendiente de Juan** (manual, fuera del código):
+> 1. ~~Aplicar migración SQL en Supabase Dashboard~~ → ✅ Aplicada via Supabase MCP en sesión
+> 2. ~~Configurar GitHub Secrets~~ → ✅ Configurados
+> 3. Guardar `FV_ENCRYPTION_KEY` en 1Password (la clave está en los secrets de GitHub Actions)
+> 4. Añadir credenciales del primer cliente FV (ver `scripts/fv-sync/README.md`)
+>
+> ## 📋 PENDIENTE REAL (no implementado, bloqueado o decisión)
+>
+> | Item | Bloqueador | Notas |
+> |---|---|---|
+> | Añadir credenciales clientes FV | Acción Juan | Ver scripts/fv-sync/README.md |
+> | Migración a Northbound API | Por cliente (pide usuario Northbound a Huawei) | NorthboundClient ya implementado |
+> | Soporte GoodWe / iSolarCloud / SMA | Futuro | Arquitectura preparada, añadir new_client.py |
+> | Panel admin gestión credenciales FV | Próxima iteración | Actualmente se insertan via SQL |
+> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
+> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
+> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
+
+# Estado actual del proyecto Valere v2
+
+> **Última actualización: 2026-04-29 por Cowork (sesión tarde — Suministros + tipos Cups)**
+>
+> ## ✅ COMPLETADO EN ESTA SESIÓN
+>
+> | Componente | Estado | Detalle |
+> |---|---|---|
+> | Página Suministros Potencias | ✅ | /potencias/suministros — tabla 73 CUPS + filtros + exptes activos |
+> | Sidebar Suministros fix | ✅ | Antes apuntaba a /datos (error), ahora a /potencias/suministros |
+> | Tipo Cups completo | ✅ | Añadidos p1_kw..p6_kw, legacy_potencia_id, ciudad_suministro, etc. |
+> | NuevoExpedienteModal | ✅ | Usa Pick<Cups> en lugar de interfaz local redundante |
+> | DatosPage location.state | ✅ | Pre-selecciona empresa+CUPS al llegar desde Suministros |
+> | Commit tipos reales (sesión mañana) | ✅ | 76ba02c — database.ts 4549 líneas + EmpresaDetailPage timeline |
+>
+> **Pendiente ejecutar**: `COMMIT_SUMINISTROS.ps1` en raíz del repo
+>
+> ## 📋 PENDIENTE REAL (no implementado, bloqueado o decisión)
+>
+> | Item | Bloqueador | Notas |
+> |---|---|---|
+> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
+> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
+> | Unificación Supabase Fase 2 | Datos reales cross-proyecto | Protocolo en scripts/unificacion_fase2_* |
+> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
+
+# Estado actual del proyecto Valere v2
+
 > **Última actualización: 2026-04-29 por Cowork (Sprint autónomo — fases técnicas completadas)**
 >
 > ## ✅ COMPLETADO HOY (sesión 2026-04-29)
