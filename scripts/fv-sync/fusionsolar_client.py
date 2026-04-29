@@ -121,18 +121,23 @@ class WebAuthClient(FusionSolarClient):
         # ── Paso 1: detectar tipo de portal ───────────────────
         resp = self._client.get(self.base_url + "/")
         resp.raise_for_status()
-        login_url = str(resp.url)   # URL final tras redirects
+        login_url = str(resp.url)   # URL final tras redirects (puede ser otro dominio SSO)
 
         is_unisso_spa = "unisso" in login_url
 
         if is_unisso_spa:
+            # ── Extraer dominio SSO de la URL de login ────────
+            # uni003eu5.fusionsolar.huawei.com redirige al SSO en eu5.fusionsolar.huawei.com
+            # Todas las llamadas /unisso/* deben ir al dominio del SSO, no al portal
+            parsed_login = urllib.parse.urlparse(login_url)
+            sso_base = f"{parsed_login.scheme}://{parsed_login.netloc}"
+
             # ── Extraer parámetro service= de la URL de login ─
-            parsed  = urllib.parse.urlparse(login_url)
-            qs      = urllib.parse.parse_qs(parsed.query)
+            qs      = urllib.parse.parse_qs(parsed_login.query)
             service = qs.get("service", [""])[0]
 
             # ── Paso 2: obtener clave pública RSA ─────────────
-            pk_resp = self._client.get(self.base_url + "/unisso/pubkey")
+            pk_resp = self._client.get(sso_base + "/unisso/pubkey")
             pk_resp.raise_for_status()
             pk_body = pk_resp.json()
             # La respuesta puede ser plana o anidada bajo "data"
@@ -158,9 +163,9 @@ class WebAuthClient(FusionSolarClient):
             else:
                 password_to_send = self.password
 
-            # ── Paso 4: POST validateUser ──────────────────────
+            # ── Paso 4: POST validateUser (al dominio SSO, no al portal) ─
             validate_url = (
-                f"{self.base_url}/unisso/v3/validateUser.action"
+                f"{sso_base}/unisso/v3/validateUser.action"
                 f"?timeStamp={timestamp}&decision=1"
                 + (f"&service={urllib.parse.quote(service, safe='')}" if service else "")
             )
