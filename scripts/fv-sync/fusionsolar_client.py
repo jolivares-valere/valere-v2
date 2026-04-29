@@ -96,7 +96,13 @@ class WebAuthClient(FusionSolarClient):
         )
 
         # Paso 1: GET página login para obtener token CSRF inicial
-        resp = self._client.get("/web/login")
+        # El portal EU (eu5.fusionsolar.huawei.com) usa /unisso/login.action
+        # Otros portales (uni003eu5, etc.) pueden usar /web/login
+        login_path = "/unisso/login.action"
+        resp = self._client.get(login_path)
+        if resp.status_code == 404:
+            # Fallback para portales con ruta alternativa
+            resp = self._client.get("/web/login")
         resp.raise_for_status()
 
         # Extraer roarand del cookie (token anti-CSRF de Huawei)
