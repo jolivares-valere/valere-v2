@@ -87,106 +87,127 @@ class WebAuthClient(FusionSolarClient):
     # ── Autenticación ──────────────────────────────────────
 
     def login(self) -> None:
-        """Realiza login web y guarda la sesión en self._client."""
-        import re as _re
+        """
+        Login para portal EU5 (eu5.fusionsolar.huawei.com).
 
-        # Usamos un cliente SIN base_url para poder POST a URLs absolutas del form action
+        Flujo real verificado (SPA React, no CAS):
+          1. GET /  → redirect → /unisso/login.action?service=...  (extrae service URL)
+          2. GET /unisso/pubkey  → { pubKey, timeStamp, enableEncrypt }
+          3. Si enableEncrypt: cifrar password con RSA-2048 PKCS#1 v1.5
+          4. POST /unisso/v3/validateUser.action?timeStamp=...&decision=1&service=...
+             body JSON: { organizationName, username, password, verifycode }
+             respuesta OK: { errorCode: "0", redirectURL: "..." }
+          5. GET redirectURL → asienta cookies de sesión (roarand / bspsession)
+
+        Para portales antiguos (sin /unisso): flujo JSON legacy.
+        """
+        import base64
+        import urllib.parse
+        from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+        from cryptography.hazmat.primitives.serialization import (
+            load_der_public_key,
+            load_pem_public_key,
+        )
+
         self._client = httpx.Client(
             timeout=self.timeout,
             follow_redirects=True,
             headers={"User-Agent": "Mozilla/5.0 (compatible; ValereCRM/1.0)"},
         )
 
-        # Paso 1: GET la raíz del portal — los redirects establecen sesión completa
-        # y nos llevan a la página de login con service= y jsessionid ya en la URL.
-        # Para eu5.fusionsolar.huawei.com esto produce:
-        #   GET / → 302 → /unisso/login.action;jsessionid=XXX?service=...
+        # ── Paso 1: detectar tipo de portal ───────────────────
         resp = self._client.get(self.base_url + "/")
         resp.raise_for_status()
+        login_url = str(resp.url)   # URL final tras redirects
 
-        login_url = str(resp.url)   # URL final tras redirects (absoluta)
-        html      = resp.text
-        roarand   = self._client.cookies.get("roarand", "")
+        is_unisso_spa = "unisso" in login_url
 
-        is_unisso = "unisso" in login_url or "unisso" in html[:2000]
+        if is_unisso_spa:
+            # ── Extraer parámetro service= de la URL de login ─
+            parsed   = urllib.parse.urlparse(login_url)
+            qs       = urllib.parse.parse_qs(parsed.query)
+            service  = qs.get("service", [""])[0]
 
-        if is_unisso:
-            # Flujo CAS UNISSO
-            # Extraer action del form — es una URL absoluta o relativa con jsessionid+service
-            form_action_match = _re.search(
-                r'<form[^>]+action=["\']([^"\']+)["\']', html, _re.IGNORECASE
-            )
-            raw_action = form_action_match.group(1) if form_action_match else login_url
+            # ── Paso 2: obtener clave pública RSA ─────────────
+            pk_resp = self._client.get(self.base_url + "/unisso/pubkey")
+            pk_resp.raise_for_status()
+            pk_body = pk_resp.json()
+            # La respuesta puede ser plana o anidada bajo "data"
+            pk_data      = pk_body.get("data", pk_body)
+            pub_key_b64  = pk_data.get("pubKey", "")
+            timestamp    = pk_data.get("timeStamp", "")
+            enable_enc   = pk_data.get("enableEncrypt", True)
 
-            # Resolver URL relativa → absoluta
-            if raw_action.startswith("http"):
-                form_action = raw_action
-            elif raw_action.startswith("/"):
-                form_action = self.base_url + raw_action
+            logger.debug("FusionSolar pubkey ts=%s encrypt=%s", timestamp, enable_enc)
+
+            # ── Paso 3: cifrar contraseña con RSA PKCS#1 v1.5 ─
+            if enable_enc and pub_key_b64:
+                # La clave puede venir como PEM o como DER base64 sin cabeceras
+                if "BEGIN" in pub_key_b64:
+                    public_key = load_pem_public_key(pub_key_b64.encode())
+                else:
+                    public_key = load_der_public_key(base64.b64decode(pub_key_b64))
+                encrypted_pw = public_key.encrypt(
+                    self.password.encode("utf-8"),
+                    asym_padding.PKCS1v15(),
+                )
+                password_to_send = base64.b64encode(encrypted_pw).decode("utf-8")
             else:
-                # relativa sin / → relativa al directorio actual
-                base_dir = login_url.rsplit("/", 1)[0]
-                form_action = base_dir + "/" + raw_action
+                password_to_send = self.password
 
-            # Extraer TODOS los <input type="hidden"> de forma robusta
-            hidden_fields: dict[str, str] = {}
-            for tag_match in _re.finditer(r'<input[^>]+>', html, _re.IGNORECASE):
-                tag = tag_match.group(0)
-                if 'hidden' not in tag.lower():
-                    continue
-                name_m  = _re.search(r'name=["\']([^"\']+)["\']',  tag, _re.IGNORECASE)
-                value_m = _re.search(r'value=["\']([^"\']*)["\']', tag, _re.IGNORECASE)
-                if name_m:
-                    hidden_fields[name_m.group(1)] = value_m.group(1) if value_m else ""
-
-            form_data = {
-                **hidden_fields,
-                "username": self.username,
-                "password": self.password,
+            # ── Paso 4: POST validateUser ──────────────────────
+            validate_url = (
+                f"{self.base_url}/unisso/v3/validateUser.action"
+                f"?timeStamp={timestamp}&decision=1"
+                + (f"&service={urllib.parse.quote(service, safe='')}" if service else "")
+            )
+            login_payload = {
+                "organizationName": "",
+                "username":          self.username,
+                "password":          password_to_send,
+                "verifycode":        "",
             }
-            if "_eventId" not in form_data:
-                form_data["_eventId"] = "submit"
-
-            logger.debug("CAS form action: %s", form_action)
-            logger.debug("CAS hidden fields: %s", list(hidden_fields.keys()))
-
-            # POST a la URL absoluta del form action
             resp2 = self._client.post(
-                form_action,
-                data=form_data,
+                validate_url,
+                json=login_payload,
                 headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Referer": login_url,
-                    **({"roarand": roarand} if roarand else {}),
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "Referer":      login_url,
                 },
             )
-            # CAS devuelve 302 → portal si login OK; 200 → misma página si falla
-            if resp2.status_code not in (200, 302):
-                raise RuntimeError(f"FusionSolar UNISSO login fallido: HTTP {resp2.status_code}")
-            # Verificar que no seguimos en la página de login (indica credenciales incorrectas)
-            final_url = str(resp2.url)
-            if "unisso/login" in final_url and resp2.status_code == 200:
+            resp2.raise_for_status()
+            body2 = resp2.json()
+
+            error_code = str(body2.get("errorCode", "")).strip()
+            if error_code not in ("0", ""):
                 raise RuntimeError(
-                    "FusionSolar UNISSO login fallido: credenciales incorrectas "
-                    f"(redirigido a {final_url})"
+                    f"FusionSolar login fallido: errorCode={error_code} "
+                    f"msg={body2.get('errorMsg', body2.get('failCode', ''))}"
                 )
-            roarand = self._client.cookies.get("roarand", roarand)
+
+            # ── Paso 5: seguir redirectURL para asentar cookies ─
+            redirect_url = body2.get("redirectURL", "")
+            if redirect_url:
+                resp3 = self._client.get(redirect_url)
+                logger.debug("Login redirect → %s (HTTP %s)", redirect_url, resp3.status_code)
+
+            self._token = self._client.cookies.get("roarand", "")
+
         else:
-            # Flujo antiguo JSON (portales uni003eu5, etc.)
+            # ── Portal antiguo: flujo JSON ─────────────────────
+            roarand = self._client.cookies.get("roarand", "")
             payload = {"userName": self.username, "value": self.password}
-            headers = {"roarand": roarand} if roarand else {}
             resp2 = self._client.post(
                 self.base_url + "/rest/neteco/oauthserver/account/authorize",
                 json=payload,
-                headers=headers,
+                headers={"roarand": roarand} if roarand else {},
             )
             resp2.raise_for_status()
             body = resp2.json()
             if body.get("failCode") not in (None, 0, "0", ""):
                 raise RuntimeError(f"FusionSolar login fallido: {body}")
+            self._token = self._client.cookies.get("roarand", roarand)
 
-        # Guardar token anti-CSRF para las llamadas siguientes
-        self._token = self._client.cookies.get("roarand", roarand)
         logger.info("FusionSolar login OK para %s@%s", self.username, self.base_url)
 
     def _headers(self) -> dict:
