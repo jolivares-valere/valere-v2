@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, Building2, Zap, Calendar, FileText, Clock,
-  CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw, ChevronRight, Loader2, Save
+  CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw, ChevronRight,
+  Loader2, Save, Edit2, X, Plus
 } from 'lucide-react'
 import { supabase } from '@/core/supabase/client'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
 import { toast } from 'sonner'
-import { getNormativa, getNormativaOptions, type NormativaConfig } from './normativas.config'
+import { getNormativa, getNormativaOptions } from './normativas.config'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,12 @@ function fmtEur(v: number | null | undefined): string {
   return v.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
 }
 
+// ISO date "YYYY-MM-DD" para inputs type="date"
+function toInputDate(d: string | null | undefined): string {
+  if (!d) return ''
+  return d.slice(0, 10)
+}
+
 // ── Stepper ───────────────────────────────────────────────────────────────────
 
 function CicloStepper({ estado }: { estado: string }) {
@@ -91,7 +98,6 @@ function CicloStepper({ estado }: { estado: string }) {
       {CICLO_ESTADOS_STEPS.map((step, i) => {
         const done    = i < idx
         const current = i === idx
-        const pending = i > idx
         return (
           <div key={step.key} className="flex items-center">
             <div className="flex flex-col items-center min-w-[72px]">
@@ -121,11 +127,11 @@ function CicloStepper({ estado }: { estado: string }) {
 // ── Transiciones de estado ────────────────────────────────────────────────────
 
 const TRANSICIONES: Record<string, { label: string; siguiente: string; color: string }> = {
-  bajada_pendiente: { label: 'Enviar solicitud bajada →',  siguiente: 'bajada_activa',    color: 'bg-blue-600 text-white hover:bg-blue-700' },
-  bajada_activa:    { label: 'Marcar bajada aprobada →',   siguiente: 'bajada_aprobada',   color: 'bg-green-600 text-white hover:bg-green-700' },
-  bajada_aprobada:  { label: 'Iniciar subida de potencia →', siguiente: 'subida_pendiente', color: 'bg-purple-600 text-white hover:bg-purple-700' },
-  subida_pendiente: { label: 'Enviar solicitud subida →',  siguiente: 'subida_activa',     color: 'bg-amber-600 text-white hover:bg-amber-700' },
-  subida_activa:    { label: 'Marcar ciclo completado ✓',  siguiente: 'completado',        color: 'bg-emerald-600 text-white hover:bg-emerald-700' },
+  bajada_pendiente: { label: 'Enviar solicitud bajada →',    siguiente: 'bajada_activa',    color: 'bg-blue-600 text-white hover:bg-blue-700' },
+  bajada_activa:    { label: 'Marcar bajada aprobada →',     siguiente: 'bajada_aprobada',   color: 'bg-green-600 text-white hover:bg-green-700' },
+  bajada_aprobada:  { label: 'Iniciar subida de potencia →', siguiente: 'subida_pendiente',  color: 'bg-purple-600 text-white hover:bg-purple-700' },
+  subida_pendiente: { label: 'Enviar solicitud subida →',    siguiente: 'subida_activa',     color: 'bg-amber-600 text-white hover:bg-amber-700' },
+  subida_activa:    { label: 'Marcar ciclo completado ✓',    siguiente: 'completado',        color: 'bg-emerald-600 text-white hover:bg-emerald-700' },
 }
 
 // ── Tarjeta ciclo ─────────────────────────────────────────────────────────────
@@ -139,10 +145,22 @@ interface CicloCardProps {
 }
 
 function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCambiado }: CicloCardProps) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen]         = useState(true)
   const [advancing, setAdvancing] = useState(false)
+  const [editando, setEditando] = useState(false)
+  const [saving, setSaving]     = useState(false)
+
   const solicitud = ciclo.solicitudes_potencia?.[0]
   const transicion = TRANSICIONES[ciclo.estado]
+
+  // Estado local del formulario de edición
+  const [formEdit, setFormEdit] = useState({
+    ref_solicitud_distribuidora: solicitud?.ref_solicitud_distribuidora ?? '',
+    fecha_solicitud_enviada:     toInputDate(solicitud?.fecha_solicitud_enviada),
+    fecha_autorizacion:          toInputDate(solicitud?.fecha_autorizacion),
+    fecha_ejecucion_real:        toInputDate(solicitud?.fecha_ejecucion_real),
+    notas_internas:              solicitud?.notas_internas ?? '',
+  })
 
   const avanzarEstado = async () => {
     if (!transicion) return
@@ -154,7 +172,7 @@ function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCam
         .eq('id', ciclo.id)
       if (error) throw error
 
-      // Notificar por email (best-effort: no bloquear si falla)
+      // Notificar por email (best-effort)
       try {
         await supabase.functions.invoke('notify-expediente-estado', {
           body: {
@@ -181,8 +199,37 @@ function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCam
     }
   }
 
+  const guardarEdicion = async () => {
+    if (!solicitud) return
+    setSaving(true)
+    try {
+      const payload = {
+        ref_solicitud_distribuidora: formEdit.ref_solicitud_distribuidora || null,
+        fecha_solicitud_enviada:     formEdit.fecha_solicitud_enviada || null,
+        fecha_autorizacion:          formEdit.fecha_autorizacion || null,
+        fecha_ejecucion_real:        formEdit.fecha_ejecucion_real || null,
+        notas_internas:              formEdit.notas_internas || null,
+      }
+      const { error } = await (supabase as any)
+        .from('solicitudes_potencia')
+        .update(payload)
+        .eq('id', solicitud.id)
+      if (error) throw error
+      toast.success('Solicitud actualizada')
+      setEditando(false)
+      onEstadoCambiado()
+    } catch {
+      toast.error('Error al guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100'
+
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* Cabecera del ciclo */}
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -206,46 +253,163 @@ function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCam
       {open && (
         <div className="border-t border-slate-100 px-5 py-4">
           {solicitud ? (
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
-              <div>
-                <p className="text-xs text-slate-400">Tipo</p>
-                <p className="text-sm font-medium capitalize text-slate-900">{solicitud.tipo ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">Estado solicitud</p>
-                <p className="text-sm font-medium text-slate-900">{solicitud.estado ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">P1 actual → nueva</p>
-                <p className="text-sm font-medium text-slate-900">{fmt(solicitud.p1_actual)} → <span className="text-blue-700 font-bold">{fmt(solicitud.p1_nueva)}</span></p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">P2 actual → nueva</p>
-                <p className="text-sm font-medium text-slate-900">{fmt(solicitud.p2_actual)} → <span className="text-blue-700 font-bold">{fmt(solicitud.p2_nueva)}</span></p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">Fecha solicitud</p>
-                <p className="text-sm font-medium text-slate-900">{fmtDate(solicitud.fecha_solicitud_enviada)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">Fecha autorización</p>
-                <p className="text-sm font-medium text-slate-900">{fmtDate(solicitud.fecha_autorizacion)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">Fecha ejecución</p>
-                <p className="text-sm font-medium text-slate-900">{fmtDate(solicitud.fecha_ejecucion_real)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">Ref. distribuidora</p>
-                <p className="text-sm font-medium text-slate-900">{solicitud.ref_solicitud_distribuidora ?? '—'}</p>
-              </div>
-              {solicitud.notas_internas && (
-                <div className="col-span-2 sm:col-span-3 lg:col-span-4">
-                  <p className="text-xs text-slate-400">Notas internas</p>
-                  <p className="text-sm text-slate-700">{solicitud.notas_internas}</p>
+            <>
+              {/* Vista lectura */}
+              {!editando ? (
+                <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
+                  <div>
+                    <p className="text-xs text-slate-400">Tipo</p>
+                    <p className="text-sm font-medium capitalize text-slate-900">{solicitud.tipo ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Estado solicitud</p>
+                    <p className="text-sm font-medium text-slate-900">{solicitud.estado ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">P1 actual → nueva</p>
+                    <p className="text-sm font-medium text-slate-900">{fmt(solicitud.p1_actual)} → <span className="text-blue-700 font-bold">{fmt(solicitud.p1_nueva)}</span></p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">P2 actual → nueva</p>
+                    <p className="text-sm font-medium text-slate-900">{fmt(solicitud.p2_actual)} → <span className="text-blue-700 font-bold">{fmt(solicitud.p2_nueva)}</span></p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Ref. distribuidora</p>
+                    <p className="text-sm font-medium text-slate-900">{solicitud.ref_solicitud_distribuidora ?? <span className="text-slate-300 italic">sin rellenar</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Fecha solicitud</p>
+                    <p className="text-sm font-medium text-slate-900">{fmtDate(solicitud.fecha_solicitud_enviada)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Fecha autorización</p>
+                    <p className="text-sm font-medium text-slate-900">{fmtDate(solicitud.fecha_autorizacion)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Fecha ejecución</p>
+                    <p className="text-sm font-medium text-slate-900">{fmtDate(solicitud.fecha_ejecucion_real)}</p>
+                  </div>
+                  {solicitud.notas_internas && (
+                    <div className="col-span-2 sm:col-span-3 lg:col-span-4">
+                      <p className="text-xs text-slate-400">Notas internas</p>
+                      <p className="text-sm text-slate-700">{solicitud.notas_internas}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Formulario de edición */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-500">Ref. distribuidora</label>
+                      <input
+                        type="text"
+                        value={formEdit.ref_solicitud_distribuidora}
+                        onChange={e => setFormEdit(f => ({ ...f, ref_solicitud_distribuidora: e.target.value }))}
+                        placeholder="REF-IBER-2026-XXXXX"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-500">Fecha solicitud enviada</label>
+                      <input
+                        type="date"
+                        value={formEdit.fecha_solicitud_enviada}
+                        onChange={e => setFormEdit(f => ({ ...f, fecha_solicitud_enviada: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-500">Fecha autorización</label>
+                      <input
+                        type="date"
+                        value={formEdit.fecha_autorizacion}
+                        onChange={e => setFormEdit(f => ({ ...f, fecha_autorizacion: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-500">Fecha ejecución real</label>
+                      <input
+                        type="date"
+                        value={formEdit.fecha_ejecucion_real}
+                        onChange={e => setFormEdit(f => ({ ...f, fecha_ejecucion_real: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">Notas internas</label>
+                    <textarea
+                      rows={2}
+                      value={formEdit.notas_internas}
+                      onChange={e => setFormEdit(f => ({ ...f, notas_internas: e.target.value }))}
+                      className={`${inputCls} resize-none`}
+                    />
+                  </div>
                 </div>
               )}
-            </div>
+
+              {/* Barra inferior: editar / guardar / avanzar estado */}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
+                <div className="flex items-center gap-2">
+                  {!editando ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormEdit({
+                          ref_solicitud_distribuidora: solicitud.ref_solicitud_distribuidora ?? '',
+                          fecha_solicitud_enviada:     toInputDate(solicitud.fecha_solicitud_enviada),
+                          fecha_autorizacion:          toInputDate(solicitud.fecha_autorizacion),
+                          fecha_ejecucion_real:        toInputDate(solicitud.fecha_ejecucion_real),
+                          notas_internas:              solicitud.notas_internas ?? '',
+                        })
+                        setEditando(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                      Editar solicitud
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={guardarEdicion}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                        Guardar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditando(false)}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        <X className="h-3 w-3" />
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {!editando && transicion && (
+                  <button
+                    onClick={avanzarEstado}
+                    disabled={advancing}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${transicion.color}`}
+                  >
+                    {advancing
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <ChevronRight className="h-4 w-4" />
+                    }
+                    {transicion.label}
+                  </button>
+                )}
+              </div>
+            </>
           ) : (
             <p className="text-sm text-slate-400">Sin solicitud registrada para este ciclo.</p>
           )}
@@ -262,28 +426,160 @@ function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCam
               </div>
             </div>
           )}
-
-          {/* Botón de avance de estado */}
-          {transicion && (
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-              <p className="text-xs text-slate-400">
-                Siguiente: <span className="font-medium text-slate-600">{transicion.siguiente.replace(/_/g, ' ')}</span>
-              </p>
-              <button
-                onClick={avanzarEstado}
-                disabled={advancing}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${transicion.color}`}
-              >
-                {advancing
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <ChevronRight className="h-4 w-4" />
-                }
-                {transicion.label}
-              </button>
-            </div>
-          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── NuevoCicloCard ────────────────────────────────────────────────────────────
+
+interface NuevoCicloCardProps {
+  expedienteId: string
+  cupsId: string
+  empresaId: string
+  numeroCiclo: number
+  p1ActualKw: number | null
+  p2ActualKw: number | null
+  p3ActualKw: number | null
+  onCreado: () => void
+}
+
+function NuevoCicloCard({
+  expedienteId, cupsId, empresaId, numeroCiclo,
+  p1ActualKw, p2ActualKw, p3ActualKw, onCreado,
+}: NuevoCicloCardProps) {
+  const [abierto, setAbierto] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({
+    p1_nueva: '',
+    p2_nueva: '',
+    p3_nueva: '',
+    notas:    '',
+  })
+
+  const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100'
+
+  const crearCiclo = async () => {
+    const p1 = parseFloat(form.p1_nueva)
+    const p2 = parseFloat(form.p2_nueva)
+    if (!p1 || !p2 || p1 <= 0 || p2 <= 0) {
+      toast.error('P1 y P2 nuevos son obligatorios y deben ser positivos')
+      return
+    }
+    setCreating(true)
+    try {
+      // 1. Crear ciclo
+      const { data: ciclo, error: e1 } = await supabase
+        .from('ciclos')
+        .insert({
+          expediente_id:         expedienteId,
+          numero_ciclo:          numeroCiclo,
+          estado:                'bajada_pendiente',
+          ahorro_previsto_total: null,
+        })
+        .select('id')
+        .single()
+      if (e1) throw e1
+
+      // 2. Crear solicitud de bajada para el nuevo ciclo
+      const { error: e2 } = await supabase
+        .from('solicitudes_potencia')
+        .insert({
+          expediente_id: expedienteId,
+          ciclo_id:      ciclo.id,
+          cups_id:       cupsId,
+          empresa_id:    empresaId,
+          tipo:          'bajada',
+          estado:        'pendiente',
+          p1_actual:     p1ActualKw,
+          p2_actual:     p2ActualKw,
+          p3_actual:     p3ActualKw,
+          p1_nueva:      p1,
+          p2_nueva:      p2,
+          p3_nueva:      form.p3_nueva ? parseFloat(form.p3_nueva) : null,
+        })
+      if (e2) throw e2
+
+      // 3. Incrementar ciclos_realizados en expediente
+      await supabase
+        .from('expedientes')
+        .update({ ciclos_realizados: numeroCiclo })
+        .eq('id', expedienteId)
+
+      toast.success(`Ciclo ${numeroCiclo} creado`)
+      onCreado()
+      setAbierto(false)
+    } catch {
+      toast.error('Error al crear el ciclo')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 px-5 py-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+        Iniciar ciclo {numeroCiclo}
+      </button>
+    )
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-blue-50/30 shadow-sm">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-blue-100">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+            {numeroCiclo}
+          </span>
+          <p className="text-sm font-semibold text-slate-900">Nuevo ciclo {numeroCiclo}</p>
+        </div>
+        <button type="button" onClick={() => setAbierto(false)} className="text-slate-400 hover:text-slate-700">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        <p className="text-xs text-slate-500">
+          Potencias actuales del CUPS (tras ciclo anterior): P1 {fmt(p1ActualKw)} · P2 {fmt(p2ActualKw)} · P3 {fmt(p3ActualKw)}
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500">P1 nueva (kW) *</label>
+            <input type="number" step="0.01" value={form.p1_nueva} onChange={e => setForm(f => ({ ...f, p1_nueva: e.target.value }))} className={inputCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500">P2 nueva (kW) *</label>
+            <input type="number" step="0.01" value={form.p2_nueva} onChange={e => setForm(f => ({ ...f, p2_nueva: e.target.value }))} className={inputCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500">P3 nueva (kW)</label>
+            <input type="number" step="0.01" value={form.p3_nueva} onChange={e => setForm(f => ({ ...f, p3_nueva: e.target.value }))} className={inputCls} />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-500">Notas</label>
+          <textarea rows={2} value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} className={`${inputCls} resize-none`} />
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={() => setAbierto(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={crearCiclo}
+            disabled={creating}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Crear ciclo {numeroCiclo}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -355,6 +651,18 @@ export default function ExpedienteDetailPage() {
   }
 
   const ciclosOrdenados = [...(exp.ciclos ?? [])].sort((a, b) => a.numero_ciclo - b.numero_ciclo)
+  const ultimoCiclo     = ciclosOrdenados[ciclosOrdenados.length - 1]
+  const puedeNuevoCiclo =
+    exp.estado === 'activo' &&
+    ultimoCiclo?.estado === 'completado' &&
+    (exp.max_ciclos_permitidos == null || ciclosOrdenados.length < exp.max_ciclos_permitidos)
+
+  // Potencias "actuales" para el nuevo ciclo = las de la última solicitud subida del último ciclo,
+  // o si no existen, las del CUPS.
+  const ultimaSolicitud = ultimoCiclo?.solicitudes_potencia?.[0]
+  const p1Para = ultimaSolicitud?.p1_nueva ?? exp.cups?.p1_kw ?? null
+  const p2Para = ultimaSolicitud?.p2_nueva ?? exp.cups?.p2_kw ?? null
+  const p3Para = ultimaSolicitud?.p3_nueva ?? exp.cups?.p3_kw ?? null
 
   return (
     <div className="min-h-full bg-slate-50 p-4 sm:p-6">
@@ -493,6 +801,20 @@ export default function ExpedienteDetailPage() {
                 onEstadoCambiado={refetch}
               />
             ))}
+
+            {/* Botón nuevo ciclo (solo si el último está completado y hay margen) */}
+            {puedeNuevoCiclo && exp.cups && (
+              <NuevoCicloCard
+                expedienteId={exp.id}
+                cupsId={exp.cups.id}
+                empresaId={exp.empresas?.id ?? ''}
+                numeroCiclo={ciclosOrdenados.length + 1}
+                p1ActualKw={p1Para}
+                p2ActualKw={p2Para}
+                p3ActualKw={p3Para}
+                onCreado={refetch}
+              />
+            )}
           </div>
         )}
       </div>

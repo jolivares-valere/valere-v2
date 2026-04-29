@@ -1,36 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════
 // AI Adapter — Interfaz sustituible para el asistente del CRM.
 // ═══════════════════════════════════════════════════════════════════
-//
-// El adapter aísla el resto del sistema del proveedor concreto de IA.
-// Cambiar de modelo (Gemini → Claude → OpenAI) = modificar este archivo,
-// cero impacto en Edge Functions ni frontend.
-//
-// Ver docs/PLAN_ASISTENTE_RAG_CRM.md §Fase 3 para contexto.
 
 import { GoogleGenAI } from 'npm:@google/genai@1.0.0'
 
 export interface AIAdapter {
-  /**
-   * Genera un embedding vectorial para el texto dado.
-   * Debe devolver un array de floats de 768 dimensiones (compatible con la tabla crm_help_embeddings).
-   */
   embed(text: string): Promise<number[]>
-
-  /**
-   * Genera una respuesta textual a partir del prompt (que incluye system prompt + contexto + pregunta).
-   */
   generate(prompt: string): Promise<string>
-
-  /**
-   * Nombre del proveedor (para logs/debug).
-   */
   readonly provider: string
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Gemini (Google) — implementación actual por defecto.
-// ═══════════════════════════════════════════════════════════════════
+// ── Gemini ────────────────────────────────────────────────────────
 
 function createGeminiAdapter(apiKey: string): AIAdapter {
   const ai = new GoogleGenAI({ apiKey })
@@ -39,15 +19,10 @@ function createGeminiAdapter(apiKey: string): AIAdapter {
     provider: 'gemini',
 
     async embed(text: string): Promise<number[]> {
-      // gemini-embedding-001 con outputDimensionality=768 (coincide con la tabla
-      // crm_help_embeddings y con scripts/generate-help-embeddings.mjs).
-      // text-embedding-004 fue deprecado para cuentas nuevas en abril 2026.
       const result = await ai.models.embedContent({
         model: 'gemini-embedding-001',
         contents: text,
-        config: {
-          outputDimensionality: 768,
-        },
+        config: { outputDimensionality: 768 },
       })
       const values =
         (result as any).embeddings?.[0]?.values ??
@@ -62,17 +37,42 @@ function createGeminiAdapter(apiKey: string): AIAdapter {
     },
 
     async generate(prompt: string): Promise<string> {
-      // gemini-2.5-flash: sustituye a gemini-2.0-flash (deprecado para cuentas
-      // nuevas desde abril 2026). Misma latencia, mejor calidad de respuesta.
+      // gemini-2.5-flash es un "thinking model" — su campo .text puede lanzar
+      // una excepción cuando la respuesta incluye partes de razonamiento (thought).
+      // Extraemos el texto manualmente de candidates[0].content.parts como fallback.
       const result = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
       })
-      // Formato de respuesta según @google/genai 1.0.0:
-      const text =
-        (result as any).text ??
-        (result as any).response?.text() ??
-        ''
+
+      let text = ''
+
+      // Intento 1: propiedad .text (funciona en modelos no-thinking)
+      try {
+        const t = (result as any).text
+        if (typeof t === 'string' && t.length > 0) text = t
+      } catch {
+        // thinking model lanza aquí — usamos fallback
+      }
+
+      // Intento 2: extraer partes de texto de candidates (saltarse las thought parts)
+      if (!text) {
+        const parts: any[] =
+          (result as any).candidates?.[0]?.content?.parts ?? []
+        text = parts
+          .filter((p: any) => p.text && !p.thought)
+          .map((p: any) => String(p.text))
+          .join('')
+      }
+
+      // Intento 3: método .response?.text() del SDK antiguo
+      if (!text) {
+        try {
+          const t = (result as any).response?.text?.()
+          if (typeof t === 'string' && t.length > 0) text = t
+        } catch { /* ignorar */ }
+      }
+
       if (!text) {
         throw new Error('Gemini generate devolvió respuesta vacía')
       }
@@ -81,10 +81,7 @@ function createGeminiAdapter(apiKey: string): AIAdapter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Factory — elige el adapter según AI_PROVIDER env var.
-// Default: gemini.
-// ═══════════════════════════════════════════════════════════════════
+// ── Factory ───────────────────────────────────────────────────────
 
 export function getAdapter(): AIAdapter {
   const provider = (Deno.env.get('AI_PROVIDER') ?? 'gemini').toLowerCase()
@@ -95,13 +92,6 @@ export function getAdapter(): AIAdapter {
       if (!apiKey) throw new Error('GEMINI_API_KEY env var missing')
       return createGeminiAdapter(apiKey)
     }
-
-    // Ejemplos futuros:
-    // case 'claude':
-    //   return createClaudeAdapter(Deno.env.get('ANTHROPIC_API_KEY')!)
-    // case 'openai':
-    //   return createOpenAIAdapter(Deno.env.get('OPENAI_API_KEY')!)
-
     default:
       throw new Error(`AI_PROVIDER "${provider}" no soportado`)
   }

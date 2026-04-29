@@ -242,7 +242,7 @@ ${question}
         sources: [],
         error: err instanceof Error ? err.message : String(err),
       },
-      500,
+      200,  // 200 para que el Supabase SDK entregue el mensaje al cliente (500 lo descarta)
       corsHeaders,
     )
   }

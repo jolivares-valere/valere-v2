@@ -300,7 +300,7 @@ function GraficoProduccion({ kpis, loading }: { kpis: { fecha: string; energia_k
           />
           <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} />
           <Tooltip
-            formatter={(v: number) => [`${v.toFixed(1)} kWh`, 'Energía']}
+            formatter={(v) => [`${Number(v ?? 0).toFixed(1)} kWh`, 'Energía']}
             labelStyle={{ fontSize: 11 }}
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
           />

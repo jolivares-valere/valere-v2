@@ -46,7 +46,12 @@ export function useSupabaseQuery<T>({
 
       const parsedFilters = JSON.parse(filtersKey) as typeof filters;
       for (const f of parsedFilters) {
-        query = query.filter(f.column, f.op, f.value);
+        // PostgREST requires .is() for NULL comparisons — .eq(col, null) returns 0 rows
+        if (f.value === null) {
+          query = (query as any).is(f.column, null);
+        } else {
+          query = query.filter(f.column, f.op, f.value);
+        }
       }
 
       if (order) {

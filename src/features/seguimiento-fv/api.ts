@@ -93,7 +93,7 @@ export function usePlantasPorEmpresa(empresaId: string | undefined) {
     queryKey: ['fv_planta', 'empresa', empresaId],
     enabled: !!empresaId,
     queryFn: async (): Promise<FVPlanta[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('fv_planta')
         .select(`
           *,
@@ -123,7 +123,7 @@ export function useAlarmasPorPlanta(plantaId: string | undefined) {
     queryKey: ['fv_alarma', 'planta', plantaId],
     enabled: !!plantaId,
     queryFn: async (): Promise<FVAlarma[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('fv_alarma')
         .select('*')
         .eq('planta_id', plantaId!)
@@ -148,7 +148,7 @@ export function useKpiDiarioPorPlanta(plantaId: string | undefined, dias = 30) {
       const desde = new Date()
       desde.setDate(desde.getDate() - dias)
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('fv_kpi_diario')
         .select('*')
         .eq('planta_id', plantaId!)
@@ -170,7 +170,7 @@ export function useDispositivosPorPlanta(plantaId: string | undefined) {
     queryKey: ['fv_dispositivo', 'planta', plantaId],
     enabled: !!plantaId,
     queryFn: async (): Promise<FVDispositivo[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('fv_dispositivo')
         .select('*')
         .eq('planta_id', plantaId!)
@@ -191,7 +191,7 @@ export function useSyncLogEmpresa(empresaId: string | undefined, limit = 5) {
     queryKey: ['fv_sync_log', empresaId, limit],
     enabled: !!empresaId,
     queryFn: async (): Promise<FVSyncLog[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('fv_sync_log')
         .select('*')
         .eq('empresa_id', empresaId!)
@@ -212,7 +212,7 @@ export function useTodasLasPlantas() {
   return useQuery({
     queryKey: ['fv_planta', 'todas'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('fv_planta')
         .select(`
           *,
