@@ -34,6 +34,7 @@ const IncidenciasPage = lazy(() => import('./features/incidencias/IncidenciasPag
 const RenovacionesPage = lazy(() => import('./features/renovaciones/RenovacionesPage'))
 const CalendarioPage = lazy(() => import('./features/calendario/CalendarioPage'))
 const AsistentePanel = lazy(() => import('./features/asistente-crm/AsistentePanel'))
+const SeguimientoFVPage = lazy(() => import('./features/seguimiento-fv/SeguimientoFVPage'))
 
 function LoadingScreen() {
   return (
@@ -138,6 +139,7 @@ export default function App() {
       <Route path="/analisis" element={<AuthGuard><AnalisisPage /></AuthGuard>} />
       <Route path="/propuestas-energia" element={<AuthGuard><PropuestasEnergiaPage /></AuthGuard>} />
       <Route path="/tracking" element={<AuthGuard><TrackingPage /></AuthGuard>} />
+      <Route path="/seguimiento-fv" element={<AuthGuard><SeguimientoFVPage /></AuthGuard>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, Building2, Calendar, ChevronDown,
   ChevronLeft, ChevronRight, FileText, GitBranch, LayoutDashboard, Mail, RefreshCw,
-  Settings, ShieldCheck, Upload, Users, X, Zap
+  Settings, ShieldCheck, Sun, Upload, Users, X, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
@@ -27,6 +27,7 @@ const crmItems: Item[] = [
   { to: '/incidencias',   label: 'Incidencias',   icon: AlertTriangle },
   { to: '/renovaciones',  label: 'Renovaciones',  icon: RefreshCw },
   { to: '/importador',    label: 'Importador',    icon: Upload },
+  { to: '/seguimiento-fv', label: 'Plantas FV',  icon: Sun },
 ]
 
 const potenciasItems: Item[] = [

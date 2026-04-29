@@ -12,9 +12,10 @@ import ContactoForm from '../contactos/components/ContactoForm'
 import { formatDate } from '../../core/utils/dates'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import CustomFieldsPanel from '../../core/components/CustomFieldsPanel'
+import PlantaFVTab from '../seguimiento-fv/components/PlantaFVTab'
 import type { EmpresaUpdate, ContactoInsert, TipoActividad } from '../../core/types/entities'
 
-type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos'
+type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos' | 'plantas-fv'
 
 export default function EmpresaDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -91,6 +92,7 @@ export default function EmpresaDetailPage() {
                 {tab === 'contactos' && <ContactosSection empresaId={empresa.id} />}
                 {tab === 'documentos' && <DocumentosTab entidadTipo="empresa" entidadId={empresa.id} />}
                 {tab === 'campos' && <CustomFieldsPanel entidad_tipo="empresa" entidad_id={empresa.id} />}
+                {tab === 'plantas-fv' && <PlantaFVTab empresaId={empresa.id} />}
                 {(tab === 'contratos' || tab === 'propuestas') && (
                   <p className="text-sm text-slate-500">
                     Sección "{tab}" — próximas iteraciones.
@@ -127,20 +129,31 @@ export default function EmpresaDetailPage() {
   )
 }
 
+const TAB_LABELS: Record<Tab, string> = {
+  resumen:      'Resumen',
+  contactos:    'Contactos',
+  contratos:    'Contratos',
+  actividades:  'Actividades',
+  documentos:   'Documentos',
+  propuestas:   'Propuestas',
+  campos:       'Campos',
+  'plantas-fv': '☀️ Plantas FV',
+}
+
 function TabsNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const tabs: Tab[] = ['resumen', 'contactos', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos']
+  const tabs: Tab[] = ['resumen', 'contactos', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv']
   return (
-    <div className="mb-4 flex gap-1 border-b border-slate-200">
+    <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
       {tabs.map((t) => (
         <button
           key={t}
           type="button"
           onClick={() => setTab(t)}
-          className={`px-4 py-2 text-sm capitalize ${
+          className={`whitespace-nowrap px-4 py-2 text-sm ${
             tab === t ? 'border-b-2 border-slate-900 font-medium text-slate-900' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          {t}
+          {TAB_LABELS[t]}
         </button>
       ))}
     </div>
