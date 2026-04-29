@@ -21,7 +21,9 @@ on:
 jobs:
   sync:
     name: Sincronizar plantas FV
-    runs-on: ubuntu-latest
+    # ubuntu-22.04: ubuntu-latest ya es Ubuntu 24 donde libasound2 no existe como paquete.
+    # Playwright 1.44 necesita libasound2 → usamos 22.04 donde sí está disponible.
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
 
     steps:
@@ -39,11 +41,7 @@ jobs:
         run: pip install -r scripts/fv-sync/requirements.txt
 
       - name: Instalar Playwright + Chromium
-        run: |
-          # Ubuntu 22/24: libasound2 fue renombrado a libasound2t64
-          # Pre-instalarlo evita el error "no installation candidate" de playwright --with-deps
-          sudo apt-get install -y libasound2t64 2>/dev/null || true
-          playwright install chromium --with-deps
+        run: playwright install chromium --with-deps
 
       - name: Ejecutar sincronización
         working-directory: scripts/fv-sync
