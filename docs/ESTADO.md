@@ -1,5 +1,31 @@
 # Estado actual del proyecto Valere v2
 
+> **Última actualización: 2026-04-29 por Cowork (sesión noche — bugs críticos + ExpedienteDetail)**
+>
+> ## ✅ COMPLETADO EN ESTA SESIÓN (commits 3614d96 + a3d4a21 en main)
+>
+> | Componente | Estado | Detalle |
+> |---|---|---|
+> | Fix Dashboard Potencias (0 clientes/CUPS) | ✅ | useSupabaseQuery usaba .eq(col,null) → PostgREST no hace IS NULL; corregido a .is() |
+> | Fix Asistente RAG (500 error) | ✅ | gemini-2.5-flash lanza en .text con thinking parts; extraer de candidates[0].content.parts |
+> | ask-crm-docs v18 desplegada | ✅ | Catch devuelve 200 en lugar de 500; SDK entrega el mensaje al cliente |
+> | ExpedienteDetailPage mejorado | ✅ | Edición inline solicitud (ref, fechas, notas) + botón Nuevo ciclo |
+> | Archivos truncados NTFS restaurados | ✅ | App.tsx, Sidebar.tsx, EmpresaDetailPage.tsx desde git HEAD |
+> | seguimiento-fv/api.ts cast (supabase as any) | ✅ | Tablas fv_* no están en database.ts → cast necesario |
+> | TSC = 0 errores verificado | ✅ | Antes del commit |
+>
+> ## 📋 PENDIENTE REAL (no implementado, bloqueado o decisión)
+>
+> | Item | Bloqueador | Notas |
+> |---|---|---|
+> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
+> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
+> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
+> | Credenciales FV primer cliente | Acción Juan | Ver scripts/fv-sync/README.md |
+> | Regenerar database.ts con tablas fv_* | Próxima sesión | Eliminar casts (supabase as any) en seguimiento-fv |
+
+# Estado actual del proyecto Valere v2
+
 > **Última actualización: 2026-04-29 por Cowork (sesión noche — Módulo Seguimiento Planta FV — COMPLETADO)**
 >
 > ## ✅ COMPLETADO EN ESTA SESIÓN (commits 032bbcd + 2d0185f en main)
@@ -763,61 +789,4 @@ CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). 
 | FASE | Descripción | ETA |
 |------|-------------|-----|
 | **28.1a** | Refactor Calculadora: DatosPage, AnalisisPage, TrackingPage, PropuestasEnergiaPage → `empresas/cups` | Próxima sesión Claude Code |
-| **28.1b** | Migración datos residuales clients→empresas + ACK DROP + DROP legacy | Sesión Cowork siguiente |
-| **28** | Personalización: custom fields, dashboards por rol, automatizaciones flujo | Post 28.1 |
-
-## Ejes de personalización FASE 28 (priorizados por valor)
-
-| Eje | Descripción | Complejidad |
-|-----|-------------|-------------|
-| Custom fields en empresas + oportunidades | Campos propios por consultoría (tarifa habitual, clasificación, próximo contacto...) | Media — tabla `custom_fields_schema` ya existe |
-| Dashboards por rol | Comercial: sus oportunidades + pipeline + vencimientos. Jefe equipo: equipo. Admin: todo | Baja-Media — widgets ya existen, filtrar por rol |
-| Automatizaciones de flujo | Oportunidad ganada→contrato automático. Contrato firmado→actividad 30d. Alerta 60d vencimiento | Media-Alta — triggers SQL o tabla de reglas |
-
-## Estado de las tablas
-
-| Tabla | Estado | Filas | Notas |
-|-------|--------|-------|-------|
-| `user_profiles` | ✅ activa | 1 | Nombre correcto |
-| `empresas` | ✅ activa | 1 | PAZ Y BIEN 5002AP migrada |
-| `clients` | ⚠️ legacy | 1 | DROP bloqueado — 4 features Calculadora leen de ella (FASE 28.1) |
-| `cups` | ✅ activa | 1 | CUPS migrado; contrato_id nullable; policy NULL fix ✅ |
-| `supply_points` | ⚠️ legacy | 1 | DROP bloqueado — 4 features Calculadora leen de ella (FASE 28.1) |
-| `facturas` | ✅ activa | 1 | Renombrada desde invoice_history |
-| `invoice_history` | ❌ eliminada | - | Renombrada a facturas |
-| `oportunidades` | ✅ activa | 1 | Pipeline energético |
-| `eventos` | ✅ activa | 0 | FASE 27 — sin datos aún |
-| `incidencias` | ✅ activa | ? | RLS fixed ✅ |
-| `renovaciones` | ✅ activa | ? | RLS fixed ✅ |
-| `documentos` (tabla) | ✅ activa | 0 | FASE 24 |
-| `documentos` (bucket) | ✅ activa | 0 | Creado 2026-04-19, 4 policies |
-
-## Archivos clave
-
-| Archivo | Propósito |
-|---|---|
-| `CLAUDE.md` | Contexto del proyecto — ambos Claudes lo leen al arrancar |
-| `docs/ROADMAP_FUSION.md` | Roadmap detallado con checklists |
-| `docs/ESTADO.md` | **Este fichero** — estado en tiempo real |
-| `docs/AUDIT_2026-04-19.md` | Audit completo (3 agentes) — 0 P0, 0 P1 pendientes |
-| `docs/BACKUP_PROTOCOL.md` | Protocolo de backup + prompt inicio sesión + reglas críticas |
-| `.cowork/inbox/2026-04-19T24-00-00-bucket-documentos-creado.md` | Confirmación P0.1 cerrado |
-
-## Cómo arrancar una nueva sesión
-
-### Claude Cowork (Web — claude.ai/code)
-```
-Trabajas en valere-v2, rama claude/valere-crm-architecture-2vvEV.
-Ejecuta:
-git pull origin claude/valere-crm-architecture-2vvEV
-cat CLAUDE.md docs/ESTADO.md
-ls .cowork/outbox/ .cowork/inbox/
-git log --oneline -10
-Lee todo y dime dónde nos quedamos. Continúa desde ahí.
-```
-
-### Claude Code (CLI/Desktop)
-```bash
-cd ~/valere-v2 && claude -c
-```
-
+| **28.1b** | Migración datos residuales clients→empresas + ACK DRO
