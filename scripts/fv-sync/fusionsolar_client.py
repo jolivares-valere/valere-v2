@@ -108,23 +108,40 @@ class WebAuthClient(FusionSolarClient):
         # Extraer roarand del cookie (token anti-CSRF de Huawei)
         roarand = self._client.cookies.get("roarand", "")
 
-        # Paso 2: POST credenciales
-        payload = {
-            "userName": self.username,
-            "value":    self.password,
-        }
-        headers = {"roarand": roarand} if roarand else {}
+        # Detectar tipo de portal según la página de login
+        # - Portal EU (eu5): flujo CAS UNISSO → POST a /unisso/login.action con form-data
+        # - Portal antiguo:  JSON → POST a /rest/neteco/oauthserver/account/authorize
+        is_unisso = "unisso" in login_path
 
-        resp = self._client.post(
-            "/rest/neteco/oauthserver/account/authorize",
-            json=payload,
-            headers=headers,
-        )
-        resp.raise_for_status()
-
-        body = resp.json()
-        if body.get("failCode") not in (None, 0, "0", ""):
-            raise RuntimeError(f"FusionSolar login fallido: {body}")
+        if is_unisso:
+            # Flujo CAS: POST form-data al mismo endpoint
+            form_data = {
+                "username": self.username,
+                "password": self.password,
+                "service":  "/unisess/v1/auth?service=%2Fnetecowebext%2Fhome%2Findex.html",
+            }
+            headers = {"roarand": roarand} if roarand else {}
+            resp = self._client.post(login_path, data=form_data, headers=headers)
+            # UNISSO devuelve redirect 302 si el login es correcto
+            if resp.status_code not in (200, 302):
+                resp.raise_for_status()
+            # Tras el redirect, las cookies de sesión ya están en self._client
+        else:
+            # Flujo antiguo JSON
+            payload = {
+                "userName": self.username,
+                "value":    self.password,
+            }
+            headers = {"roarand": roarand} if roarand else {}
+            resp = self._client.post(
+                "/rest/neteco/oauthserver/account/authorize",
+                json=payload,
+                headers=headers,
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            if body.get("failCode") not in (None, 0, "0", ""):
+                raise RuntimeError(f"FusionSolar login fallido: {body}")
 
         # Renovar roarand tras login exitoso
         self._token = self._client.cookies.get("roarand", roarand)
