@@ -88,95 +88,119 @@ class WebAuthClient(FusionSolarClient):
 
     def login(self) -> None:
         """Realiza login web y guarda la sesión en self._client."""
+        import re as _re
+
+        # Usamos un cliente SIN base_url para poder POST a URLs absolutas del form action
         self._client = httpx.Client(
-            base_url=self.base_url,
             timeout=self.timeout,
             follow_redirects=True,
             headers={"User-Agent": "Mozilla/5.0 (compatible; ValereCRM/1.0)"},
         )
 
-        # Paso 1: GET página login para obtener token CSRF inicial
-        # El portal EU (eu5.fusionsolar.huawei.com) usa /unisso/login.action
-        # Otros portales (uni003eu5, etc.) pueden usar /web/login
-        login_path = "/unisso/login.action"
-        resp = self._client.get(login_path)
-        if resp.status_code == 404:
-            # Fallback para portales con ruta alternativa
-            resp = self._client.get("/web/login")
+        # Paso 1: GET la raíz del portal — los redirects establecen sesión completa
+        # y nos llevan a la página de login con service= y jsessionid ya en la URL.
+        # Para eu5.fusionsolar.huawei.com esto produce:
+        #   GET / → 302 → /unisso/login.action;jsessionid=XXX?service=...
+        resp = self._client.get(self.base_url + "/")
         resp.raise_for_status()
 
-        # Extraer roarand del cookie (token anti-CSRF de Huawei)
-        roarand = self._client.cookies.get("roarand", "")
+        login_url = str(resp.url)   # URL final tras redirects (absoluta)
+        html      = resp.text
+        roarand   = self._client.cookies.get("roarand", "")
 
-        # Detectar tipo de portal según la página de login
-        # - Portal EU (eu5): flujo CAS UNISSO → necesita parsear form para obtener
-        #   lt (login ticket), execution y action URL antes del POST
-        # - Portal antiguo:  JSON → POST a /rest/neteco/oauthserver/account/authorize
-        is_unisso = "unisso" in login_path
+        is_unisso = "unisso" in login_url or "unisso" in html[:2000]
 
         if is_unisso:
-            # Flujo CAS UNISSO: extraer campos ocultos del formulario HTML
-            import re as _re
-            html = resp.text
+            # Flujo CAS UNISSO
+            # Extraer action del form — es una URL absoluta o relativa con jsessionid+service
+            form_action_match = _re.search(
+                r'<form[^>]+action=["\']([^"\']+)["\']', html, _re.IGNORECASE
+            )
+            raw_action = form_action_match.group(1) if form_action_match else login_url
 
-            # Extraer action del form (puede tener jsessionid u otros params)
-            form_action_match = _re.search(r'<form[^>]+action=["\']([^"\']+)["\']', html)
-            form_action = form_action_match.group(1) if form_action_match else login_path
+            # Resolver URL relativa → absoluta
+            if raw_action.startswith("http"):
+                form_action = raw_action
+            elif raw_action.startswith("/"):
+                form_action = self.base_url + raw_action
+            else:
+                # relativa sin / → relativa al directorio actual
+                base_dir = login_url.rsplit("/", 1)[0]
+                form_action = base_dir + "/" + raw_action
 
-            # Extraer campos ocultos: lt, execution, _eventId, etc.
-            hidden_fields = dict(_re.findall(
-                r'<input[^>]+type=["\']hidden["\'][^>]+name=["\']([^"\']+)["\'][^>]+value=["\']([^"\']*)["\']',
-                html
-            ))
-            # También el orden inverso name/value
-            hidden_fields.update(dict(_re.findall(
-                r'<input[^>]+name=["\']([^"\']+)["\'][^>]+type=["\']hidden["\'][^>]+value=["\']([^"\']*)["\']',
-                html
-            )))
+            # Extraer TODOS los <input type="hidden"> de forma robusta
+            hidden_fields: dict[str, str] = {}
+            for tag_match in _re.finditer(r'<input[^>]+>', html, _re.IGNORECASE):
+                tag = tag_match.group(0)
+                if 'hidden' not in tag.lower():
+                    continue
+                name_m  = _re.search(r'name=["\']([^"\']+)["\']',  tag, _re.IGNORECASE)
+                value_m = _re.search(r'value=["\']([^"\']*)["\']', tag, _re.IGNORECASE)
+                if name_m:
+                    hidden_fields[name_m.group(1)] = value_m.group(1) if value_m else ""
 
             form_data = {
                 **hidden_fields,
                 "username": self.username,
                 "password": self.password,
             }
-            # Asegurar _eventId=submit si no viene en el form
             if "_eventId" not in form_data:
                 form_data["_eventId"] = "submit"
 
-            headers = {"roarand": roarand, "Content-Type": "application/x-www-form-urlencoded"}
-            resp = self._client.post(form_action, data=form_data, headers=headers)
-            # CAS devuelve 302 redirect si el login es correcto
-            if resp.status_code not in (200, 302):
-                raise RuntimeError(f"FusionSolar UNISSO login fallido: HTTP {resp.status_code}")
-            # Renovar roarand tras login
+            logger.debug("CAS form action: %s", form_action)
+            logger.debug("CAS hidden fields: %s", list(hidden_fields.keys()))
+
+            # POST a la URL absoluta del form action
+            resp2 = self._client.post(
+                form_action,
+                data=form_data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Referer": login_url,
+                    **({"roarand": roarand} if roarand else {}),
+                },
+            )
+            # CAS devuelve 302 → portal si login OK; 200 → misma página si falla
+            if resp2.status_code not in (200, 302):
+                raise RuntimeError(f"FusionSolar UNISSO login fallido: HTTP {resp2.status_code}")
+            # Verificar que no seguimos en la página de login (indica credenciales incorrectas)
+            final_url = str(resp2.url)
+            if "unisso/login" in final_url and resp2.status_code == 200:
+                raise RuntimeError(
+                    "FusionSolar UNISSO login fallido: credenciales incorrectas "
+                    f"(redirigido a {final_url})"
+                )
             roarand = self._client.cookies.get("roarand", roarand)
         else:
-            # Flujo antiguo JSON
-            payload = {
-                "userName": self.username,
-                "value":    self.password,
-            }
+            # Flujo antiguo JSON (portales uni003eu5, etc.)
+            payload = {"userName": self.username, "value": self.password}
             headers = {"roarand": roarand} if roarand else {}
-            resp = self._client.post(
-                "/rest/neteco/oauthserver/account/authorize",
+            resp2 = self._client.post(
+                self.base_url + "/rest/neteco/oauthserver/account/authorize",
                 json=payload,
                 headers=headers,
             )
-            resp.raise_for_status()
-            body = resp.json()
+            resp2.raise_for_status()
+            body = resp2.json()
             if body.get("failCode") not in (None, 0, "0", ""):
                 raise RuntimeError(f"FusionSolar login fallido: {body}")
 
-        # Renovar roarand tras login exitoso
+        # Guardar token anti-CSRF para las llamadas siguientes
         self._token = self._client.cookies.get("roarand", roarand)
         logger.info("FusionSolar login OK para %s@%s", self.username, self.base_url)
 
     def _headers(self) -> dict:
         return {"roarand": self._token} if self._token else {}
 
+    def _url(self, path: str) -> str:
+        """Convierte path relativo en URL absoluta usando base_url."""
+        if path.startswith("http"):
+            return path
+        return self.base_url + path
+
     def _get(self, path: str, params: dict | None = None) -> Any:
         assert self._client, "Debes llamar a login() primero"
-        resp = self._client.get(path, params=params, headers=self._headers())
+        resp = self._client.get(self._url(path), params=params, headers=self._headers())
         resp.raise_for_status()
         body = resp.json()
         # FusionSolar devuelve {"success": true/false, "data": ...} en endpoints internos
@@ -186,7 +210,7 @@ class WebAuthClient(FusionSolarClient):
 
     def _post(self, path: str, payload: dict | None = None) -> Any:
         assert self._client, "Debes llamar a login() primero"
-        resp = self._client.post(path, json=payload or {}, headers=self._headers())
+        resp = self._client.post(self._url(path), json=payload or {}, headers=self._headers())
         resp.raise_for_status()
         body = resp.json()
         if isinstance(body, dict) and body.get("success") is False:
