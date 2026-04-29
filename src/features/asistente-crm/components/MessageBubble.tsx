@@ -1,7 +1,6 @@
-import ReactMarkdown from 'react-markdown'
+﻿import ReactMarkdown from 'react-markdown'
 import { Sparkles, User, AlertCircle } from 'lucide-react'
 import type { AsistenteMessage } from '../types'
-import { SourcesCitation } from './SourcesCitation'
 
 interface Props {
   message: AsistenteMessage
@@ -40,9 +39,6 @@ export function MessageBubble({ message }: Props) {
         <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1">
           <ReactMarkdown>{message.content}</ReactMarkdown>
         </div>
-        {!isUser && message.sources && message.sources.length > 0 && (
-          <SourcesCitation sources={message.sources} />
-        )}
       </div>
 
       {isUser && (

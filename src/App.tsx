@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+﻿import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './core/hooks/useAuth'
 import AppShell from './components/layout/AppShell'
@@ -22,9 +22,12 @@ const AnalisisPage = lazy(() => import('./features/analisis/AnalisisPage'))
 const PropuestasEnergiaPage = lazy(() => import('./features/propuestas-energia/PropuestasEnergiaPage'))
 const TrackingPage = lazy(() => import('./features/tracking/TrackingPage'))
 const PotenciasDashboardPage = lazy(() => import('./features/potencias/PotenciasDashboardPage'))
-const PotenciasPlaceholderPage = lazy(() => import('./features/potencias/PotenciasPlaceholderPage'))
 const ExpedientesPage = lazy(() => import('./features/potencias/ExpedientesPage'))
 const ExpedienteDetailPage = lazy(() => import('./features/potencias/ExpedienteDetailPage'))
+const ComunicacionesPage = lazy(() => import('./features/potencias/ComunicacionesPage'))
+const InformesPotenciasPage = lazy(() => import('./features/potencias/InformesPotenciasPage'))
+const DocumentacionPage = lazy(() => import('./features/potencias/DocumentacionPage'))
+const ConfiguracionPotenciasPage = lazy(() => import('./features/potencias/ConfiguracionPotenciasPage'))
 const InformesPage = lazy(() => import('./features/informes/InformesPage'))
 const IncidenciasPage = lazy(() => import('./features/incidencias/IncidenciasPage'))
 const RenovacionesPage = lazy(() => import('./features/renovaciones/RenovacionesPage'))
@@ -47,27 +50,18 @@ function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: str
   if (!session || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
-  // Bloquear usuarios pendientes de aprobación. Esperamos a que el perfil real
-  // esté cargado para no actuar sobre el bootstrap (que pone approved=false por
-  // defecto). Si el perfil ya está cargado y approved !== true → /pending-approval.
   if (profileLoaded && user.approved !== true) {
     return <Navigate to="/pending-approval" replace />
   }
-  // Cuando la ruta depende del rol, esperamos a que el perfil real se haya cargado
-  // (bootstrapFromSession mete role='client' por defecto; sin esta espera un master
-  // sería redirigido en el primer render).
   if (roles && !profileLoaded) return <LoadingScreen />
   if (roles && (!user.role || !roles.includes(user.role))) {
     return <Navigate to="/dashboard" replace />
   }
   return (
     <AppShell>
-      <ErrorBoundary moduleName="esta sección">
+      <ErrorBoundary moduleName="esta seccion">
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
       </ErrorBoundary>
-      {/* Asistente del CRM — widget flotante en todas las páginas autenticadas.
-          Va en su propio ErrorBoundary para que un fallo del asistente
-          (Edge Function caída, respuesta malformada) no tire la página. */}
       <ErrorBoundary moduleName="el asistente">
         <Suspense fallback={null}>
           <AsistentePanel />
@@ -83,8 +77,6 @@ function LoginRoute() {
 
   if (loading) return <LoadingScreen />
   if (session && user) {
-    // Si la sesión está activa pero el usuario no está aprobado → /pending-approval.
-    // Si profileLoaded aún no está true, esperamos para evitar parpadeo.
     if (profileLoaded && user.approved !== true) {
       return <Navigate to="/pending-approval" replace />
     }
@@ -94,11 +86,6 @@ function LoginRoute() {
   return <LoginPage />
 }
 
-/**
- * Ruta para usuarios autenticados pero NO aprobados todavía. No usa AuthGuard
- * (que redirigiría aquí en bucle). Si llega un usuario aprobado, lo manda
- * al dashboard.
- */
 function PendingApprovalRoute() {
   const { user, session, loading, profileLoaded } = useAuth()
 
@@ -124,34 +111,27 @@ export default function App() {
 
       <Route path="/empresas" element={<AuthGuard><EmpresasPage /></AuthGuard>} />
       <Route path="/empresas/:id" element={<AuthGuard><EmpresaDetailPage /></AuthGuard>} />
-
       <Route path="/contactos" element={<AuthGuard><ContactosPage /></AuthGuard>} />
-
       <Route path="/contratos" element={<AuthGuard><ContratosPage /></AuthGuard>} />
       <Route path="/contratos/:id" element={<AuthGuard><ContratoDetailPage /></AuthGuard>} />
-
       <Route path="/oportunidades" element={<AuthGuard><OportunidadesPage /></AuthGuard>} />
-
       <Route path="/actividades" element={<AuthGuard><ActividadesPage /></AuthGuard>} />
-
       <Route path="/calendario" element={<AuthGuard><CalendarioPage /></AuthGuard>} />
-
       <Route path="/informes" element={<AuthGuard><InformesPage /></AuthGuard>} />
-
       <Route path="/incidencias" element={<AuthGuard><IncidenciasPage /></AuthGuard>} />
-
       <Route path="/renovaciones" element={<AuthGuard><RenovacionesPage /></AuthGuard>} />
-
       <Route path="/importador" element={<AuthGuard><ImportadorPage /></AuthGuard>} />
 
       <Route path="/admin" element={<AuthGuard roles={['master', 'manager']}><AdminPage /></AuthGuard>} />
+
       <Route path="/potencias" element={<AuthGuard><PotenciasDashboardPage /></AuthGuard>} />
       <Route path="/potencias/expedientes" element={<AuthGuard><ExpedientesPage /></AuthGuard>} />
       <Route path="/potencias/expedientes/:id" element={<AuthGuard><ExpedienteDetailPage /></AuthGuard>} />
-      <Route path="/potencias/comunicaciones" element={<AuthGuard><PotenciasPlaceholderPage titulo="Comunicaciones" descripcion="Historial de comunicaciones con clientes. En implementación." /></AuthGuard>} />
-      <Route path="/potencias/informes" element={<AuthGuard><PotenciasPlaceholderPage titulo="Informes de Potencias" descripcion="Informes y métricas de gestión de potencias. En implementación." /></AuthGuard>} />
-      <Route path="/potencias/documentacion" element={<AuthGuard><PotenciasPlaceholderPage titulo="Documentación" descripcion="Repositorio de documentos por cliente y expediente. En implementación." /></AuthGuard>} />
-      <Route path="/potencias/configuracion" element={<AuthGuard><PotenciasPlaceholderPage titulo="Configuración" descripcion="Parámetros de la sección de Gestión de Potencias. En implementación." /></AuthGuard>} />
+      <Route path="/potencias/comunicaciones" element={<AuthGuard><ComunicacionesPage /></AuthGuard>} />
+      <Route path="/potencias/informes" element={<AuthGuard><InformesPotenciasPage /></AuthGuard>} />
+      <Route path="/potencias/documentacion" element={<AuthGuard><DocumentacionPage /></AuthGuard>} />
+      <Route path="/potencias/configuracion" element={<AuthGuard><ConfiguracionPotenciasPage /></AuthGuard>} />
+
       <Route path="/datos" element={<AuthGuard><DatosPage /></AuthGuard>} />
       <Route path="/analisis" element={<AuthGuard><AnalisisPage /></AuthGuard>} />
       <Route path="/propuestas-energia" element={<AuthGuard><PropuestasEnergiaPage /></AuthGuard>} />

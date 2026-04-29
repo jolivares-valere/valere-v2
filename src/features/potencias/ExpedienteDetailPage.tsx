@@ -129,7 +129,15 @@ const TRANSICIONES: Record<string, { label: string; siguiente: string; color: st
 
 // ── Tarjeta ciclo ─────────────────────────────────────────────────────────────
 
-function CicloCard({ ciclo, onEstadoCambiado }: { ciclo: CicloRow; onEstadoCambiado: () => void }) {
+interface CicloCardProps {
+  ciclo: CicloRow
+  expedienteId: string
+  empresaNombre: string
+  cupsCodigo: string
+  onEstadoCambiado: () => void
+}
+
+function CicloCard({ ciclo, expedienteId, empresaNombre, cupsCodigo, onEstadoCambiado }: CicloCardProps) {
   const [open, setOpen] = useState(true)
   const [advancing, setAdvancing] = useState(false)
   const solicitud = ciclo.solicitudes_potencia?.[0]
@@ -144,6 +152,25 @@ function CicloCard({ ciclo, onEstadoCambiado }: { ciclo: CicloRow; onEstadoCambi
         .update({ estado: transicion.siguiente })
         .eq('id', ciclo.id)
       if (error) throw error
+
+      // Notificar por email (best-effort: no bloquear si falla)
+      try {
+        await supabase.functions.invoke('notify-expediente-estado', {
+          body: {
+            expediente_id:   expedienteId,
+            ciclo_id:        ciclo.id,
+            empresa_nombre:  empresaNombre,
+            cups_codigo:     cupsCodigo,
+            estado_anterior: ciclo.estado,
+            estado_nuevo:    transicion.siguiente,
+            p1_nueva:        solicitud?.p1_nueva ?? undefined,
+            p2_nueva:        solicitud?.p2_nueva ?? undefined,
+          },
+        })
+      } catch (emailErr) {
+        console.warn('notify-expediente-estado falló (no crítico):', emailErr)
+      }
+
       toast.success(`Estado actualizado: ${transicion.siguiente.replace(/_/g, ' ')}`)
       onEstadoCambiado()
     } catch {
@@ -415,7 +442,14 @@ export default function ExpedienteDetailPage() {
         ) : (
           <div className="space-y-3">
             {ciclosOrdenados.map(ciclo => (
-              <CicloCard key={ciclo.id} ciclo={ciclo} onEstadoCambiado={refetch} />
+              <CicloCard
+                key={ciclo.id}
+                ciclo={ciclo}
+                expedienteId={exp.id}
+                empresaNombre={exp.empresas?.nombre ?? ''}
+                cupsCodigo={exp.cups?.codigo_cups ?? ''}
+                onEstadoCambiado={refetch}
+              />
             ))}
           </div>
         )}
