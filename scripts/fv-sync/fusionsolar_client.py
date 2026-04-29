@@ -56,16 +56,19 @@ class FusionSolarClient(ABC):
 
 
 # ─────────────────────────────────────────────────────────
-# Implementación 1: Web Auth (scraping autenticado)
+# Implementación 1: Web Auth (REST SPA autenticado)
 # ─────────────────────────────────────────────────────────
 
 class WebAuthClient(FusionSolarClient):
     """
-    Autenticación con credenciales web normales del portal FusionSolar.
-    Usa cookies de sesión + cabecera roarand.
+    Autenticación con credenciales web normales del portal FusionSolar EU5.
+
+    Flujo real verificado (SPA React):
+      GET /unisso/pubkey → RSA encrypt password → POST /unisso/v3/validateUser.action
+      → follow redirectURL → cookies de sesión (roarand)
 
     Ventaja: funciona con las credenciales que ya nos dieron los clientes.
-    Riesgo: los endpoints internos pueden cambiar sin aviso.
+    Riesgo: los endpoints internos pueden cambiar sin aviso (bajo en la práctica).
     """
 
     # Endpoints internos identificados via inspección de red
@@ -90,7 +93,7 @@ class WebAuthClient(FusionSolarClient):
         """
         Login para portal EU5 (eu5.fusionsolar.huawei.com).
 
-        Flujo real verificado (SPA React, no CAS):
+        Flujo real verificado (SPA React, no CAS form-data):
           1. GET /  → redirect → /unisso/login.action?service=...  (extrae service URL)
           2. GET /unisso/pubkey  → { pubKey, timeStamp, enableEncrypt }
           3. Si enableEncrypt: cifrar password con RSA-2048 PKCS#1 v1.5
@@ -124,19 +127,19 @@ class WebAuthClient(FusionSolarClient):
 
         if is_unisso_spa:
             # ── Extraer parámetro service= de la URL de login ─
-            parsed   = urllib.parse.urlparse(login_url)
-            qs       = urllib.parse.parse_qs(parsed.query)
-            service  = qs.get("service", [""])[0]
+            parsed  = urllib.parse.urlparse(login_url)
+            qs      = urllib.parse.parse_qs(parsed.query)
+            service = qs.get("service", [""])[0]
 
             # ── Paso 2: obtener clave pública RSA ─────────────
             pk_resp = self._client.get(self.base_url + "/unisso/pubkey")
             pk_resp.raise_for_status()
             pk_body = pk_resp.json()
             # La respuesta puede ser plana o anidada bajo "data"
-            pk_data      = pk_body.get("data", pk_body)
-            pub_key_b64  = pk_data.get("pubKey", "")
-            timestamp    = pk_data.get("timeStamp", "")
-            enable_enc   = pk_data.get("enableEncrypt", True)
+            pk_data     = pk_body.get("data", pk_body)
+            pub_key_b64 = pk_data.get("pubKey", "")
+            timestamp   = pk_data.get("timeStamp", "")
+            enable_enc  = pk_data.get("enableEncrypt", True)
 
             logger.debug("FusionSolar pubkey ts=%s encrypt=%s", timestamp, enable_enc)
 
