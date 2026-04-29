@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Building2, Zap, Calendar, FileText, Clock,
-  CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw
+  CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw, ChevronRight, Loader2
 } from 'lucide-react'
+import { supabase } from '@/core/supabase/client'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
+import { toast } from 'sonner'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -115,11 +117,41 @@ function CicloStepper({ estado }: { estado: string }) {
   )
 }
 
+// ── Transiciones de estado ────────────────────────────────────────────────────
+
+const TRANSICIONES: Record<string, { label: string; siguiente: string; color: string }> = {
+  bajada_pendiente: { label: 'Enviar solicitud bajada →',  siguiente: 'bajada_activa',    color: 'bg-blue-600 text-white hover:bg-blue-700' },
+  bajada_activa:    { label: 'Marcar bajada aprobada →',   siguiente: 'bajada_aprobada',   color: 'bg-green-600 text-white hover:bg-green-700' },
+  bajada_aprobada:  { label: 'Iniciar subida de potencia →', siguiente: 'subida_pendiente', color: 'bg-purple-600 text-white hover:bg-purple-700' },
+  subida_pendiente: { label: 'Enviar solicitud subida →',  siguiente: 'subida_activa',     color: 'bg-amber-600 text-white hover:bg-amber-700' },
+  subida_activa:    { label: 'Marcar ciclo completado ✓',  siguiente: 'completado',        color: 'bg-emerald-600 text-white hover:bg-emerald-700' },
+}
+
 // ── Tarjeta ciclo ─────────────────────────────────────────────────────────────
 
-function CicloCard({ ciclo }: { ciclo: CicloRow }) {
+function CicloCard({ ciclo, onEstadoCambiado }: { ciclo: CicloRow; onEstadoCambiado: () => void }) {
   const [open, setOpen] = useState(true)
+  const [advancing, setAdvancing] = useState(false)
   const solicitud = ciclo.solicitudes_potencia?.[0]
+  const transicion = TRANSICIONES[ciclo.estado]
+
+  const avanzarEstado = async () => {
+    if (!transicion) return
+    setAdvancing(true)
+    try {
+      const { error } = await supabase
+        .from('ciclos')
+        .update({ estado: transicion.siguiente })
+        .eq('id', ciclo.id)
+      if (error) throw error
+      toast.success(`Estado actualizado: ${transicion.siguiente.replace(/_/g, ' ')}`)
+      onEstadoCambiado()
+    } catch {
+      toast.error('Error al cambiar el estado')
+    } finally {
+      setAdvancing(false)
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -202,6 +234,26 @@ function CicloCard({ ciclo }: { ciclo: CicloRow }) {
               </div>
             </div>
           )}
+
+          {/* Botón de avance de estado */}
+          {transicion && (
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+              <p className="text-xs text-slate-400">
+                Siguiente: <span className="font-medium text-slate-600">{transicion.siguiente.replace(/_/g, ' ')}</span>
+              </p>
+              <button
+                onClick={avanzarEstado}
+                disabled={advancing}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${transicion.color}`}
+              >
+                {advancing
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <ChevronRight className="h-4 w-4" />
+                }
+                {transicion.label}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -213,7 +265,7 @@ function CicloCard({ ciclo }: { ciclo: CicloRow }) {
 export default function ExpedienteDetailPage() {
   const { id } = useParams<{ id: string }>()
 
-  const { data, loading } = useSupabaseQuery<ExpedienteDetail>({
+  const { data, loading, refetch } = useSupabaseQuery<ExpedienteDetail>({
     table: 'expedientes',
     select: `
       id, anio, estado, tipo_normativa, ciclos_realizados,
@@ -363,7 +415,7 @@ export default function ExpedienteDetailPage() {
         ) : (
           <div className="space-y-3">
             {ciclosOrdenados.map(ciclo => (
-              <CicloCard key={ciclo.id} ciclo={ciclo} />
+              <CicloCard key={ciclo.id} ciclo={ciclo} onEstadoCambiado={refetch} />
             ))}
           </div>
         )}

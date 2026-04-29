@@ -6,6 +6,7 @@ import {
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
 import EmptyState from '@/core/components/EmptyState'
 import { SkeletonRow } from '@/components/ui/Skeleton'
+import NuevoExpedienteModal from './components/NuevoExpedienteModal'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -62,8 +63,9 @@ function CicloEstadoBadge({ estado }: { estado: string }) {
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ExpedientesPage() {
-  const [search, setSearch]           = useState('')
+  const [search, setSearch]             = useState('')
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activo' | 'cancelado'>('todos')
+  const [showModal, setShowModal]       = useState(false)
   const dias = useMemo(() => diasRDL(), [])
 
   const { data, loading, refetch } = useSupabaseQuery<ExpedienteRow>({
@@ -115,7 +117,10 @@ export default function ExpedientesPage() {
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            <button className="flex items-center gap-2 rounded-xl bg-[#1e3a6e] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d58] transition-colors">
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 rounded-xl bg-[#1e3a6e] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d58] transition-colors"
+            >
               <Plus className="h-4 w-4" />
               Nuevo expediente
             </button>
@@ -243,6 +248,13 @@ export default function ExpedientesPage() {
           </table>
         </div>
       </div>
+
+      {showModal && (
+        <NuevoExpedienteModal
+          onClose={() => setShowModal(false)}
+          onCreated={() => { refetch(); setShowModal(false) }}
+        />
+      )}
     </div>
   )
 }
