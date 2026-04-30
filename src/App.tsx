@@ -36,6 +36,7 @@ const CalendarioPage = lazy(() => import('./features/calendario/CalendarioPage')
 const AsistentePanel = lazy(() => import('./features/asistente-crm/AsistentePanel'))
 const SeguimientoFVPage = lazy(() => import('./features/seguimiento-fv/SeguimientoFVPage'))
 const DatadisPage = lazy(() => import('./features/datadis/DatadisPage'))
+const SupplyDetailPage = lazy(() => import('./features/datadis/SupplyDetailPage'))
 
 function LoadingScreen() {
   return (
@@ -142,6 +143,7 @@ export default function App() {
       <Route path="/tracking" element={<AuthGuard><TrackingPage /></AuthGuard>} />
       <Route path="/seguimiento-fv" element={<AuthGuard><SeguimientoFVPage /></AuthGuard>} />
       <Route path="/datadis" element={<AuthGuard><DatadisPage /></AuthGuard>} />
+      <Route path="/datadis/:cups" element={<AuthGuard><SupplyDetailPage /></AuthGuard>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
