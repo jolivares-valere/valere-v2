@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, Building2, CheckCircle2, ChevronDown, ChevronUp,
-  Database, Eye, EyeOff, Info, Loader2,
+  ChevronRight, Database, Eye, EyeOff, Info, Loader2,
   LogIn, MapPin, RefreshCw, User, Wifi, WifiOff, X, Zap,
 } from 'lucide-react'
 import { useDatadisSupplies, type DatadisCreds, type DatadisSupply } from './api'
@@ -158,7 +159,7 @@ function CredsForm({ onConnect, onDisconnect, activeCreds }: CredsFormProps) {
 // --- Fila de suministro ---
 
 function SupplyRow({ supply, idx }: { supply: DatadisSupply; idx: number }) {
-  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   const cups         = supply.cups ?? '---'
   const distributor  = supply.distributor ?? (supply['cod_disitribuidora'] as string) ?? '---'
@@ -167,66 +168,51 @@ function SupplyRow({ supply, idx }: { supply: DatadisSupply; idx: number }) {
   const municipality = supply.municipality ?? (supply['municipio'] as string)
   const pointType    = supply.pointType ?? (supply['tipoPuntoMedida'] as number)
 
-  return (
-    <>
-      <tr
-        className={`cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 ${
-          idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
-        }`}
-        onClick={() => setOpen(o => !o)}
-      >
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-              <Zap className="h-3.5 w-3.5 text-blue-600" />
-            </div>
-            <span className="font-mono text-xs font-medium text-slate-800">{cups}</span>
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-1.5">
-            <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span className="text-xs text-slate-700">{distributorName(distributor)}</span>
-          </div>
-        </td>
-        <td className="px-4 py-3">{tariffBadge(tariff)}</td>
-        <td className="px-4 py-3">
-          {(province || municipality) ? (
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              {municipality && <span>{municipality}</span>}
-              {province && municipality && <span>·</span>}
-              {province && <span>{province}</span>}
-            </div>
-          ) : (
-            <span className="text-xs text-slate-300">---</span>
-          )}
-        </td>
-        <td className="px-4 py-3">
-          <span className="text-xs text-slate-500">{POINT_TYPE[pointType] ?? '---'}</span>
-        </td>
-        <td className="px-4 py-3 text-right">
-          <span className="text-[10px] text-slate-400">{open ? 'v' : '>'}</span>
-        </td>
-      </tr>
+  function handleClick() {
+    if (supply.cups) navigate(`/datadis/${encodeURIComponent(supply.cups)}`)
+  }
 
-      {open && (
-        <tr className="bg-blue-50/50">
-          <td colSpan={6} className="px-6 py-3">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3 md:grid-cols-4">
-              {Object.entries(supply).map(([k, v]) =>
-                v !== null && v !== undefined && v !== '' ? (
-                  <div key={k} className="min-w-0">
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{k}</span>
-                    <span className="block truncate font-mono text-xs text-slate-700">{String(v)}</span>
-                  </div>
-                ) : null
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+  return (
+    <tr
+      className={`cursor-pointer border-b border-slate-100 transition-colors hover:bg-blue-50/50 ${
+        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
+      }`}
+      onClick={handleClick}
+    >
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+            <Zap className="h-3.5 w-3.5 text-blue-600" />
+          </div>
+          <span className="font-mono text-xs font-medium text-slate-800">{cups}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="text-xs text-slate-700">{distributorName(distributor)}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">{tariffBadge(tariff)}</td>
+      <td className="px-4 py-3">
+        {(province || municipality) ? (
+          <div className="flex items-center gap-1 text-xs text-slate-500">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            {municipality && <span>{municipality}</span>}
+            {province && municipality && <span>·</span>}
+            {province && <span>{province}</span>}
+          </div>
+        ) : (
+          <span className="text-xs text-slate-300">---</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <span className="text-xs text-slate-500">{POINT_TYPE[pointType] ?? '---'}</span>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <ChevronRight className="ml-auto h-4 w-4 text-slate-300" />
+      </td>
+    </tr>
   )
 }
 
@@ -379,7 +365,7 @@ export default function DatadisPage() {
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="border-b border-slate-100 px-4 py-2.5 flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-600">Listado de suministros</span>
-                  <span className="text-[11px] text-slate-400">Haz clic en una fila para ver todos los campos</span>
+                  <span className="text-[11px] text-slate-400">Haz clic en un suministro para ver su detalle</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
