@@ -261,7 +261,40 @@ def sync_credencial(
         logger.error(msg)
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
 
-    client: FusionSolarClient = make_client(plataforma, region_url, username, password)
+    # ── Seleccionar modo de autenticación ───────────────────
+    # Si hay cookies pre-extraídas y no están expiradas → CookieAuthClient (httpx, sin login en CI)
+    # Si no                                              → WebAuthClient (Playwright login)
+    session_cookies_enc = cred.get("session_cookies")
+    cookies_expires_at  = cred.get("cookies_expires_at")
+    cookies: list[dict] | None = None
+
+    if session_cookies_enc:
+        from datetime import timezone as _tz
+        now = datetime.now(_tz.utc)
+        expired = (
+            cookies_expires_at is not None
+            and datetime.fromisoformat(cookies_expires_at) < now
+        )
+        if expired:
+            logger.warning(
+                "Cookies de sesión expiradas para cred=%s (expiraron %s). "
+                "Ejecuta extract_cookies.py para renovar. Intentando login Playwright...",
+                cred_id, cookies_expires_at,
+            )
+        else:
+            try:
+                import json as _json
+                cookies_json = decrypt_password(session_cookies_enc, enc_key)
+                cookies = _json.loads(cookies_json)
+                logger.info(
+                    "Usando %d cookies pre-extraídas para cred=%s (expiran %s)",
+                    len(cookies), cred_id, (cookies_expires_at or "N/A")[:10],
+                )
+            except Exception as e:
+                logger.warning("Error al descifrar cookies: %s. Fallback a Playwright.", e)
+                cookies = None
+
+    client: FusionSolarClient = make_client(plataforma, region_url, username, password, cookies=cookies)
 
     try:
         client.login()

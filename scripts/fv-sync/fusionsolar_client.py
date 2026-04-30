@@ -182,7 +182,24 @@ class WebAuthClient(FusionSolarClient):
         logger.debug("Formulario enviado via keyboard.press(Enter) sobre campo con foco JS")
 
         # Paso 5: esperar redirección al portal
-        self._page.wait_for_url("**/uniportal/**", timeout=25_000)
+        # Registrar URL actual antes de esperar (ayuda a diagnosticar fallos de login)
+        url_antes = self._page.url
+        logger.info("URL antes de wait_for_url: %s", url_antes)
+        try:
+            self._page.wait_for_url("**/uniportal/**", timeout=25_000)
+        except Exception as e:
+            # Guardar screenshot de diagnóstico para entender qué muestra el portal
+            url_despues = self._page.url
+            logger.error("wait_for_url falló. URL actual: %s", url_despues)
+            try:
+                import os
+                screenshot_path = os.path.join(os.getcwd(), "playwright_debug.png")
+                self._page.screenshot(path=screenshot_path, full_page=True)
+                logger.info("Screenshot de diagnóstico guardado en %s", screenshot_path)
+            except Exception as se:
+                logger.warning("No se pudo guardar screenshot: %s", se)
+            raise
+
         # Esperar a que el JS del SPA inicialice (networkidle puede ser largo)
         try:
             self._page.wait_for_load_state("networkidle", timeout=15_000)
@@ -336,6 +353,148 @@ class WebAuthClient(FusionSolarClient):
 
 
 # ─────────────────────────────────────────────────────────
+# Cliente basado en cookies (sin login en CI)
+# ─────────────────────────────────────────────────────────
+
+class CookieAuthClient(FusionSolarClient):
+    """
+    Cliente FusionSolar usando cookies de sesión pre-extraídas (sin Playwright login en CI).
+
+    Flujo:
+      1. El usuario ejecuta extract_cookies.py UNA VEZ en su máquina local
+         (browser visible → resuelve CAPTCHAs si los hay → cookies guardadas en Supabase).
+      2. El job de CI carga esas cookies y hace llamadas REST directamente con httpx.
+         No hay login ni Playwright en CI → más rápido, más fiable.
+
+    Las cookies expiran en ~7-30 días. extract_cookies.py avisa cuando hay que renovar.
+    """
+
+    def __init__(self, base_url: str, cookies: list[dict]):
+        self.base_url = base_url.rstrip("/")
+        self._cookies = cookies          # lista de dicts del formato Playwright
+        self._session = None             # httpx.Client, se crea en login()
+
+    def login(self) -> None:
+        """Inicializa la sesión httpx con las cookies pre-extraídas."""
+        import httpx
+
+        cookie_jar = {c["name"]: c["value"] for c in self._cookies}
+
+        # roarand es el CSRF token de Huawei SSO — también va como header
+        csrf_token = cookie_jar.get("roarand", "")
+
+        self._session = httpx.Client(
+            cookies=cookie_jar,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Origin":         self.base_url,
+                "Referer":        self.base_url + "/",
+                "roarand":        csrf_token,        # CSRF header que exige FusionSolar
+                "Content-Type":   "application/json",
+                "Accept":         "application/json, text/plain, */*",
+            },
+            timeout=30.0,
+            follow_redirects=True,
+        )
+        logger.info(
+            "CookieAuthClient: sesión httpx inicializada con %d cookies",
+            len(self._cookies),
+        )
+
+    def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
+        url = path if path.startswith("http") else self.base_url + path
+        if method.upper() == "GET":
+            r = self._session.get(url)
+        else:
+            r = self._session.post(url, json=payload)
+
+        if r.status_code == 401:
+            raise RuntimeError(
+                "Sesión expirada (401). Ejecuta extract_cookies.py para renovar."
+            )
+        r.raise_for_status()
+        return r.json()
+
+    def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
+        try:
+            return self._fetch(method, path, payload)
+        except Exception as e:
+            logger.warning("_fetch error [%s %s]: %s", method, path, e)
+            return default if default is not None else {}
+
+    # Reutilizamos la misma lógica de WebAuthClient para parsear respuestas
+    _STATION_LIST = WebAuthClient._STATION_LIST
+    _TOTAL_KPI    = WebAuthClient._TOTAL_KPI
+    _ALARM_LIST   = WebAuthClient._ALARM_LIST
+    _DEV_LIST     = WebAuthClient._DEV_LIST
+    _DAILY_KPI    = WebAuthClient._DAILY_KPI
+
+    def get_station_list(self) -> list[dict]:
+        data = self._fetch("POST", self._STATION_LIST, {
+            "pageNo": 1, "pageSize": 100, "locale": "es_ES",
+        })
+        raw = data.get("data", data)
+        stations: list[dict] = []
+        if isinstance(raw, dict):
+            stations = raw.get("list", raw.get("pageList", []))
+        elif isinstance(raw, list):
+            stations = raw
+        logger.debug("get_station_list: %d plantas", len(stations))
+        return stations
+
+    def get_station_kpi(self, station_code: str) -> dict:
+        ts_ms = int(time.time() * 1000)
+        return self._safe_fetch(
+            "GET", f"{self._TOTAL_KPI}?queryTime={ts_ms}&timeZone=2"
+        ).get("data", {})
+
+    def get_devices(self, station_code: str) -> list[dict]:
+        data = self._safe_fetch("POST", self._DEV_LIST, {
+            "stationCodes": station_code, "pageNo": 1, "pageSize": 100,
+        }, default={"data": {}})
+        raw = data.get("data", data)
+        if isinstance(raw, dict):
+            return raw.get("list", [])
+        return raw or []
+
+    def get_alarms(self, station_code: str) -> list[dict]:
+        data = self._safe_fetch(
+            "GET", f"{self._ALARM_LIST}?stationCode={station_code}",
+            default={"data": {}},
+        )
+        raw = data.get("data", data)
+        alarms: list[dict] = []
+        if isinstance(raw, dict):
+            alarms = raw.get("list", raw.get("alarmList", []))
+        elif isinstance(raw, list):
+            alarms = raw
+        return alarms
+
+    def get_daily_kpi(self, station_code: str, day: date) -> dict:
+        dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+        ts_ms = int(dt.timestamp() * 1000)
+        data  = self._safe_fetch("POST", self._DAILY_KPI, {
+            "stationCodes": station_code, "collectTime": ts_ms,
+        }, default={})
+        raw = data.get("data", data)
+        if isinstance(raw, list):
+            return raw[0] if raw else {}
+        return raw or {}
+
+    def close(self) -> None:
+        try:
+            if self._session:
+                self._session.close()
+        except Exception as e:
+            logger.debug("httpx session.close() error: %s", e)
+        self._session = None
+
+
+# ─────────────────────────────────────────────────────────
 # Factory
 # ─────────────────────────────────────────────────────────
 
@@ -344,18 +503,28 @@ def make_client(
     base_url: str,
     username: str,
     password: str,
-    mode: str = "web",       # reservado para futura implementación Northbound
+    cookies: list[dict] | None = None,
 ) -> FusionSolarClient:
     """
-    Crea el cliente correcto según la plataforma.
+    Crea el cliente correcto según la plataforma y el modo de autenticación.
 
     Args:
         plataforma: "fusionsolar" (único implementado)
         base_url:   URL del portal (ej. https://uni003eu5.fusionsolar.huawei.com)
         username:   Usuario del portal
         password:   Contraseña en claro (ya descifrada)
-        mode:       "web" (por ahora el único modo disponible)
+        cookies:    Lista de cookies pre-extraídas (formato Playwright). Si se
+                    proporcionan, se usa CookieAuthClient (httpx, sin login en CI).
+                    Si None → WebAuthClient (Playwright login).
     """
     if plataforma != "fusionsolar":
         raise NotImplementedError(f"Plataforma '{plataforma}' no implementada aún")
+
+    if cookies:
+        logger.info(
+            "make_client: usando CookieAuthClient (cookies pre-extraídas, sin login en CI)"
+        )
+        return CookieAuthClient(base_url, cookies)
+
+    logger.info("make_client: usando WebAuthClient (Playwright login headless)")
     return WebAuthClient(base_url, username, password)
