@@ -431,7 +431,7 @@ def main() -> None:
     sb: Client = create_client(supabase_url, supabase_key)
 
     # ── Cargar credenciales activas ──────────────────────
-    q = sb.table("fv_credenciales").select("*").eq("activa", True)
+    q = sb.table("fv_credenciales").select("*").eq("activa", "true")
     if args.empresa:
         q = q.eq("empresa_id", args.empresa)
     credenciales = q.execute().data or []
