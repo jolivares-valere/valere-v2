@@ -169,33 +169,17 @@ class WebAuthClient(FusionSolarClient):
         logger.debug("Credenciales rellenadas via JS evaluate")
 
         # Paso 4: enviar el formulario
-        submitted = False
-        for selector in [
-            'button:has-text("Iniciar")',
-            'button[type="submit"]',
-            'input[type="submit"]',
-            'button:has-text("Login")',
-            'button:has-text("Log in")',
-        ]:
-            try:
-                self._page.click(selector, timeout=2_000, force=True)
-                submitted = True
-                break
-            except Exception:
-                continue
-        if not submitted:
-            # Fallback: Enter en el campo password via JS
-            try:
-                self._page.locator('input[type="password"]').first.press("Enter")
-            except Exception:
-                self._page.evaluate(
-                    """() => {
-                        const pwd = document.querySelector('input[type="password"]');
-                        if (pwd) pwd.dispatchEvent(
-                            new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
-                        );
-                    }"""
-                )
+        # Estrategia: focus el campo password via JS (no requiere visibilidad),
+        # luego page.keyboard.press() que opera sobre el elemento con foco activo.
+        # Esto bypasea los checks de visibilidad de Playwright y funciona en CI headless.
+        self._page.evaluate(
+            """() => {
+                const pwd = document.querySelector('input[type="password"]');
+                if (pwd) pwd.focus();
+            }"""
+        )
+        self._page.keyboard.press("Enter")
+        logger.debug("Formulario enviado via keyboard.press(Enter) sobre campo con foco JS")
 
         # Paso 5: esperar redirección al portal
         self._page.wait_for_url("**/uniportal/**", timeout=25_000)
