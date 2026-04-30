@@ -143,14 +143,30 @@ class WebAuthClient(FusionSolarClient):
         # Pequeña pausa para que la animación CSS del SPA termine de renderizar
         self._page.wait_for_timeout(1_500)
 
-        # Paso 3: rellenar credenciales
-        # En CI headless el campo username puede estar en el DOM pero no visible aún.
-        # force=True bypasea el check de visibilidad de Playwright.
-        username_field = self._page.locator('input[type="text"]').first
-        username_field.click(force=True)
-        username_field.fill(self.username)
-
-        self._page.locator('input[type="password"]').first.fill(self.password)
+        # Paso 3: rellenar credenciales via JavaScript
+        # En CI headless los campos pueden estar en el DOM pero no visibles aún
+        # por animaciones CSS del SPA de FusionSolar. evaluate() bypasea todos
+        # los checks de visibilidad de Playwright (force=True no es suficiente
+        # cuando el elemento tiene display:none o está cubierto por un overlay).
+        self._page.evaluate(
+            """([user, pwd]) => {
+                function fillInput(el, value) {
+                    if (!el) return;
+                    try {
+                        const setter = Object.getOwnPropertyDescriptor(
+                            window.HTMLInputElement.prototype, 'value'
+                        ).set;
+                        setter.call(el, value);
+                    } catch(e) { el.value = value; }
+                    el.dispatchEvent(new Event('input',  {bubbles: true}));
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+                fillInput(document.querySelector('input[type="text"]'), user);
+                fillInput(document.querySelector('input[type="password"]'), pwd);
+            }""",
+            [self.username, self.password],
+        )
+        logger.debug("Credenciales rellenadas via JS evaluate")
 
         # Paso 4: enviar el formulario
         submitted = False
@@ -162,14 +178,24 @@ class WebAuthClient(FusionSolarClient):
             'button:has-text("Log in")',
         ]:
             try:
-                self._page.click(selector, timeout=2_000)
+                self._page.click(selector, timeout=2_000, force=True)
                 submitted = True
                 break
             except Exception:
                 continue
         if not submitted:
-            # Fallback: Enter en el campo password
-            self._page.locator('input[type="password"]').first.press("Enter")
+            # Fallback: Enter en el campo password via JS
+            try:
+                self._page.locator('input[type="password"]').first.press("Enter")
+            except Exception:
+                self._page.evaluate(
+                    """() => {
+                        const pwd = document.querySelector('input[type="password"]');
+                        if (pwd) pwd.dispatchEvent(
+                            new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})
+                        );
+                    }"""
+                )
 
         # Paso 5: esperar redirección al portal
         self._page.wait_for_url("**/uniportal/**", timeout=25_000)
