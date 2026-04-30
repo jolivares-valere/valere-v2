@@ -331,4 +331,158 @@ def sync_credencial(
                 kpi = client.get_station_kpi(station_code)
                 sb.table("fv_kpi_realtime").upsert({
                     "planta_id":          planta_id,
-                    "potencia_actual_kw":  kpi.get("currentPower") or kpi.get("
+                    "potencia_actual_kw":  kpi.get("currentPower") or kpi.get("activePower"),
+                    "energia_hoy_kwh":     kpi.get("dayPower") or kpi.get("dayEnergy"),
+                    "factor_rendimiento":  kpi.get("performanceRatio") or kpi.get("pr"),
+                    "ts":                  datetime.now(timezone.utc).isoformat(),
+                }, on_conflict="planta_id").execute()
+            except Exception as e:
+                logger.warning("  KPI realtime error %s: %s", station_code, e)
+
+            # ── KPIs diarios ──────────────────────────────────
+            try:
+                hoy_str = date.today().isoformat()
+                kpi_d = client.get_station_kpi_daily(station_code)
+                sb.table("fv_kpi_diario").upsert({
+                    "planta_id":       planta_id,
+                    "fecha":           hoy_str,
+                    "energia_kwh":     kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0,
+                    "potencia_max_kw": kpi_d.get("peakPower") or 0,
+                    "ingresos_eur":    kpi_d.get("income") or 0,
+                }, on_conflict="planta_id,fecha").execute()
+            except Exception as e:
+                logger.warning("  KPI diario error %s: %s", station_code, e)
+
+            # ── Alarmas activas ───────────────────────────────
+            try:
+                alarmas = client.get_station_alarms(station_code)
+                for al in alarmas:
+                    severidad = normalize_severity(al.get("lev") or al.get("severity", "4"))
+                    desc = al.get("alarmName") or al.get("description", "Sin descripción")
+                    sb.table("fv_alarma").upsert({
+                        "planta_id":    planta_id,
+                        "codigo":       str(al.get("alarmId") or al.get("id", "")),
+                        "severidad":    severidad,
+                        "descripcion":  desc,
+                        "activa":       True,
+                        "detectada_en": al.get("raiseTime") or datetime.now(timezone.utc).isoformat(),
+                    }, on_conflict="planta_id,codigo").execute()
+                    total_alarmas += 1
+
+                    if severidad in ("critica", "mayor"):
+                        alerta_alarma_critica(planta_nombre, severidad, desc, resend_key)
+            except Exception as e:
+                logger.warning("  Alarmas error %s: %s", station_code, e)
+
+            total_plantas += 1
+
+    except Exception as e:
+        msg = f"Error en sync loop: {e}"
+        logger.error(msg)
+        if not dry_run:
+            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+        return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
+    finally:
+        try:
+            client.logout()
+        except Exception:
+            pass
+
+    elapsed = round(time.time() - t0, 1)
+    logger.info(
+        "  ✅ cred=%s: %d plantas, %d alarmas en %.1fs",
+        cred_id, total_plantas, total_alarmas, elapsed,
+    )
+
+    if not dry_run:
+        sb.table("fv_credenciales").update({
+            "ultimo_error":          None,
+            "ultima_sincronizacion": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", cred_id).execute()
+
+    return {
+        "ok":     True,
+        "plantas": total_plantas,
+        "alarmas": total_alarmas,
+        "elapsed": elapsed,
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# Punto de entrada principal
+# ─────────────────────────────────────────────────────────
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Sincronizador FV → Supabase")
+    parser.add_argument("--empresa", help="UUID empresa (solo esa empresa)")
+    parser.add_argument("--dry-run", action="store_true", help="Sin escritura en BD")
+    args = parser.parse_args()
+
+    dry_run = args.dry_run
+    if dry_run:
+        logger.info("🔴 DRY-RUN activado — no se escribirá nada en la BD")
+
+    # ── Variables de entorno ─────────────────────────────
+    supabase_url = os.environ["SUPABASE_URL"]
+    supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
+    enc_key      = os.environ["FV_ENCRYPTION_KEY"]
+    resend_key   = os.environ.get("RESEND_API_KEY")
+
+    sb: Client = create_client(supabase_url, supabase_key)
+
+    # ── Cargar credenciales activas ──────────────────────
+    q = sb.table("fv_credenciales").select("*").eq("activa", True)
+    if args.empresa:
+        q = q.eq("empresa_id", args.empresa)
+    credenciales = q.execute().data or []
+    logger.info("Credenciales activas: %d", len(credenciales))
+
+    if not credenciales:
+        logger.warning("No hay credenciales activas. Saliendo.")
+        return
+
+    # ── Sincronizar cada credencial ──────────────────────
+    resultados = []
+    for cred in credenciales:
+        resultado = sync_credencial(sb, cred, enc_key, resend_key, dry_run=dry_run)
+        resultados.append(resultado)
+
+    total_ok      = sum(1 for r in resultados if r["ok"])
+    total_plantas = sum(r["plantas"] for r in resultados)
+    total_alarmas = sum(r["alarmas"] for r in resultados)
+
+    # ── Resumen semanal (lunes) ──────────────────────────
+    hoy = date.today()
+    if hoy.weekday() == 0:   # 0 = lunes
+        logger.info("📅 Lunes → generando resumen semanal…")
+        generar_resumen_semanal(sb, dry_run=dry_run)
+
+    # ── Informe mensual (día 1) ──────────────────────────
+    if hoy.day == 1:
+        logger.info("📊 Día 1 → generando borradores de informe mensual…")
+        generar_informe_mensual_borrador(sb, dry_run=dry_run)
+
+    # ── Log global de sincronización ────────────────────
+    if not dry_run:
+        sb.table("fv_sync_log").insert({
+            "credenciales_ok":    total_ok,
+            "credenciales_total": len(credenciales),
+            "plantas_sync":       total_plantas,
+            "alarmas_detectadas": total_alarmas,
+            "resultado":          "ok" if total_ok == len(credenciales) else "parcial",
+            "detalles":           json.dumps(resultados, default=str),
+        }).execute()
+
+    # ── Resumen final ────────────────────────────────────
+    estado = "✅ OK" if total_ok == len(credenciales) else f"⚠️ {total_ok}/{len(credenciales)} OK"
+    logger.info(
+        "Sync finalizado: %s | %d plantas | %d alarmas",
+        estado, total_plantas, total_alarmas,
+    )
+
+    if total_ok < len(credenciales):
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
