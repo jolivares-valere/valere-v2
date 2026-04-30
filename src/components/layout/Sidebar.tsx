@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, Building2, Calendar, ChevronDown,
-  ChevronLeft, ChevronRight, FileText, GitBranch, LayoutDashboard, Mail, RefreshCw,
-  Settings, ShieldCheck, Sun, Upload, Users, X, Zap
+  ChevronLeft, ChevronRight, Database, FileText, GitBranch, LayoutDashboard, Mail,
+  RefreshCw, Settings, ShieldCheck, Sun, Upload, Users, X, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
@@ -16,18 +16,19 @@ interface SidebarProps {
 }
 
 const crmItems: Item[] = [
-  { to: '/dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
-  { to: '/empresas',      label: 'Empresas',      icon: Building2 },
-  { to: '/contactos',     label: 'Contactos',     icon: Users },
-  { to: '/actividades',   label: 'Actividades',   icon: Activity },
-  { to: '/calendario',    label: 'Calendario',    icon: Calendar },
-  { to: '/contratos',     label: 'Contratos',     icon: FileText },
-  { to: '/oportunidades', label: 'Oportunidades', icon: GitBranch },
-  { to: '/informes',      label: 'Informes',      icon: BarChart3 },
-  { to: '/incidencias',   label: 'Incidencias',   icon: AlertTriangle },
-  { to: '/renovaciones',  label: 'Renovaciones',  icon: RefreshCw },
-  { to: '/importador',    label: 'Importador',    icon: Upload },
-  { to: '/seguimiento-fv', label: 'Plantas FV',  icon: Sun },
+  { to: '/dashboard',      label: 'Dashboard',     icon: LayoutDashboard },
+  { to: '/empresas',       label: 'Empresas',      icon: Building2 },
+  { to: '/contactos',      label: 'Contactos',     icon: Users },
+  { to: '/actividades',    label: 'Actividades',   icon: Activity },
+  { to: '/calendario',     label: 'Calendario',    icon: Calendar },
+  { to: '/contratos',      label: 'Contratos',     icon: FileText },
+  { to: '/oportunidades',  label: 'Oportunidades', icon: GitBranch },
+  { to: '/informes',       label: 'Informes',      icon: BarChart3 },
+  { to: '/incidencias',    label: 'Incidencias',   icon: AlertTriangle },
+  { to: '/renovaciones',   label: 'Renovaciones',  icon: RefreshCw },
+  { to: '/importador',     label: 'Importador',    icon: Upload },
+  { to: '/seguimiento-fv', label: 'Plantas FV',    icon: Sun },
+  { to: '/datadis',        label: 'Datadis',       icon: Database },
 ]
 
 const potenciasItems: Item[] = [
@@ -100,24 +101,22 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
           </div>
         )}
         <div className="flex items-center gap-1">
-          {/* Botón colapsar/expandir — solo desktop */}
           {onToggleCollapse && (
             <button
               type="button"
               onClick={onToggleCollapse}
-              title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+              title={collapsed ? 'Expandir menu' : 'Colapsar menu'}
               className="hidden lg:flex rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </button>
           )}
-          {/* Botón cerrar — solo móvil */}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden"
-              aria-label="Cerrar menú"
+              aria-label="Cerrar menu"
             >
               <X className="h-4 w-4" />
             </button>
@@ -125,9 +124,8 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
         </div>
       </div>
 
-      {/* Navegación */}
+      {/* Navegacion */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {/* Sección CRM */}
         {!collapsed && (
           <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
             CRM Comercial
@@ -140,14 +138,13 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
           ))}
         </div>
 
-        {/* Sección Potencias */}
+        {/* Seccion Potencias */}
         <div className="mt-2 border-t border-slate-100 pt-2">
           {collapsed ? (
-            /* Modo colapsado: solo icono ⚡ con NavLink al dashboard de potencias */
             <NavLink
               to="/potencias"
               onClick={onClose}
-              title="Gestión de Potencias"
+              title="Gestion de Potencias"
               className={({ isActive }) =>
                 `flex items-center justify-center rounded-xl px-2 py-2 transition-colors ${
                   isActive || isPotenciasActive
@@ -159,7 +156,6 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
               <Zap className="h-4 w-4 text-amber-500" />
             </NavLink>
           ) : (
-            /* Modo expandido: botón desplegable */
             <>
               <button
                 type="button"
@@ -169,7 +165,7 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
                 }`}
               >
                 <Zap className="h-4 w-4 shrink-0 text-amber-500" />
-                <span className="flex-1 text-left">Gestión de Potencias</span>
+                <span className="flex-1 text-left">Gestion de Potencias</span>
                 <ChevronDown
                   className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
                     potenciasOpen ? 'rotate-180' : ''
@@ -205,7 +201,7 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
           <button
             type="button"
             onClick={() => void signOut()}
-            title="Cerrar sesión"
+            title="Cerrar sesion"
             className="flex w-full items-center justify-center rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
           >
             <X className="h-4 w-4" />
@@ -221,7 +217,7 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
               onClick={() => void signOut()}
               className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
-              Cerrar sesión
+              Cerrar sesion
             </button>
           </>
         )}
