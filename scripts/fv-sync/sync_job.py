@@ -287,30 +287,32 @@ def sync_credencial(
             planta_estado = normalize_status(st.get("status", "desconocido"))
             planta_nombre = st.get("stationName") or st.get("plantName", station_code)
 
-            # ── Upsert fv_planta ──────────────────────────────
-            planta_row = {
-                "credencial_id":  cred_id,
-                "empresa_id":     empresa_id,   # None → admin asigna desde CRM
-                "plataforma":     plataforma,
-                "station_code":   station_code,
-                "nombre":         planta_nombre,
-                "pais":           st.get("country", "ES"),
-                "capacidad_kwp":  st.get("installedCapacity") or st.get("capacity"),
-                "tiene_bateria":  bool(st.get("hasBattery") or st.get("batteryCapacity")),
-                "fecha_conexion": st.get("gridConnectedDay") or st.get("buildDate"),
-                "estado":         planta_estado,
-            }
-
+            # ── Upsert fv_planta (via función segura anti-duplicados) ──────
             if dry_run:
-                logger.info("  [DRY-RUN] planta: %s", json.dumps(planta_row, default=str))
+                logger.info(
+                    "  [DRY-RUN] planta: %s / %s / empresa=%s",
+                    plataforma, planta_nombre, empresa_id or "sin asignar",
+                )
                 total_plantas += 1
                 continue
 
-            res = sb.table("fv_planta").upsert(
-                planta_row, on_conflict="credencial_id,station_code",
-            ).execute()
+            # fv_upsert_planta: no sobreescribe empresa_id si ya tiene valor (asignacion manual)
+            res = sb.rpc("fv_upsert_planta", {
+                "p_plataforma":    plataforma,
+                "p_region_url":    region_url,
+                "p_station_code":  station_code,
+                "p_credencial_id": cred_id,
+                "p_nombre":        planta_nombre,
+                "p_pais":          st.get("country", "ES"),
+                "p_capacidad_kwp": st.get("installedCapacity") or st.get("capacity"),
+                "p_tiene_bateria": bool(st.get("hasBattery") or st.get("batteryCapacity")),
+                "p_fecha_conexion":st.get("gridConnectedDay") or st.get("buildDate"),
+                "p_estado":        planta_estado,
+                "p_empresa_id":    empresa_id,
+            }).execute()
             planta_id = res.data[0]["id"] if res.data else None
             if not planta_id:
+                logger.warning("  fv_upsert_planta sin resultado para %s", station_code)
                 total_plantas += 1
                 continue
 
@@ -329,188 +331,4 @@ def sync_credencial(
                 kpi = client.get_station_kpi(station_code)
                 sb.table("fv_kpi_realtime").upsert({
                     "planta_id":          planta_id,
-                    "potencia_actual_kw":  kpi.get("currentPower") or kpi.get("activePower"),
-                    "energia_hoy_kwh":     kpi.get("dayPower")     or kpi.get("dayEnergy"),
-                    "energia_mes_kwh":     kpi.get("monthPower")   or kpi.get("monthEnergy"),
-                    "energia_total_kwh":   kpi.get("totalPower")   or kpi.get("totalEnergy")
-                                           or kpi.get("cumulativeEnergy"),
-                    "ingresos_hoy_eur":    kpi.get("dayIncome"),
-                    "actualizado_en":      datetime.now(timezone.utc).isoformat(),
-                }, on_conflict="planta_id").execute()
-            except Exception as e:
-                logger.warning("  KPI realtime [%s]: %s", station_code, e)
-
-            # ── KPI diario (ayer) ─────────────────────────────
-            yesterday = date.today() - timedelta(days=1)
-            try:
-                day_kpi = client.get_daily_kpi(station_code, yesterday)
-                if day_kpi:
-                    sb.table("fv_kpi_diario").upsert({
-                        "planta_id":    planta_id,
-                        "fecha":        yesterday.isoformat(),
-                        "energia_kwh":  day_kpi.get("energy")    or day_kpi.get("productPower"),
-                        "ingresos_eur": day_kpi.get("incomeDay") or day_kpi.get("income"),
-                    }, on_conflict="planta_id,fecha").execute()
-            except Exception as e:
-                logger.warning("  KPI diario [%s]: %s", station_code, e)
-
-            # ── Dispositivos ──────────────────────────────────
-            tipo_map = {1: "inversor", 10: "bateria", 22: "optimizador", 47: "smart_meter"}
-            try:
-                for dev in client.get_devices(station_code):
-                    did = str(dev.get("id") or dev.get("devDn", ""))
-                    if not did:
-                        continue
-                    sb.table("fv_dispositivo").upsert({
-                        "planta_id":    planta_id,
-                        "device_id":    did,
-                        "tipo":         tipo_map.get(int(dev.get("devTypeId", 0)), "otro"),
-                        "nombre":       dev.get("devName") or dev.get("name"),
-                        "modelo":       dev.get("softVer") or dev.get("model"),
-                        "numero_serie": dev.get("devSn")   or dev.get("sn"),
-                        "estado":       normalize_status(dev.get("runState", "desconocido")),
-                    }, on_conflict="planta_id,device_id").execute()
-            except Exception as e:
-                logger.warning("  Dispositivos [%s]: %s", station_code, e)
-
-            # ── Alarmas ───────────────────────────────────────
-            try:
-                alarms = client.get_alarms(station_code)
-                alarm_ids_activos: list[str] = []
-
-                for alarm in alarms:
-                    aid = str(alarm.get("alarmId") or alarm.get("id", ""))
-                    if not aid:
-                        continue
-                    severidad = normalize_severity(alarm.get("severity", "desconocida"))
-                    res_a = sb.table("fv_alarma").upsert({
-                        "planta_id":   planta_id,
-                        "alarm_id":    aid,
-                        "codigo":      str(alarm.get("alarmCode", "")),
-                        "severidad":   severidad,
-                        "descripcion": alarm.get("alarmDesc") or alarm.get("description", ""),
-                        "dispositivo": alarm.get("devName")   or alarm.get("deviceName"),
-                        "iniciada_en": alarm.get("raiseTime") or alarm.get("createTime"),
-                        "activa":      True,
-                    }, on_conflict="planta_id,alarm_id").execute()
-
-                    # Email solo si es alarma nueva crítica/mayor
-                    if res_a.data and severidad in ("critica", "mayor"):
-                        alerta_alarma_critica(
-                            nombre=planta_nombre,
-                            severidad=severidad,
-                            descripcion=alarm.get("alarmDesc") or alarm.get("description", ""),
-                            resend_key=resend_key,
-                        )
-
-                    alarm_ids_activos.append(aid)
-                    total_alarmas += 1
-
-                # Marcar como resueltas las que ya no aparecen en FusionSolar
-                q = (
-                    sb.table("fv_alarma")
-                    .update({"activa": False, "resuelta_en": datetime.now(timezone.utc).isoformat()})
-                    .eq("planta_id", planta_id).eq("activa", True)
-                )
-                if alarm_ids_activos:
-                    q = q.not_.in_("alarm_id", alarm_ids_activos)
-                q.execute()
-
-            except Exception as e:
-                logger.warning("  Alarmas [%s]: %s", station_code, e)
-
-            total_plantas += 1
-
-        if not dry_run:
-            sb.table("fv_credenciales").update({
-                "ultimo_ok_at": datetime.now(timezone.utc).isoformat(),
-                "ultimo_error": None,
-            }).eq("id", cred_id).execute()
-
-    except Exception as e:
-        msg = f"Error sync: {e}"
-        logger.error(msg, exc_info=True)
-        if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
-        return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
-    finally:
-        client.close()
-
-    duracion_ms = int((time.time() - t0) * 1000)
-    logger.info("  ✅ %d plantas, %d alarmas, %dms", total_plantas, total_alarmas, duracion_ms)
-    return {
-        "ok": True, "plantas": total_plantas, "alarmas": total_alarmas,
-        "msg": f"OK: {total_plantas} plantas, {total_alarmas} alarmas en {duracion_ms}ms",
-        "duracion_ms": duracion_ms,
-    }
-
-
-# ─────────────────────────────────────────────────────────
-# Main
-# ─────────────────────────────────────────────────────────
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--empresa", help="UUID empresa (solo esa)")
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-
-    supabase_url = os.environ.get("SUPABASE_URL", "")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
-    enc_key      = os.environ.get("FV_ENCRYPTION_KEY", "")
-    resend_key   = os.environ.get("RESEND_API_KEY")
-
-    if not all([supabase_url, supabase_key, enc_key]):
-        logger.error("Faltan variables de entorno: SUPABASE_URL, SUPABASE_SERVICE_KEY, FV_ENCRYPTION_KEY")
-        sys.exit(1)
-
-    sb: Client = create_client(supabase_url, supabase_key)
-
-    query = sb.table("fv_credenciales").select("*").eq("activo", True)
-    if args.empresa:
-        query = query.eq("empresa_id", args.empresa)
-    creds = query.execute().data or []
-
-    if not creds:
-        logger.info("No hay credenciales FV activas.")
-        return
-
-    logger.info("Iniciando sync de %d credenciales FV", len(creds))
-    errores = 0
-
-    for cred in creds:
-        result = sync_credencial(sb, cred, enc_key, resend_key, dry_run=args.dry_run)
-        if not args.dry_run:
-            sb.table("fv_sync_log").insert({
-                "empresa_id":   cred.get("empresa_id"),
-                "plataforma":   cred["plataforma"],
-                "ok":           result["ok"],
-                "plantas_sync": result["plantas"],
-                "alarmas_sync": result["alarmas"],
-                "mensaje":      result["msg"],
-                "duracion_ms":  result.get("duracion_ms"),
-            }).execute()
-        if not result["ok"]:
-            errores += 1
-
-    # ── Tareas periódicas ──────────────────────────────────────
-    hoy = date.today()
-    if hoy.weekday() == 0:   # lunes
-        try:
-            generar_resumen_semanal(sb, dry_run=args.dry_run)
-        except Exception as e:
-            logger.error("Resumen semanal: %s", e)
-
-    if hoy.day == 1:          # primer día del mes
-        try:
-            generar_informe_mensual_borrador(sb, dry_run=args.dry_run)
-        except Exception as e:
-            logger.error("Informe mensual: %s", e)
-
-    logger.info("Sync completado. %d OK, %d errores.", len(creds) - errores, errores)
-    if errores > 0:
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+                    "potencia_actual_kw":  kpi.get("currentPower") or kpi.get("

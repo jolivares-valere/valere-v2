@@ -2090,6 +2090,467 @@ export type Database = {
           },
         ]
       }
+      fv_alarma: {
+        Row: {
+          activa: boolean
+          actualizado_en: string
+          alarm_id: string
+          codigo: string | null
+          creado_en: string
+          descripcion: string | null
+          dispositivo: string | null
+          id: string
+          iniciada_en: string | null
+          planta_id: string
+          resuelta_en: string | null
+          severidad: string | null
+        }
+        Insert: {
+          activa?: boolean
+          actualizado_en?: string
+          alarm_id: string
+          codigo?: string | null
+          creado_en?: string
+          descripcion?: string | null
+          dispositivo?: string | null
+          id?: string
+          iniciada_en?: string | null
+          planta_id: string
+          resuelta_en?: string | null
+          severidad?: string | null
+        }
+        Update: {
+          activa?: boolean
+          actualizado_en?: string
+          alarm_id?: string
+          codigo?: string | null
+          creado_en?: string
+          descripcion?: string | null
+          dispositivo?: string | null
+          id?: string
+          iniciada_en?: string | null
+          planta_id?: string
+          resuelta_en?: string | null
+          severidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_alarma_planta_id_fkey"
+            columns: ["planta_id"]
+            isOneToOne: false
+            referencedRelation: "fv_planta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_credenciales: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          creado_en: string
+          empresa_id: string | null
+          id: string
+          password_enc: string
+          plataforma: string
+          region_url: string | null
+          ultimo_error: string | null
+          ultimo_ok_at: string | null
+          username: string
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          creado_en?: string
+          empresa_id?: string | null
+          id?: string
+          password_enc: string
+          plataforma: string
+          region_url?: string | null
+          ultimo_error?: string | null
+          ultimo_ok_at?: string | null
+          username: string
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          creado_en?: string
+          empresa_id?: string | null
+          id?: string
+          password_enc?: string
+          plataforma?: string
+          region_url?: string | null
+          ultimo_error?: string | null
+          ultimo_ok_at?: string | null
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_credenciales_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fv_credenciales_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_dispositivo: {
+        Row: {
+          actualizado_en: string
+          device_id: string
+          estado: string | null
+          id: string
+          modelo: string | null
+          nombre: string | null
+          numero_serie: string | null
+          planta_id: string
+          tipo: string
+        }
+        Insert: {
+          actualizado_en?: string
+          device_id: string
+          estado?: string | null
+          id?: string
+          modelo?: string | null
+          nombre?: string | null
+          numero_serie?: string | null
+          planta_id: string
+          tipo: string
+        }
+        Update: {
+          actualizado_en?: string
+          device_id?: string
+          estado?: string | null
+          id?: string
+          modelo?: string | null
+          nombre?: string | null
+          numero_serie?: string | null
+          planta_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_dispositivo_planta_id_fkey"
+            columns: ["planta_id"]
+            isOneToOne: false
+            referencedRelation: "fv_planta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_informe_mensual: {
+        Row: {
+          actualizado_en: string
+          ahorro_estimado_eur: number | null
+          co2_evitado_kg: number | null
+          creado_en: string
+          empresa_id: string
+          energia_total_kwh: number | null
+          enviado_en: string | null
+          estado: string
+          generado_en: string | null
+          id: string
+          mes: string
+          notas: string | null
+          num_alarmas_criticas: number | null
+          num_alarmas_graves: number | null
+        }
+        Insert: {
+          actualizado_en?: string
+          ahorro_estimado_eur?: number | null
+          co2_evitado_kg?: number | null
+          creado_en?: string
+          empresa_id: string
+          energia_total_kwh?: number | null
+          enviado_en?: string | null
+          estado?: string
+          generado_en?: string | null
+          id?: string
+          mes: string
+          notas?: string | null
+          num_alarmas_criticas?: number | null
+          num_alarmas_graves?: number | null
+        }
+        Update: {
+          actualizado_en?: string
+          ahorro_estimado_eur?: number | null
+          co2_evitado_kg?: number | null
+          creado_en?: string
+          empresa_id?: string
+          energia_total_kwh?: number | null
+          enviado_en?: string | null
+          estado?: string
+          generado_en?: string | null
+          id?: string
+          mes?: string
+          notas?: string | null
+          num_alarmas_criticas?: number | null
+          num_alarmas_graves?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_informe_mensual_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fv_informe_mensual_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_kpi_diario: {
+        Row: {
+          creado_en: string
+          energia_kwh: number | null
+          fecha: string
+          id: string
+          ingresos_eur: number | null
+          planta_id: string
+          potencia_max_kw: number | null
+        }
+        Insert: {
+          creado_en?: string
+          energia_kwh?: number | null
+          fecha: string
+          id?: string
+          ingresos_eur?: number | null
+          planta_id: string
+          potencia_max_kw?: number | null
+        }
+        Update: {
+          creado_en?: string
+          energia_kwh?: number | null
+          fecha?: string
+          id?: string
+          ingresos_eur?: number | null
+          planta_id?: string
+          potencia_max_kw?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_kpi_diario_planta_id_fkey"
+            columns: ["planta_id"]
+            isOneToOne: false
+            referencedRelation: "fv_planta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_kpi_realtime: {
+        Row: {
+          actualizado_en: string
+          energia_hoy_kwh: number | null
+          energia_mes_kwh: number | null
+          energia_total_kwh: number | null
+          ingresos_hoy_eur: number | null
+          planta_id: string
+          potencia_actual_kw: number | null
+        }
+        Insert: {
+          actualizado_en?: string
+          energia_hoy_kwh?: number | null
+          energia_mes_kwh?: number | null
+          energia_total_kwh?: number | null
+          ingresos_hoy_eur?: number | null
+          planta_id: string
+          potencia_actual_kw?: number | null
+        }
+        Update: {
+          actualizado_en?: string
+          energia_hoy_kwh?: number | null
+          energia_mes_kwh?: number | null
+          energia_total_kwh?: number | null
+          ingresos_hoy_eur?: number | null
+          planta_id?: string
+          potencia_actual_kw?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_kpi_realtime_planta_id_fkey"
+            columns: ["planta_id"]
+            isOneToOne: true
+            referencedRelation: "fv_planta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_planta: {
+        Row: {
+          actualizado_en: string
+          capacidad_kwp: number | null
+          creado_en: string
+          credencial_id: string
+          empresa_id: string | null
+          estado: string | null
+          fecha_conexion: string | null
+          id: string
+          nombre: string
+          pais: string | null
+          plataforma: string
+          station_code: string
+          tiene_bateria: boolean | null
+          tiene_esss: boolean | null
+        }
+        Insert: {
+          actualizado_en?: string
+          capacidad_kwp?: number | null
+          creado_en?: string
+          credencial_id: string
+          empresa_id?: string | null
+          estado?: string | null
+          fecha_conexion?: string | null
+          id?: string
+          nombre: string
+          pais?: string | null
+          plataforma?: string
+          station_code: string
+          tiene_bateria?: boolean | null
+          tiene_esss?: boolean | null
+        }
+        Update: {
+          actualizado_en?: string
+          capacidad_kwp?: number | null
+          creado_en?: string
+          credencial_id?: string
+          empresa_id?: string | null
+          estado?: string | null
+          fecha_conexion?: string | null
+          id?: string
+          nombre?: string
+          pais?: string | null
+          plataforma?: string
+          station_code?: string
+          tiene_bateria?: boolean | null
+          tiene_esss?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_planta_credencial_id_fkey"
+            columns: ["credencial_id"]
+            isOneToOne: false
+            referencedRelation: "fv_credenciales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fv_planta_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fv_planta_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_resumen_semanal: {
+        Row: {
+          creado_en: string
+          dias_activo: number | null
+          energia_kwh: number | null
+          id: string
+          planta_id: string
+          potencia_max_kw: number | null
+          semana_fin: string
+          semana_inicio: string
+        }
+        Insert: {
+          creado_en?: string
+          dias_activo?: number | null
+          energia_kwh?: number | null
+          id?: string
+          planta_id: string
+          potencia_max_kw?: number | null
+          semana_fin: string
+          semana_inicio: string
+        }
+        Update: {
+          creado_en?: string
+          dias_activo?: number | null
+          energia_kwh?: number | null
+          id?: string
+          planta_id?: string
+          potencia_max_kw?: number | null
+          semana_fin?: string
+          semana_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_resumen_semanal_planta_id_fkey"
+            columns: ["planta_id"]
+            isOneToOne: false
+            referencedRelation: "fv_planta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fv_sync_log: {
+        Row: {
+          alarmas_sync: number | null
+          duracion_ms: number | null
+          empresa_id: string | null
+          id: string
+          iniciado_en: string
+          mensaje: string | null
+          ok: boolean
+          plantas_sync: number | null
+          plataforma: string | null
+        }
+        Insert: {
+          alarmas_sync?: number | null
+          duracion_ms?: number | null
+          empresa_id?: string | null
+          id?: string
+          iniciado_en?: string
+          mensaje?: string | null
+          ok: boolean
+          plantas_sync?: number | null
+          plataforma?: string | null
+        }
+        Update: {
+          alarmas_sync?: number | null
+          duracion_ms?: number | null
+          empresa_id?: string | null
+          id?: string
+          iniciado_en?: string
+          mensaje?: string | null
+          ok?: boolean
+          plantas_sync?: number | null
+          plataforma?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fv_sync_log_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fv_sync_log_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "holded_audit_empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       global_config: {
         Row: {
           id: string
@@ -4291,6 +4752,7 @@ export type Database = {
       }
       clasifica_nif_cif: { Args: { p_input: string }; Returns: string }
       cleanup_pending_users_older_than_7_days: { Args: never; Returns: number }
+      fv_is_admin: { Args: never; Returns: boolean }
       get_resumen_vencimientos: {
         Args: { p_comercial_id?: string }
         Returns: {

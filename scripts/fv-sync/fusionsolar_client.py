@@ -150,7 +150,7 @@ class WebAuthClient(FusionSolarClient):
         username_field.click(force=True)
         username_field.fill(self.username)
 
-        self._page.locator('input[type="password"]').first.fill(self.password, force=True)
+        self._page.locator('input[type="password"]').first.fill(self.password)
 
         # Paso 4: enviar el formulario
         submitted = False
