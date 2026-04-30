@@ -1,6 +1,6 @@
 # Plan de Integración Datadis
 
-> **Estado**: borrador inicial — 2026-04-28  
+> **Estado**: proxy v4 funcional en producción — 2026-04-30 ✅  
 > **Autor**: Driver Cowork  
 > **Sustituye**: C-04 del `docs/AUDIT_SEGURIDAD_2026-04-27.md` (passwords Datadis en cliente → eliminado por diseño)  
 > **Pre-requisito paralelo**: trámite alta empresa en Datadis (Juan, ver sección 7)

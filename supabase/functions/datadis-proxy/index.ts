@@ -8,7 +8,8 @@
 //                     en vivo 2026-04-30 (sesión CHEMTROL ESPAÑOLA SA).
 //                     Funcionan YA con cualquier cuenta Datadis.
 //                     Sin SLA oficial — Datadis puede cambiarlos sin aviso.
-//                     Auth: Authorization: <jwt>  (sin "Bearer")
+//                     Auth: Authorization: Bearer <jwt>  ← /api-private/* exige Bearer
+//                           (A/B testing 2026-04-30: sin Bearer → 401, con Bearer → 200)
 //                     Formato: POST con JSON body, fechas "yyyy/MM/dd"
 //
 //   MODO "terceros" — API oficial para integradores registrados.
@@ -74,13 +75,15 @@ const ALLOWED_ORIGINS = [
 
 // ───────────── Cache de token en memoria ─────────────
 
-interface TokenCache { jwt: string; expiresAt: number }
+interface TokenCache { jwt: string; cookies: string; expiresAt: number }
 let tokenCache: TokenCache | null = null
 
-async function getDatadisToken(): Promise<string> {
+async function getDatadisSession(): Promise<{ jwt: string; cookies: string }> {
   const now    = Date.now()
   const margin = 5 * 60 * 1000
-  if (tokenCache && tokenCache.expiresAt > now + margin) return tokenCache.jwt
+  if (tokenCache && tokenCache.expiresAt > now + margin) {
+    return { jwt: tokenCache.jwt, cookies: tokenCache.cookies }
+  }
 
   console.log('[datadis-proxy] Solicitando nuevo token Datadis...')
   const res = await fetch(DATADIS_LOGIN_URL, {
@@ -93,23 +96,33 @@ async function getDatadisToken(): Promise<string> {
   const jwt = (await res.text()).trim()
   if (!jwt.startsWith('eyJ')) throw new Error('Token Datadis con formato inesperado')
 
+  // Capturar cookies de sesión (JSESSIONID u otras) que Spring Security requiere
+  const cookies = res.headers.getSetCookie
+    ? res.headers.getSetCookie().map(c => c.split(';')[0]).join('; ')
+    : (res.headers.get('set-cookie') ?? '').split(';')[0]
+
+  console.log(`[datadis-proxy] Cookies capturadas: ${cookies ? cookies.substring(0,40)+'...' : '(ninguna)'}`)
+
   let expiresAt: number
   try { expiresAt = JSON.parse(atob(jwt.split('.')[1])).exp * 1000 }
   catch { expiresAt = now + 23 * 60 * 60 * 1000 }
 
-  tokenCache = { jwt, expiresAt }
-  console.log(`[datadis-proxy] Token valido hasta ${new Date(expiresAt).toISOString()}`)
-  return jwt
+  tokenCache = { jwt, cookies, expiresAt }
+  console.log(`[datadis-proxy] Sesion valida hasta ${new Date(expiresAt).toISOString()}`)
+  return { jwt, cookies }
 }
 
 // ───────────── Llamada autenticada a Datadis ─────────────
 
 async function datadisRequest(path: string, method: 'GET' | 'POST', bodyOrParams?: unknown): Promise<unknown> {
-  const doRequest = async (jwt: string) => {
+  const doRequest = async (jwt: string, cookies: string) => {
     const headers: HeadersInit = {
-      'Authorization': DATADIS_MODE === 'terceros' ? `Bearer ${jwt}` : jwt,
+      'Authorization': `Bearer ${jwt}`,   // /api-private/* siempre exige "Bearer " (A/B verificado 2026-04-30)
       'Accept': 'application/json',
+      'Content-Type': 'application/json',
     }
+    if (cookies) headers['Cookie'] = cookies
+
     let url = `${DATADIS_BASE}${path}`
     let fetchBody: string | undefined
 
@@ -127,13 +140,13 @@ async function datadisRequest(path: string, method: 'GET' | 'POST', bodyOrParams
     return fetch(url, { method, headers, body: fetchBody })
   }
 
-  let jwt = await getDatadisToken()
-  let res  = await doRequest(jwt)
+  let { jwt, cookies } = await getDatadisSession()
+  let res  = await doRequest(jwt, cookies)
   if (res.status === 401) {
-    console.log('[datadis-proxy] 401 — renovando token...')
+    console.log('[datadis-proxy] 401 — renovando sesion...')
     tokenCache = null
-    jwt = await getDatadisToken()
-    res = await doRequest(jwt)
+    ;({ jwt, cookies } = await getDatadisSession())
+    res = await doRequest(jwt, cookies)
   }
   if (!res.ok) {
     const errText = await res.text().catch(() => '')
