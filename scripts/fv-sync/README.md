@@ -31,7 +31,7 @@ Ve a: `https://github.com/jolivares-valere/valere-v2/settings/secrets/actions`
 |---|---|
 | `SUPABASE_URL` | `https://gtphkowfcuiqbvfkwjxb.supabase.co` |
 | `SUPABASE_SERVICE_KEY` | Service Role Key del proyecto Supabase |
-| `FV_ENCRYPTION_KEY` | La clave generada en el paso 1 |
+| `FV_ENCRYPTION_KEY` | 1doMcEYZBiBnKo5npSgV1JGzDlBDYT0m0LSXBWyefts= |
 
 ### 3. Aplicar la migración SQL
 

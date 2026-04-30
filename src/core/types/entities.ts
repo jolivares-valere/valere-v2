@@ -443,3 +443,31 @@ export type EventoInsert = Insert<Evento>
 export type EventoUpdate = Update<Evento>
 
 // Datadis (Insert/Update ya definidos inline arriba para evitar conflicto con helper genérico)
+
+// =====================================================================
+// Tipos migrados desde repo musing-kalam (Potencias) — 2026-04-30
+// Necesarios para src/core/pdf/, src/core/email/, src/core/excel/,
+// src/features/potencias/lib/.
+// =====================================================================
+
+export type TariffType = '2.0TD' | '3.0TD' | '6.1TD' | '6.2TD' | '6.3TD' | '6.4TD'
+
+export interface PowerValues {
+  p1: number
+  p2: number
+  p3: number
+  p4: number
+  p5: number
+  p6: number
+}
+
+export interface RegulatedRate {
+  id: string
+  tariff_type: TariffType
+  period: string  // 'P1', 'P2', ...
+  rate_eur_kw_day: number
+  valid_from: string
+  valid_to: string | null
+  updated_at?: string
+  updated_by?: string | null
+}

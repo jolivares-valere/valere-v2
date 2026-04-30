@@ -62,3 +62,13 @@ export function formatComision(valor: number | null | undefined): string {
 export function normalizarNIF(nif: string | null | undefined): string {
   return (nif ?? '').replace(/[\s-]/g, '').toUpperCase()
 }
+
+export type AlertaVencimiento = 'vencido' | 'pronto' | 'proximo' | 'ok'
+
+export function calcAlertaVencimiento(fechaFin: string | Date | null | undefined): AlertaVencimiento {
+  const dias = calcDiasVencimiento(fechaFin)
+  if (dias < 0) return 'vencido'
+  if (dias <= 30) return 'pronto'
+  if (dias <= 90) return 'proximo'
+  return 'ok'
+}

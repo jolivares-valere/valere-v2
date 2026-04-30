@@ -2,17 +2,58 @@
 
 Mapa maestro de que app, que repo, que Supabase, y como convive todo. Actualizar cada vez que se cree o integre una app nueva.
 
-> **Ultima actualizacion:** 2026-04-23
+> **Ultima actualizacion:** 2026-04-23 (noche, post-auditoria autonoma)
 
 ---
 
-## 1. Inventario actual
+## 1. Inventario actual (auditado 2026-04-23)
 
-| App | Repo GitHub | Proyecto Supabase | Ubicacion local | Estado |
+**Cuenta canonica:** `jolivares@valereconsultores.com` — Google Workspace + GitHub `jolivares-valere` + Supabase org `luvkvsihgucimbqmqarf` + Vercel team `valere-consultores` (slug `jolivares-valere`).
+
+### Apps activas
+
+| App | Repo GitHub | Proyecto Supabase | Vercel | Auto-deploy |
 |---|---|---|---|---|
-| **CRM Valere** (CRM + Calculadora fusionados) | jolivares-valere/valere-v2 | gtphkowfcuiqbvfkwjxb (PROYECTO VALERE) | C:\Users\joliv\valere-v2 | En produccion |
-| **Gestion de Potencias** | PENDIENTE CONFIRMAR | alesfvxqtwlrwlmkoosg (valere-gestion-potencias) — 18 tablas, datos reales (41 expedientes, 75 supplies) | ? | En desarrollo paralelo |
-| **Gestion de Excedentes** | — no existe aun | — no existe aun | — | En evaluacion (posible nueva app) |
+| **CRM Valere** (CRM + Calculadora) | `jolivares-valere/valere-v2` (publico) | `gtphkowfcuiqbvfkwjxb` PROYECTO VALERE — **56 tablas reales** | `prj_LuE1NBS54FOT4ZJVsTsb0FKvo302` valere-v2 — valere-v2.vercel.app | Si (main) |
+| **Valere Potencias** (era "excedentes") | `jolivares-valere/valere-gestion-potencias` (privado) | `alesfvxqtwlrwlmkoosg` valere-gestion-potencias — 18 tablas, datos reales (41 expedientes, 75 supplies, 30 clients) | `prj_597bgWdEAVcDs3nl7luHDTt3Kk8H` valere-gestion-potencias — valere-gestion-potencias.vercel.app | Si (main) — desde 2026-04-23 |
+
+### Repos archivados
+- `jolivares-valere/valere-gestion-energetica` — primer intento de excedentes (Apr 9), abandonado y archivado 2026-04-23.
+
+### ⚠️ Hallazgo critico (2026-04-23 noche) — el CRM tiene 56 tablas, no 22
+
+Al regenerar los tipos TypeScript del CRM se descubre que el schema real es **mucho mas grande** de lo documentado en CLAUDE.md. Hay modulos enteros en produccion sin documentar.
+
+**Tablas core conocidas (~22):** user_profiles, empresas, contactos, contratos, cups, oportunidades, actividades, propuestas, custom_fields_schema, custom_fields_values, notificaciones, documentos, eventos, facturas, retailers, retailer_offers, proposals, global_config, precios_regulados_boe (renombrada desde boe_regulated_prices), incidencias, renovaciones, tareas.
+
+**Tablas integracion potencias YA presentes en CRM (no documentado):**
+- `expedientes`, `solicitudes_potencia`, `ciclos`, `comercializadora_docs`, `comercializadoras`, `comercializadora_ofertas`, `savings_calculations`, `email_templates`, `comunicaciones_cliente`, `status_log`, `excel_import_templates`, `alertas`
+- 7 tablas auxiliares `_migration_*_map` (mapeo IDs legacy potencias -> IDs canonicos CRM): `_migration_ciclo_map`, `_migration_comercializadora_map`, `_migration_cups_map`, `_migration_empresa_map`, `_migration_expediente_map`, `_migration_request_map`, `_migration_user_map`.
+
+→ **La integracion del proyecto potencias al CRM YA se preparo o ejecuto en el pasado.** Verificar con SELECT COUNT cuando se hizo y si hay datos reales en estas tablas o son zombi.
+
+**Modulo FV (fotovoltaica) — 9 tablas, sin documentar en CLAUDE.md:**
+- `fv_planta`, `fv_dispositivo`, `fv_credenciales`, `fv_alarma`, `fv_kpi_realtime`, `fv_kpi_diario`, `fv_resumen_semanal`, `fv_informe_mensual`, `fv_sync_log`.
+→ Modulo de monitorizacion fotovoltaica (lectura inversores, KPIs generacion). Fuera de roadmap visible.
+
+**Modulo Holded (ERP) — 5 tablas, sin documentar:**
+- `holded_config`, `holded_conflicts`, `holded_integration_logs`, `holded_sync_queue`, `holded_sync_state`.
+→ Integracion con Holded (ERP español). Pipeline sync con cola y conflictos.
+
+**Modulo asistente RAG (mencionado en CLAUDE.md, confirmado):**
+- `crm_help_embeddings`, `crm_asistente_log`, `audit_log`.
+
+**Modulo Datadis (ya conocido):**
+- `datadis_consumptions`, `datadis_tokens`.
+
+### Acciones urgentes derivadas
+- [ ] Revisar `git log` de `supabase/migrations/` para entender cuando se anadieron FV / Holded / `_migration_potencia_*`.
+- [ ] Determinar si modulos FV / Holded estan activos (frontend que los consuma) o son tablas zombi.
+- [ ] Si la integracion potencias→CRM ya se hizo, **el proyecto Supabase `alesfvxqtwlrwlmkoosg` puede estar obsoleto** o duplicar datos del CRM.
+- [ ] Actualizar `CLAUDE.md` raiz con los modulos reales descubiertos.
+
+### Decision Escenario 1 (2026-04-23)
+Juan confirmo: **valere-gestion-potencias es UNA SOLA app** (no dos). Mantener nomenclatura actual. La feature de "excedentes" queda como sub-modulo dentro de la misma app (fase C del PLANNING). PR #1 mergeado, auto-deploy desde main activo. **PERO** dado el hallazgo de las 7 tablas `_migration_potencia_*` en el CRM, hay que verificar si la integracion (fase E del PLANNING) ya esta hecha o en curso.
 
 ---
 
