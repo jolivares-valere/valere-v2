@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './core/hooks/useAuth'
 import AppShell from './components/layout/AppShell'
@@ -35,6 +35,7 @@ const RenovacionesPage = lazy(() => import('./features/renovaciones/Renovaciones
 const CalendarioPage = lazy(() => import('./features/calendario/CalendarioPage'))
 const AsistentePanel = lazy(() => import('./features/asistente-crm/AsistentePanel'))
 const SeguimientoFVPage = lazy(() => import('./features/seguimiento-fv/SeguimientoFVPage'))
+const DatadisPage = lazy(() => import('./features/datadis/DatadisPage'))
 
 function LoadingScreen() {
   return (
@@ -140,6 +141,7 @@ export default function App() {
       <Route path="/propuestas-energia" element={<AuthGuard><PropuestasEnergiaPage /></AuthGuard>} />
       <Route path="/tracking" element={<AuthGuard><TrackingPage /></AuthGuard>} />
       <Route path="/seguimiento-fv" element={<AuthGuard><SeguimientoFVPage /></AuthGuard>} />
+      <Route path="/datadis" element={<AuthGuard><DatadisPage /></AuthGuard>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
