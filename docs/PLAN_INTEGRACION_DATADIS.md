@@ -269,3 +269,237 @@ SELECT vault.create_secret('TU_PASSWORD_DATADIS', 'datadis_master_pass', 'Passwo
 - [Manual API privada y agregada (ICAEN)](https://icaen.gencat.cat/web/.content/20_Energia/210_auditoriesenergetiques/enllacos/MANUAL-API-PRIVADA-Y-AGREGADA.pdf)
 - `docs/AUDIT_SEGURIDAD_2026-04-27.md` — hallazgo C-04 (cancelado por este plan)
 - `docs/BACKLOG_CRM.md` — Sprint C, entrada Datadis-as-a-Service
+
+---
+
+## Apéndice A — Spec real capturada en vivo (2026-04-30)
+
+> Sesión real con credenciales CHEMTROL ESPAÑOLA SA (14 suministros).  
+> Esta sección sustituye cualquier asunción previa sobre la API.
+
+### A.1 — Login
+
+```
+POST https://datadis.es/nikola-auth/tokens/login
+Content-Type: application/x-www-form-urlencoded
+
+username=<NIF>&password=<password>&origin=WEB
+```
+
+**Respuesta**: JWT crudo como texto plano (no JSON, no envoltorio).  
+Empieza con `eyJhbGciOi…` — 3 segmentos estándar, ~1094 bytes.
+
+```json
+{
+  "sub": "A28429348",
+  "iat": 1777550998,
+  "exp": 1777637398,
+  "environment": "PRO",
+  "origin": "WEB",
+  "publicUser": { "id": 18721, "login": "A28429348", "name": "CHEMTROL ESPAÑOLA SA" }
+}
+```
+
+- **TTL real**: 24h (`exp - iat = 86400`)
+- **Header en requests posteriores**: `Authorization: <jwt>` — **sin prefijo "Bearer "**
+- **401 sin token**: `{"timestamp":"…","status":401,"error":"Unauthorized","path":"/api-private/…"}`
+- **401 token expirado**: `"401 Unauthorized\n"` (texto plano)
+
+---
+
+### A.2 — getSupplies
+
+```
+GET https://datadis.es/api-private/getSupplies
+Authorization: <jwt>
+```
+
+Respuesta (1 suministro de 14):
+```json
+{
+  "response": [{
+    "cups": "ES0021000005080774JW",
+    "direccion": "C/ ARAVACA, 6 , BAJO 28040-MADRID - MADRID",
+    "codigoPostal": "28040",
+    "provincia": "Madrid",        "codigoProvincia": "41",
+    "municipio": "MADRID",        "municipioCode": "079",
+    "distribuidora": "I-DE REDES ELÉCTRICAS INTELIGENTES, S.A.U.",
+    "cod_disitribuidora": "8",
+    "tipoPunto": 4,
+    "fechaVigenciaDesde": "2025/10/15",
+    "fechaVigenciaHasta": "",
+    "hasAutoconsumo": null,
+    "selfconsumption": 0,
+    "error": null
+  }],
+  "CodError": "902",
+  "Distributors": "EDISTRIBUCIÓN, CIDE, I-DE",
+  "errorSupplies": [
+    { "distributorCode": "6", "distributorName": "EOSA",  "errorCode": "2", "errorDescription": "La distribuidora no puede facilitar información a ese NIF" },
+    { "distributorCode": "3", "distributorName": "EREDES","errorCode": "2", "errorDescription": "La distribuidora no puede facilitar información a ese NIF" }
+  ]
+}
+```
+
+**⚠️ Notas críticas**:
+- `cod_disitribuidora` — typo oficial en la API (dos 'i'), no corregir.
+- `CodError: "902"` = respuesta parcial (alguna distribuidora no contesta) → tratar como warning, no error.
+- `tipoPunto` equivale a `pointType` en la API de terceros. Tipos observados: **4** (8 suministros) y **5** (6 suministros).
+- Distribuidoras detectadas en este NIF: 2=EDISTRIBUCIÓN, 3=EREDES, 6=EOSA, 7=ELÉCTRICA DE TENTUDIA, 8=I-DE.
+- Nombres en español en portal interno vs inglés en API de terceros (ver mapeo §A.6).
+
+---
+
+### A.3 — Curva horaria (consumo activo)
+
+```
+POST https://datadis.es/api-private/supply-data/v2/time-curve-data/hours
+Content-Type: application/json
+Authorization: <jwt>
+
+{
+  "cups": ["ES0021000005080774JW"],
+  "distributor": "8",
+  "fechaInicial": "2026/04/26",
+  "fechaFinal":   "2026/04/29",
+  "provinceCode": "28",
+  "municipioCode": "079",
+  "tarifaCode":   "3T",
+  "tipoPuntoMedida": 4,
+  "fraccion": 0,
+  "hasAutoConsumo": false,
+  "tipoAutoConsumo": ""
+}
+```
+
+Respuesta (200, con datos):
+```json
+{
+  "response": {
+    "timeCurveList": [{
+      "cups": "ES0021000005080774JW",
+      "date": "2026/04/26",
+      "hour": "01:00",
+      "measureMagnitudeActive": 1.099,
+      "energyPoured": null,
+      "energyGenerated": null,
+      "selfConsumptionEnergy": null,
+      "energyReactive": null,
+      "period": "6",
+      "obtainingMethod": null,
+      "metodoObtencion": "",
+      "error": 0
+    }],
+    "mediumCurveList": null,
+    "mediumCurveAutoList": null
+  }
+}
+```
+
+Respuesta sin datos (200, rango futuro):
+```json
+{"response":{"timeCurveList":[],"mediumCurveList":null,"mediumCurveAutoList":null}}
+```
+
+**⚠️ Notas críticas**:
+- Formato de fechas: `yyyy/MM/dd` con barras — **no ISO 8601**.
+- Unidades: **kWh** (no Wh — confirmado contra totales diarios de la UI).
+- `timeCurveList: []` = sin datos en ese rango — es 200 OK, no un error.
+- `period` 1..6 → P1..P6 de la tarifa. Tarifa 3T tiene 3 periodos pero el endpoint siempre devuelve 6 slots.
+- `cups` es **array** aunque sea 1 elemento.
+
+---
+
+### A.4 — Otros endpoints capturados
+
+**Datos contractuales**
+```
+POST /api-private/supply-data/contractual-data
+Body: { "cups": ["…"], "distributor": "8" }
+```
+```json
+{
+  "response": [{
+    "cups": "ES0021000005080774JW",
+    "comercializador": "THE YELLOW ENERGY, S.L.",
+    "tarifaAccesoCode": "3T",
+    "tension": "Baja tensión",
+    "potenciaContratada": [17.1, 17.1, 17.1, 17.1, 17.1, 17.1],
+    "modoControlPotencia": 1,
+    "modoControlPotenciaName": "Maxímetro",
+    "potenciaMaximaContratada": "61700",
+    "fechaInicio": "2025/10/14",
+    "fechaInicioComercializadora": "2025/10/14",
+    "rangoFechas": [{ "fechaInicio": "2002/12/18", "fechaFin": "9999/01/01" }],
+    "estadoContrato": null,
+    "error": 0
+  }]
+}
+```
+
+**Potencias máximas** (un registro por mes × periodo)
+```
+POST /api-private/supply-data/max-power
+Body: { "cups": ["…"], "distributor": "8", "fechaInicial": "2026/01/01", "fechaFinal": "2026/12/31", "provinceCode": "28", "tarifaCode": "3T" }
+```
+```json
+{ "response": [
+  { "cups": "…", "fechaMaximo": "2026/01/07", "hora": "08:30", "maximoPotenciaDemandada": 17.273, "periodo": "2", "error": 0 },
+  { "cups": "…", "fechaMaximo": "2026/01/27", "hora": "08:00", "maximoPotenciaDemandada": 9.760,  "periodo": "6", "error": 0 }
+]}
+```
+Unidades: **kW**.
+
+**Energía reactiva** (mensual por periodo)
+```
+POST /api-private/supply-data/get-reactive-data
+```
+```json
+{ "response": {
+  "cups": "…",
+  "energy": [{ "date": "2026/04", "energyP1": 0.0, "energyP2": 0.0, "energyP3": 0.0, "energyP4": -144.627, "energyP5": -113.878, "energyP6": -285.145 }],
+  "code": "0", "codeDescription": "Llamada Correcta"
+}}
+```
+Unidades: kVArh. Negativos = capacitiva.
+
+---
+
+### A.5 — Mapeo campos español→inglés (portal interno → API terceros)
+
+| Campo portal (español) | Campo API terceros (inglés) | Columna Postgres |
+|---|---|---|
+| `cups` | `cups` | `cups TEXT` |
+| `cod_disitribuidora` *(typo oficial)* | `distributorCode` | `distributor_code TEXT` |
+| `tipoPunto` / `tipoPuntoMedida` | `pointType` | `point_type SMALLINT` |
+| `tarifaAccesoCode` | `accessFare` | `access_fare TEXT` |
+| `measureMagnitudeActive` | `consumptionKWh` | `consumption_kwh NUMERIC` |
+| `period` | `period` | `period SMALLINT` |
+| `maximoPotenciaDemandada` | `maxPower` | `max_power_kw NUMERIC` |
+| `potenciaContratada[]` | `contractedPowerKW[]` | `contracted_power_kw NUMERIC[]` |
+| `fechaVigenciaDesde` | `validDateFrom` | `valid_date_from DATE` |
+
+---
+
+### A.6 — Pendiente: API oficial de terceros
+
+Los endpoints capturados son del portal web interno (sin SLA oficial).  
+La API de terceros documentada por REE/Datadis usa rutas distintas:
+
+```
+/api-private/api/get-supplies
+/api-private/api/get-consumption-data   ?cups=…&distributorCode=…&startDate=…&endDate=…&measurementType=1&pointType=4
+/api-private/api/get-max-power
+/api-private/api/get-contract-detail
+```
+
+**Parámetros por querystring** (GET), no body JSON.  
+**`authorizedNif`** requerido cuando el NIF logueado es la consultora (Valere) y el suministro pertenece al cliente.
+
+PDFs con spec oficial:
+- `https://datadis.es/api-public/api/files?fileId=1` — manual API privada para terceros
+- `https://datadis.es/api-public/api/files?fileId=2` — manual API pública / agregados
+
+> ⚠️ **Actualizar `DATADIS_ENDPOINTS` en `datadis-proxy/index.ts`** cuando Valere tenga acceso  
+> corporativo y se lean los PDFs. Los endpoints de portal interno (`/api-private/supply-data/…`)  
+> podrían romperse sin aviso.
