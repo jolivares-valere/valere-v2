@@ -139,3 +139,32 @@ $$;
 
 COMMENT ON FUNCTION public.cleanup_datadis_cache() IS
   'Elimina filas expiradas del cache Datadis. Invocar desde cron o Edge Function.';
+
+
+-- ── 5. Tabla de referencia: códigos de provincia (INE) ────────────────────
+-- Fuente: Datadis fileId=2 (PDF oficial) — 52 provincias españolas.
+-- Usado como provinceCode en peticiones de consumo/max_power/reactive.
+
+CREATE TABLE IF NOT EXISTS public.datadis_provincias (
+  codigo  TEXT PRIMARY KEY,   -- '01'..'52'
+  nombre  TEXT NOT NULL
+);
+
+INSERT INTO public.datadis_provincias (codigo, nombre) VALUES
+  ('01','Álava'),('02','Albacete'),('03','Alicante'),('04','Almería'),
+  ('05','Ávila'),('06','Badajoz'),('07','Balears, Illes'),('08','Barcelona'),
+  ('09','Burgos'),('10','Cáceres'),('11','Cádiz'),('12','Castellón'),
+  ('13','Ciudad Real'),('14','Córdoba'),('15','Coruña, A'),('16','Cuenca'),
+  ('17','Girona'),('18','Granada'),('19','Guadalajara'),('20','Gipuzkoa'),
+  ('21','Huelva'),('22','Huesca'),('23','Jaén'),('24','León'),
+  ('25','Lleida'),('26','Rioja, La'),('27','Lugo'),('28','Madrid'),
+  ('29','Málaga'),('30','Murcia'),('31','Navarra'),('32','Ourense'),
+  ('33','Asturias'),('34','Palencia'),('35','Palmas, Las'),('36','Pontevedra'),
+  ('37','Salamanca'),('38','Santa Cruz de Tenerife'),('39','Cantabria'),
+  ('40','Segovia'),('41','Sevilla'),('42','Soria'),('43','Tarragona'),
+  ('44','Teruel'),('45','Toledo'),('46','Valencia'),('47','Valladolid'),
+  ('48','Bizkaia'),('49','Zamora'),('50','Zaragoza'),('51','Ceuta'),('52','Melilla')
+ON CONFLICT (codigo) DO NOTHING;
+
+COMMENT ON TABLE public.datadis_provincias IS
+  'Códigos de provincia INE usados como provinceCode en la API Datadis. Fuente: fileId=2.';
