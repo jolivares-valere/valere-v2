@@ -37,7 +37,10 @@ export function useMisOportunidades() {
         logError(error, 'useMisOportunidades')
         throw error
       }
-      return (data ?? [])
+      // Cast: la vista v_mis_oportunidades devuelve id como string|null en tipos
+      // generados (limitación de Postgres views), pero en BD nunca es null porque
+      // viene de oportunidades.id (PK). Cast seguro.
+      return (data ?? []) as unknown as VMisOportunidadesRow[]
     },
   })
 }

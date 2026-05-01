@@ -45,6 +45,7 @@ function bootstrapFromSession(session: Session): UserProfile {
     status: 'active',
     approved: false,
     avatar_url: null,
+    funciones: [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
