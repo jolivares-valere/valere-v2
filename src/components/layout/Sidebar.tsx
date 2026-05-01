@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  Activity, AlertTriangle, BarChart3, BookOpen, Building2, Calendar, ChevronDown,
-  ChevronLeft, ChevronRight, Database, FileText, GitBranch, LayoutDashboard, Mail,
-  RefreshCw, Settings, ShieldCheck, Sun, Upload, Users, X, Zap
+  Activity, AlertTriangle, BarChart3, BookOpen, Briefcase, Building2, Calendar, ChevronDown,
+  ChevronLeft, ChevronRight, Database, FileSearch, FileText, GitBranch, LayoutDashboard, Mail,
+  PhoneCall, RefreshCw, Settings, ShieldCheck, Sun, Upload, Users, X, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
@@ -29,6 +29,12 @@ const crmItems: Item[] = [
   { to: '/importador',     label: 'Importador',    icon: Upload },
   { to: '/seguimiento-fv', label: 'Plantas FV',    icon: Sun },
   { to: '/datadis',        label: 'Datadis',       icon: Database },
+]
+
+const captacionItems: Item[] = [
+  { to: '/captacion',       label: 'Captación',    icon: PhoneCall, roles: ['telemarketing', 'admin'] },
+  { to: '/analisis-captacion', label: 'Análisis facturas', icon: FileSearch, roles: ['analista', 'admin'] },
+  { to: '/cartera-senior',  label: 'Cartera senior', icon: Briefcase, roles: ['asesor_senior', 'admin'] },
 ]
 
 const potenciasItems: Item[] = [
@@ -69,6 +75,13 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
   const { user, signOut } = useAuth()
   const location = useLocation()
   const isMasterOrManager = user?.role === 'master' || user?.role === 'manager'
+
+  const userFunciones = user?.funciones ?? []
+  const hasCaptacionAccess =
+    userFunciones.includes('telemarketing') ||
+    userFunciones.includes('analista') ||
+    userFunciones.includes('asesor_senior') ||
+    userFunciones.includes('admin')
 
   const isPotenciasActive =
     location.pathname === '/potencias' ||
@@ -137,6 +150,26 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
             <NavItem key={item.to} {...item} onClose={onClose} collapsed={collapsed} />
           ))}
         </div>
+
+        {/* Seccion Captacion */}
+        {hasCaptacionAccess && (
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            {!collapsed && (
+              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Captación
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {captacionItems.map(item => {
+                const roles = item.roles ?? []
+                const itemVisible = roles.length === 0 || roles.some(r => userFunciones.includes(r))
+                return itemVisible ? (
+                  <NavItem key={item.to} {...item} onClose={onClose} collapsed={collapsed} />
+                ) : null
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Seccion Potencias */}
         <div className="mt-2 border-t border-slate-100 pt-2">
