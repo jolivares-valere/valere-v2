@@ -1,11 +1,15 @@
 ﻿import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { useEmpresas, useCreateEmpresa, fetchEmpresasForExport } from './api'
+import { useCreateContacto } from '../contactos/api'
 import EmpresaForm from './components/EmpresaForm'
+import ContactoForm from '../contactos/components/ContactoForm'
 import ExportButton from '../../core/components/ExportButton'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { formatDate } from '../../core/utils/dates'
-import type { Empresa, EmpresaInsert } from '../../core/types/entities'
+import type { Empresa, EmpresaInsert, ContactoInsert } from '../../core/types/entities'
 
 export default function EmpresasPage() {
   const [params, setParams] = useSearchParams()
@@ -14,6 +18,9 @@ export default function EmpresasPage() {
   const search = params.get('q') ?? ''
   const tipo = params.get('tipo') ?? ''
   const [showForm, setShowForm] = useState(false)
+  const [wizardStep, setWizardStep] = useState<'empresa' | 'contacto'>('empresa')
+  const [newEmpresa, setNewEmpresa] = useState<Empresa | null>(null)
+  const [confirmSkipContacto, setConfirmSkipContacto] = useState(false)
 
   const { data, isLoading, error, refetch, isFetching } = useEmpresas({
     page,
@@ -22,7 +29,8 @@ export default function EmpresasPage() {
     sort: { field: 'created_at', direction: 'desc' },
   })
 
-  const createMut = useCreateEmpresa()
+  const createEmpresaMut = useCreateEmpresa()
+  const createContactoMut = useCreateContacto()
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize))
 
   const updateParam = (key: string, value: string) => {
@@ -33,9 +41,33 @@ export default function EmpresasPage() {
     setParams(next)
   }
 
-  const onCreate = async (values: EmpresaInsert) => {
-    await createMut.mutateAsync(values)
+  const resetWizard = () => {
     setShowForm(false)
+    setWizardStep('empresa')
+    setNewEmpresa(null)
+    setConfirmSkipContacto(false)
+  }
+
+  const onCreate = async (values: EmpresaInsert) => {
+    const empresa = await createEmpresaMut.mutateAsync(values)
+    setNewEmpresa(empresa)
+    setWizardStep('contacto')
+  }
+
+  const onSkipContacto = () => {
+    toast.warning('Empresa creada sin contacto decisor. Recuerda añadir uno antes de avanzar en el pipeline.')
+    resetWizard()
+  }
+
+  const onContactoCreated = async (values: ContactoInsert) => {
+    if (!newEmpresa) return
+    try {
+      await createContactoMut.mutateAsync({ ...values, empresa_id: newEmpresa.id })
+      toast.success('Empresa creada con contacto decisor')
+      resetWizard()
+    } catch {
+      // Error ya fue mostrado por useCreateContacto.onError
+    }
   }
 
   return (
@@ -100,15 +132,59 @@ export default function EmpresasPage() {
         </select>
       </div>
 
-      {showForm && (
+      {showForm && wizardStep === 'empresa' && (
         <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Nueva empresa</h2>
+          <h2 className="mb-4 text-lg font-semibold">Paso 1: Datos de la empresa</h2>
           <EmpresaForm
             onSubmit={onCreate}
-            onCancel={() => setShowForm(false)}
-            submitting={createMut.isPending}
+            onCancel={() => resetWizard()}
+            submitting={createEmpresaMut.isPending}
           />
         </div>
+      )}
+
+      {showForm && wizardStep === 'contacto' && newEmpresa && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setConfirmSkipContacto(true)} />
+          <div role="dialog" aria-modal="true" aria-label="Primer contacto decisor" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              <div className="flex items-center justify-between border-b border-slate-200 p-4">
+                <h2 className="text-lg font-semibold text-slate-900">Paso 2: Primer contacto</h2>
+                <button
+                  type="button"
+                  onClick={() => setConfirmSkipContacto(true)}
+                  aria-label="Cerrar"
+                  className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-6">
+                <p className="mb-4 text-sm text-slate-600">
+                  Por favor, añade al menos un contacto decisor para {newEmpresa.nombre}. Es necesario para avanzar en el pipeline.
+                </p>
+                <ContactoForm
+                  defaultValues={{ empresa_id: newEmpresa.id, es_decisor: true }}
+                  onSubmit={onContactoCreated}
+                  onCancel={() => setConfirmSkipContacto(true)}
+                  submitting={createContactoMut.isPending}
+                />
+              </div>
+            </div>
+          </div>
+
+          <ConfirmDialog
+            isOpen={confirmSkipContacto}
+            title="Crear sin contacto"
+            message={`¿Seguro que quieres crear la empresa sin un contacto decisor? Podrás añadirlo después en la ficha de la empresa.`}
+            confirmLabel="Crear sin contacto"
+            cancelLabel="Volver"
+            variant="warning"
+            submitting={false}
+            onConfirm={onSkipContacto}
+            onCancel={() => setConfirmSkipContacto(false)}
+          />
+        </>
       )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

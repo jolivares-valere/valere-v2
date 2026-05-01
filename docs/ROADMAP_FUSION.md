@@ -324,6 +324,173 @@ Dos informes iniciales:
 
 ---
 
+# Sprints derivados de `docs/AUDIT_2026-05-01_MEJORAS_CRM.md`
+
+Tres sprints (FASES 30, 31, 32) que cierran las brechas detectadas en la auditoría del 1 mayo 2026. Cada sub-fase: 1 commit, TSC=0, marcar ✅ aquí al cerrar.
+
+## FASE 30 — Cablear lo que ya existe (Sprint A · 5 días)
+
+Convertir esqueletos en flujos funcionales. Sin SQL nuevo significativo, sólo migraciones de cierre + glue UI.
+
+### FASE 30.1 — Programar pg_cron de `daily-contract-check`
+**Objetivo**: el rollover diario funciona sólo. Hoy la Edge Function existe pero nadie la invoca.
+**Migration**: `supabase/migrations/20260502_pgcron_daily_contract_check.sql` con `cron.schedule('daily_contract_check', '0 4 * * *', $$ SELECT net.http_post(...) $$)`.
+**Verificación**: tras 24 h, contratos con `fecha_fin < today` están en estado `vencido`; oportunidades de renovación creadas para los que vencen en ≤60 d.
+**DONE**: commit `feat(fase30.1): programar cron daily-contract-check`.
+
+### FASE 30.2 — Consolidar `renovaciones` vs `oportunidades.tipo='renovacion'`
+**Objetivo**: una sola tabla autoritativa. Hoy duplicamos el dato.
+**Decisión propuesta**: la fuente de verdad es `oportunidades.tipo='renovacion'`. Convertir `/renovaciones` en una vista filtrada de oportunidades. `DROP TABLE renovaciones` (con migración de datos si hay rows). Refactorizar `src/features/renovaciones/api.ts` para apuntar a `oportunidades`.
+**Riesgo**: si Cowork ha persistido datos en `renovaciones`, migrarlos. Hacer `SELECT count(*) FROM renovaciones WHERE deleted_at IS NULL` antes.
+**DONE**: commit `refactor(fase30.2): consolidar renovaciones en oportunidades`.
+
+### FASE 30.3 — Cerrar migración FASE 21.a (etapas legacy)
+**Objetivo**: pipeline 100% energético, sin etapas genéricas residuales.
+**Acciones**:
+- Migración SQL: `UPDATE oportunidades SET etapa = CASE etapa WHEN 'contactado' THEN 'auditoria_consumo' WHEN 'analisis' THEN 'auditoria_consumo' WHEN 'propuesta_enviada' THEN 'oferta_presentada' WHEN 'ganada' THEN 'cerrada_ganada' WHEN 'perdida' THEN 'cerrada_perdida' WHEN 'cancelada' THEN 'cerrada_perdida' ELSE etapa END;`
+- Restringir `oportunidades_etapa_check` a las 8 etapas energéticas.
+- Limpiar `EtapaOportunidad` en `src/core/types/entities.ts` a 8 valores.
+- Refactorizar `DashboardPage.tsx:20-34` para iterar las 8 etapas.
+**DONE**: commit `refactor(fase30.3): pipeline 100% energético, etapas legacy retiradas`.
+
+### FASE 30.4 — Mostrar importes en Kanban + tabla oportunidades
+**Objetivo**: los campos `valor_estimado_eur` y `ahorro_anual_estimado` se ven en la UI.
+**Ficheros**: `src/features/oportunidades/components/KanbanCard.tsx`, `KanbanColumn.tsx` (suma por etapa), `OportunidadesPage.tsx` (tabla list mode).
+**DONE**: commit `feat(fase30.4): mostrar ahorro y valor estimado en pipeline`.
+
+### FASE 30.5 — Validación: empresa nueva exige contacto decisor
+**Objetivo**: `EmpresaForm` permite crear empresa sin contacto. Cambiar a wizard 2 pasos: empresa → contacto inicial.
+**Validación zod**: form requiere ≥1 contacto con `es_decisor=true` antes de submit.
+**DONE**: commit `feat(fase30.5): wizard alta empresa con contacto decisor obligatorio`.
+
+### FASE 30.6 — Botón "Asociar a empresa" en `DatadisPage`
+**Objetivo**: por cada fila del listado Datadis, abrir un modal que busca/crea empresa y vincula `cups.empresa_id` + `cups.codigo_cups` + datos Datadis.
+**Reutiliza**: la búsqueda de empresas que ya tiene `GlobalSearch`.
+**DONE**: commit `feat(fase30.6): asociar suministros Datadis a empresas`.
+
+### FASE 30.7 — Vinculación masiva Datadis ↔ Empresa por NIF
+**Objetivo**: acción admin que mira los suministros Datadis del usuario logueado, los cruza por NIF contra `empresas`, y crea/asocia automáticamente.
+**Edge Function nueva**: `datadis-bulk-associate` (recibe credenciales Datadis, devuelve resumen de mapeos propuestos para revisión).
+**UI**: tab nueva en `/admin` o botón en `DatadisPage`.
+**DONE**: commit `feat(fase30.7): vinculación masiva Datadis-empresas por NIF`.
+
+### FASE 30.8 — `incidencias.cups: text → cups_id uuid FK`
+**Objetivo**: incidencias con FK fuerte a CUPS.
+**Migration**:
+```sql
+ALTER TABLE public.incidencias ADD COLUMN cups_id uuid REFERENCES public.cups(id) ON DELETE SET NULL;
+UPDATE public.incidencias i SET cups_id = c.id FROM public.cups c WHERE c.codigo_cups = i.cups;
+CREATE INDEX idx_incidencias_cups_id ON public.incidencias(cups_id);
+ALTER TABLE public.incidencias DROP COLUMN cups; -- después de validar
+```
+**DONE**: commit `refactor(fase30.8): incidencias.cups text -> cups_id uuid FK`.
+
+### FASE 30.9 — Aplicar RLS granular FASE 20.9 con feature flag
+**Objetivo**: pasar de RLS permisiva (`all_authenticated`) a granular por `comercial_id`. **Tabla a tabla, con EXPLAIN ANALYZE antes/después y rollback inmediato si p95 > 500 ms.**
+**Orden propuesto**: empresas → contactos → contratos → oportunidades → actividades → incidencias → renovaciones → cups.
+**Día 1**: empresas. Día 2: si OK, contactos+contratos. Día 3: oportunidades+actividades. Día 4: el resto.
+**Helper**: `is_manager_or_above()` ya existe (`fase20.9_rls_granular.sql:10-22`).
+**DONE**: commit `security(fase30.9): aplicar RLS granular en producción`.
+
+### FASE 30.10 — Observabilidad básica (Sentry o Logtail)
+**Objetivo**: tener errores de producción visibles. Hoy `logger.ts` no envía a ningún sink remoto.
+**Decisión**: Sentry plan free (5 K eventos/mes) o Logtail (gratis 1 GB/mes). Recomendación Sentry por rastreo de stacks.
+**Cobertura**: frontend + Edge Functions críticas (`daily-contract-check`, `chat-consultor`, `datadis-proxy`).
+**DONE**: commit `feat(fase30.10): observabilidad con Sentry`.
+
+---
+
+## FASE 31 — Ampliar el modelo energético (Sprint B · 5 días)
+
+Schema y datos para que la palanca económica esté en BD.
+
+### FASE 31.1 — Precios P1–P6 en `contratos`
+ALTER `contratos` ADD `precio_energia_p1..p6 numeric(8,5)`, `precio_potencia_p1..p6 numeric(10,2)`, `documento_firmado_id uuid REFERENCES documentos(id)`.
+Refactor `ContratoForm.tsx` para 12 campos opcionales (collapsable por defecto).
+**DONE**: commit `feat(fase31.1): contratos con precios P1-P6 desglosados`.
+
+### FASE 31.2 — Detalle económico en `oportunidades`
+ALTER `oportunidades` ADD `consumo_anual_kwh numeric(12,2)`, `precio_actual_kwh numeric(8,5)`, `precio_ofertado_kwh numeric(8,5)`, `fee_valere_pct numeric(5,2)`, `plazo_meses int`.
+**DONE**: commit `feat(fase31.2): oportunidades con detalle económico energético`.
+
+### FASE 31.3 — Tabla `oportunidad_cups` (N:M)
+Crear tabla con `oportunidad_id`, `cups_id`, `created_at`. UI multi-select en `OportunidadForm` que filtra por `empresa_id`.
+**DONE**: commit `feat(fase31.3): vincular oportunidades a múltiples CUPS`.
+
+### FASE 31.4 — `historial_precios_contrato` con trigger
+Tabla `historial_precios_contrato (id, contrato_id, snapshot_at, precio_energia_p1..p6, precio_potencia_p1..p6, motivo)` + trigger `BEFORE UPDATE ON contratos` que captura snapshot cuando cambian precios. Renovación = motivo `renovacion`.
+**DONE**: commit `feat(fase31.4): historial de precios de contrato`.
+
+### FASE 31.5 — Subsegmento + tamaño + consumo estimado en `empresas`
+ALTER `empresas` ADD `subsegmento text`, `tamano_empleados text`, `consumo_anual_estimado_kwh numeric(12,2)`. Trigger que actualiza `consumo_anual_estimado_kwh` al asociar CUPS.
+**DONE**: commit `feat(fase31.5): segmentación enriquecida de empresas`.
+
+### FASE 31.6 — `rol_energetico` y `canal_preferido` en `contactos`
+ALTER `contactos` ADD `rol_energetico text CHECK IN ('decisor','tecnico','administrativo','propietario')`, `canal_preferido text CHECK IN ('email','telefono','whatsapp','presencial')`.
+**DONE**: commit `feat(fase31.6): rol energético y canal preferido en contactos`.
+
+### FASE 31.7 — Hook `useAhorroEstimado(oportunidad_id)`
+Calcula ahorro contra Datadis: lee `cups.energia_p*_kwh` × `oportunidad.precio_actual_kwh` − × `oportunidad.precio_ofertado_kwh`. Muestra en `OportunidadDetailDrawer`.
+**DONE**: commit `feat(fase31.7): cálculo de ahorro contra Datadis en oportunidades`.
+
+### FASE 31.8 — 5 informes energéticos
+1. Ahorro generado 12 m.
+2. Vencen en 90 d con precio actual vs OMIE (snapshot manual semanal).
+3. Distribución tarifaria de la cartera.
+4. Top consumidores con ahorro relativo bajo.
+5. Reactiva acumulada último mes (si hay datos).
+**Ficheros**: `src/features/informes/components/Informe*.tsx` (5 nuevos) + SQL agregado en `informes/api.ts`.
+**DONE**: commit `feat(fase31.8): 5 informes energéticos sobre la cartera`.
+
+---
+
+## FASE 32 — Diferenciar el servicio (Sprint C · 5 días)
+
+Las dos palancas de fidelización: validador de facturas y portal cliente.
+
+### FASE 32.1 — Edge Function `datadis-incidencias-detector`
+Cron diario. Tres detectores:
+1. Lecturas estimadas en últimos 7 días → incidencia tipo `facturacion`.
+2. Excesos de potencia (max_power > contracted_power) → tipo `potencia`.
+3. Reactiva fuera de umbral (>33% energía activa) → tipo `facturacion`.
+Usa `cups_id` (de FASE 30.8). `created_by = NULL` con marca `auto=true` (añadir columna).
+**DONE**: commit `feat(fase32.1): incidencias automáticas desde Datadis`.
+
+### FASE 32.2 — Validador de facturas v0
+Subida PDF en `/empresas/:id` tab "Facturas comercializadora" → Edge Function `factura-validator`:
+1. Extracción texto (pdf-parse / pdfplumber via Deno o Python lambda).
+2. LLM call (Claude Haiku o Gemini Flash) con prompt estructurado → JSON con `consumo_p*`, `precio_p*`, `importes`.
+3. Comparar contra `cups.energia_p*_kwh` + `contratos.precio_energia_p*` del mismo período.
+4. Tabla `facturas_validacion (factura_id, estado: 'ok'|'discrepancia', diffs jsonb, importe_reclamable)`.
+5. Si discrepancia: crea incidencia auto con plantilla de reclamación.
+**DPA pendiente** con proveedor LLM antes de mover datos reales.
+**DONE**: commit `feat(fase32.2): validador de facturas v0`.
+
+### FASE 32.3 — Portal cliente v0
+**Pre-requisito**: FASE 30.9 aplicada (RLS granular). Sin RLS, un cliente vería todos los datos.
+**Mapping**: tabla `cliente_empresa (user_id, empresa_id)` (un cliente puede ser de varias empresas).
+**Rutas nuevas**: `/cliente/dashboard`, `/cliente/suministros`, `/cliente/incidencias`, `/cliente/ahorros`.
+**AuthGuard**: `roles=['client']` redirige a `/cliente/dashboard`.
+**Layout cliente**: sidebar minimalista (4 items) en lugar del completo.
+**DONE**: commit `feat(fase32.3): portal cliente v0`.
+
+### FASE 32.4 — Generador de Autorización Datadis desde CRM
+Reutilizar `src/features/potencias/lib/client-docs.ts` como base para autorizaciones Datadis. Botón "Generar autorización Datadis" en `EmpresaDetailPage` → PDF prerellenado → upload firmado → `documentos.tipo='autorizacion_datadis'` + `firmado_el`.
+**DONE**: commit `feat(fase32.4): generador de autorización Datadis`.
+
+---
+
+## FASE 33+ — Sprints diferidos
+
+- **33.1** Firma digital con Signaturit/DocuSign (3 d).
+- **33.2** Convergencia visual completa (CRIT-1, CRIT-2 design review): `rounded-xl` único, padding `p-6 md:p-8`, H1 `font-display`, eliminar `confirm()`, añadir `aria-label` (3 d).
+- **33.3** Tests a 30% cobertura dominio (5 d).
+- **33.4** Limpieza de los 111 `as never` legados (1 d).
+- **33.5** Tabla móvil responsive (cards en lugar de tablas a `<lg`) (2 d).
+- **33.6** Modo oscuro (1 d).
+
+---
+
 ## Checklist — Fusión (20.x)
 
 - [x] FASE 20.0 — Documentación ✅
@@ -356,6 +523,44 @@ Dos informes iniciales:
 
 - [x] Code-splitting con `React.lazy()` por rutas + `manualChunks` para vendors (main bundle 1515 kB → 253 kB)
 - [x] Vitest + React Testing Library + tests de humo en `core/utils` (16 tests)
+
+## Checklist — Auditoría 2026-05-01 (FASES 30 → 33)
+
+Sprint A — Cablear lo que ya existe:
+- [x] FASE 30.1 — Programar pg_cron de `daily-contract-check` ✅ aplicado en prod 2026-05-01 (jobid 3, cron 04:00 UTC, lógica en SQL `run_daily_contract_check()`)
+- [ ] FASE 30.2 — Consolidar `renovaciones` vs `oportunidades` (pendiente decisión Juan)
+- [ ] FASE 30.3 — Cerrar migración FASE 21.a (etapas legacy) (pendiente verificar etapas vivas)
+- [x] FASE 30.4 — Mostrar importes en Kanban + tabla ✅ frontend modificado 2026-05-01 (TSC pendiente)
+- [x] FASE 30.5 — Validación: empresa nueva exige contacto decisor ✅ wizard 2 pasos en EmpresasPage 2026-05-01 (TSC pendiente)
+- [x] FASE 30.6 — Botón "Asociar a empresa" en `DatadisPage` ✅ AsociarEmpresaDialog + hook + botón 2026-05-01 (TSC pendiente)
+- [ ] FASE 30.7 — Vinculación masiva Datadis ↔ Empresa por NIF (requiere Edge Function nueva)
+- [x] FASE 30.8 (aditiva) — `incidencias.cups: text → cups_id uuid FK` ✅ ALTER + index + populate aplicado en prod 2026-05-01. 30.8b (DROP cups text) cuando frontend migre.
+- [ ] FASE 30.9 — Aplicar RLS granular FASE 20.9 con feature flag (sesión coordinada con Juan)
+- [x] FASE 30.10 — Observabilidad básica (Sentry o Logtail) ✅ Sentry SDK lazy 2026-05-01 (TSC pendiente)
+
+Sprint B — Ampliar el modelo energético:
+- [ ] FASE 31.1 — Precios P1–P6 en contratos
+- [ ] FASE 31.2 — Detalle económico en oportunidades
+- [ ] FASE 31.3 — Tabla `oportunidad_cups` (N:M)
+- [ ] FASE 31.4 — `historial_precios_contrato` con trigger
+- [ ] FASE 31.5 — Subsegmento + tamaño + consumo estimado en empresas
+- [ ] FASE 31.6 — `rol_energetico` y `canal_preferido` en contactos
+- [ ] FASE 31.7 — Hook `useAhorroEstimado`
+- [ ] FASE 31.8 — 5 informes energéticos
+
+Sprint C — Diferenciar el servicio:
+- [ ] FASE 32.1 — Edge Function `datadis-incidencias-detector`
+- [ ] FASE 32.2 — Validador de facturas v0
+- [ ] FASE 32.3 — Portal cliente v0 (depende de 30.9)
+- [ ] FASE 32.4 — Generador de Autorización Datadis
+
+Diferidos:
+- [ ] FASE 33.1 — Firma digital
+- [ ] FASE 33.2 — Convergencia visual completa
+- [ ] FASE 33.3 — Tests a 30% cobertura
+- [ ] FASE 33.4 — Limpieza `as never`
+- [ ] FASE 33.5 — Tabla móvil responsive
+- [ ] FASE 33.6 — Modo oscuro
 
 ## Criterios de cierre global
 

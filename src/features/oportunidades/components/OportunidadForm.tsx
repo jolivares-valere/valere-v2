@@ -9,7 +9,8 @@ import CustomFieldsPanel from '../../../core/components/CustomFieldsPanel'
 import type { Oportunidad, OportunidadInsert } from '../../../core/types/entities'
 
 const TIPOS = ['nueva_venta', 'renovacion', 'ampliacion', 'recuperacion'] as const
-const ETAPAS = ['prospecto', 'contactado', 'analisis', 'propuesta_enviada', 'negociacion', 'ganada', 'perdida', 'cancelada', 'auditoria_consumo', 'oferta_presentada', 'contrato_firmado', 'activo', 'cerrada_ganada', 'cerrada_perdida'] as const
+// FASE 30.3 (1 mayo 2026): pipeline 100% energético.
+const ETAPAS = ['prospecto', 'auditoria_consumo', 'oferta_presentada', 'negociacion', 'contrato_firmado', 'activo', 'cerrada_ganada', 'cerrada_perdida'] as const
 
 // Mapeo de etapas legacy → canónica. Al cargar una oportunidad con etapa
 // legacy, el form la normaliza para que al guardar se quede en canónica.

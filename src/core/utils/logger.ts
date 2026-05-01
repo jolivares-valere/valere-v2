@@ -1,4 +1,6 @@
-﻿const isDev =
+﻿import { captureException } from './sentry'
+
+const isDev =
   typeof import.meta !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true
 
 function serializeError(error: unknown): string {
@@ -22,9 +24,12 @@ export function logError(error: unknown, context: string): void {
   const stack = error instanceof Error ? error.stack : undefined
   if (isDev) {
     console.error(`[Valere] ${context}:`, message, error, stack ?? '')
-    return
+  } else {
+    console.error(`[Valere] ${context}:`, message)
   }
-  console.error(`[Valere] ${context}:`, message)
+  // Reenvío a Sentry. No-op si VITE_SENTRY_DSN no está definido.
+  // FASE 30.10 — Auditoría 2026-05-01.
+  captureException(error, context)
 }
 
 export function logInfo(message: string, data?: unknown): void {
