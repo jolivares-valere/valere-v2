@@ -13,6 +13,13 @@ export default function AnalisisPage() {
   const enAnalisis = filterByEtapas(['en_analisis'])
   const propuestasPreparacion = filterByEtapas(['propuesta_en_preparacion'])
 
+  // Tab default: primero con datos.
+  const defaultTab =
+    facturasPendientes.length > 0 ? 'facturas-pendientes'
+    : enAnalisis.length > 0 ? 'en-analisis'
+    : propuestasPreparacion.length > 0 ? 'propuestas-preparacion'
+    : 'facturas-pendientes'
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -29,12 +36,12 @@ export default function AnalisisPage() {
           Análisis de facturas
         </h1>
         <p className="text-slate-600 mt-1">
-          Decide complejidad y prepara propuestas
+          Bandeja de análisis — recibes facturas, decides estándar/senior y preparas propuestas.
         </p>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="facturas-pendientes" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList>
           <TabsTrigger value="facturas-pendientes">
             Facturas pendientes ({facturasPendientes.length})

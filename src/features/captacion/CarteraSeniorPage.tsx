@@ -13,6 +13,13 @@ export default function CarteraSeniorPage() {
   const propuestasPreparacion = filterByEtapas(['propuesta_en_preparacion'])
   const seguimientosDirectos = filterByEtapas(['propuesta_enviada', 'seguimiento'])
 
+  // Tab default: primero con datos.
+  const defaultTab =
+    asignadosASenior.length > 0 ? 'asignados'
+    : propuestasPreparacion.length > 0 ? 'propuestas-preparacion'
+    : seguimientosDirectos.length > 0 ? 'seguimientos'
+    : 'asignados'
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -29,12 +36,12 @@ export default function CarteraSeniorPage() {
           Cartera senior
         </h1>
         <p className="text-slate-600 mt-1">
-          Casos complejos asignados directamente
+          Bandeja de asesor senior — clientes complejos donde tratas directamente con el cliente.
         </p>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="asignados" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList>
           <TabsTrigger value="asignados">
             Asignados a mí ({asignadosASenior.length})

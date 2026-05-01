@@ -14,6 +14,14 @@ export default function CaptacionPage() {
   const propuestasEnviar = filterByEtapas(['propuesta_lista'])
   const seguimientos = filterByEtapas(['propuesta_enviada', 'seguimiento'])
 
+  // Tab default: primero con datos. Si todos vacíos, queda 'por-llamar'.
+  const defaultTab =
+    porLlamar.length > 0 ? 'por-llamar'
+    : esperandoFactura.length > 0 ? 'esperando-factura'
+    : propuestasEnviar.length > 0 ? 'propuestas-enviar'
+    : seguimientos.length > 0 ? 'seguimientos'
+    : 'por-llamar'
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -30,12 +38,12 @@ export default function CaptacionPage() {
           Captación
         </h1>
         <p className="text-slate-600 mt-1">
-          Tu bandeja de leads y propuestas
+          Bandeja de telemarketing — leads que captas, propuestas que envías y seguimientos.
         </p>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="por-llamar" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList>
           <TabsTrigger value="por-llamar">
             Por llamar ({porLlamar.length})
