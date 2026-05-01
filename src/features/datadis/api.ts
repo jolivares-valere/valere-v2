@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 
@@ -227,5 +228,63 @@ export function useDatadisReactive(
     enabled: !!params?.cups,
     staleTime: 10 * 60 * 1000,
     retry: 1,
+  })
+}
+
+// ─── Asociar suministro a empresa (Upsert en tabla cups) ──────────────────────
+
+export function useAsociarSuministroAEmpresa() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      supply,
+      empresa_id,
+    }: {
+      supply: DatadisSupply
+      empresa_id: string
+    }) => {
+      // Mapeo de campos de Datadis a tabla cups
+      const distribuidor = (supply.distributor ?? '') as string
+      const direccion = (supply.address ?? '') as string
+      const tarifa = (supply.tariff ?? '') as string
+      const pointType = supply.pointType ?? undefined
+
+      // Upsert sobre codigo_cups
+      const { error } = await supabase.from('cups').upsert(
+        {
+          codigo_cups: supply.cups,
+          empresa_id,
+          direccion_suministro: direccion || null,
+          distribuidor: distribuidor || null,
+          tarifa_acceso: tarifa || null,
+          datadis_distribuidor_cod: distribuidor || null,
+          datadis_punto_tipo: pointType || null,
+          datadis_sincronizado: true,
+          datadis_ultima_sync: new Date().toISOString(),
+          estado: 'activo',
+        } as never,
+        { onConflict: 'codigo_cups' },
+      )
+
+      if (error) {
+        logError(error, 'useAsociarSuministroAEmpresa')
+        throw error
+      }
+    },
+
+    onSuccess: () => {
+      // Invalidar queries de cups
+      qc.invalidateQueries({ queryKey: ['cups'] })
+      // Invalidar queries de datadis supplies
+      qc.invalidateQueries({ queryKey: ['datadis', 'supplies'] })
+      toast.success('Suministro asociado a empresa')
+    },
+
+    onError: (e) => {
+      toast.error('No se pudo asociar el suministro', {
+        description: (e as Error).message,
+      })
+    },
   })
 }
