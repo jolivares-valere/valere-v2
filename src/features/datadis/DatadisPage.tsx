@@ -1,27 +1,42 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   AlertTriangle, Building2, CheckCircle2, ChevronDown, ChevronUp,
-  ChevronRight, Database, Eye, EyeOff, Info, Loader2,
+  ChevronRight, Database, Eye, EyeOff, Info, Link2, Loader2,
   LogIn, MapPin, RefreshCw, User, Wifi, WifiOff, X, Zap,
 } from 'lucide-react'
+import { Button } from '../../components/ui/button'
 import { useDatadisSupplies, type DatadisCreds, type DatadisSupply } from './api'
+import AsociarEmpresaDialog from './components/AsociarEmpresaDialog'
 
 // --- Helpers ---
 
 const DISTRIBUTOR_NAMES: Record<string, string> = {
+  // Códigos cortos (portal Datadis)
+  '1': 'UFD (Gas Natural Fenosa)',
+  '2': 'EDISTRIBUCIÓN (Endesa)',
+  '3': 'I-DE (Iberdrola)',
+  '4': 'UFD Distribución',
+  '5': 'Viesgo / E.ON',
+  '6': 'EOSA',
+  '7': 'Eléctrica de Tentudía',
+  '8': 'EREDES',
+  // Códigos largos (legacy)
   '0021': 'I-DE (Iberdrola)',
-  '0022': 'e-distribucion (Endesa)',
+  '0022': 'EDISTRIBUCIÓN (Endesa)',
   '0023': 'UFD (Gas Natural)',
-  '0024': 'EDISTRIBUCION (Naturgy)',
+  '0024': 'EDISTRIBUCIÓN (Naturgy)',
   '0031': 'EOSA',
   '0033': 'EREDES',
-  '0029': 'UFD Distribucion',
+  '0029': 'UFD Distribución',
   '0026': 'Viesgo / E.ON',
 }
 
-function distributorName(code: string) {
-  return DISTRIBUTOR_NAMES[code] ?? code
+function distributorLabel(supply: DatadisSupply): string {
+  const nombre = supply['distribuidora'] as string | undefined
+  if (nombre && typeof nombre === 'string' && nombre.length > 2) return nombre
+  const code = String(supply['cod_disitribuidora'] ?? supply.distributor ?? '')
+  return DISTRIBUTOR_NAMES[code] ?? (code || '---')
 }
 
 const TARIFF_COLORS: Record<string, string> = {
@@ -44,7 +59,11 @@ function tariffBadge(tariff?: string) {
 }
 
 const POINT_TYPE: Record<number, string> = {
-  1: 'Tipo 1', 2: 'Tipo 2', 3: 'Tipo 3', 4: 'Tipo 4', 5: 'Tipo 5',
+  1: 'Telemedida',
+  2: 'Telegestión',
+  3: 'Tipo 3',
+  4: 'Tipo 4 (BT)',
+  5: 'Tipo 5',
 }
 
 // --- Panel de credenciales ---
@@ -112,7 +131,7 @@ function CredsForm({ onConnect, onDisconnect, activeCreds }: CredsFormProps) {
             </div>
             <div>
               <label className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Contrasena
+                Contraseña
               </label>
               <div className="relative">
                 <input
@@ -156,20 +175,29 @@ function CredsForm({ onConnect, onDisconnect, activeCreds }: CredsFormProps) {
   )
 }
 
-// --- Fila de suministro ---
+// --- Fila de suministro (P1-B: Link para Ctrl+click, row onClick para UX) ---
 
-function SupplyRow({ supply, idx }: { supply: DatadisSupply; idx: number }) {
+interface SupplyRowProps {
+  supply: DatadisSupply
+  idx: number
+  onOpenAsociar?: (supply: DatadisSupply) => void
+}
+
+function SupplyRow({ supply, idx, onOpenAsociar }: SupplyRowProps) {
   const navigate = useNavigate()
-
-  const cups         = supply.cups ?? '---'
-  const distributor  = supply.distributor ?? (supply['cod_disitribuidora'] as string) ?? '---'
-  const tariff       = supply.tariff ?? (supply['tarifa'] as string) ?? (supply['tarifaCode'] as string)
-  const province     = supply.province ?? (supply['provincia'] as string)
-  const municipality = supply.municipality ?? (supply['municipio'] as string)
-  const pointType    = supply.pointType ?? (supply['tipoPuntoMedida'] as number)
+  const cups      = supply.cups ?? '---'
+  const tariff    = String(supply['tarifa'] ?? supply.tariff ?? supply['tarifaCode'] ?? '')
+  const province  = String(supply['provincia'] ?? supply.province ?? '')
+  const munic     = String(supply['municipio'] ?? supply.municipality ?? '')
+  const tipoPunto = Number(supply['tipoPunto'] ?? supply.pointType ?? supply['tipoPuntoMedida'] ?? 0)
 
   function handleClick() {
     if (supply.cups) navigate(`/datadis/${encodeURIComponent(supply.cups)}`)
+  }
+
+  function handleAsociarClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    onOpenAsociar?.(supply)
   }
 
   return (
@@ -184,22 +212,33 @@ function SupplyRow({ supply, idx }: { supply: DatadisSupply; idx: number }) {
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50">
             <Zap className="h-3.5 w-3.5 text-blue-600" />
           </div>
-          <span className="font-mono text-xs font-medium text-slate-800">{cups}</span>
+          {/* P1-B: Link for Ctrl+click / accessibility */}
+          <Link
+            to={supply.cups ? `/datadis/${encodeURIComponent(supply.cups)}` : '/datadis'}
+            onClick={e => e.stopPropagation()}
+            className="font-mono text-xs font-medium text-slate-800 hover:text-blue-600"
+          >
+            {cups}
+          </Link>
         </div>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1.5">
           <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="text-xs text-slate-700">{distributorName(distributor)}</span>
+          <span className="text-xs text-slate-700">{distributorLabel(supply)}</span>
         </div>
       </td>
-      <td className="px-4 py-3">{tariffBadge(tariff)}</td>
       <td className="px-4 py-3">
-        {(province || municipality) ? (
+        {tariff ? tariffBadge(tariff) : (
+          <span className="text-[11px] text-slate-300 italic">N/D</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {(province || munic) ? (
           <div className="flex items-center gap-1 text-xs text-slate-500">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
-            {municipality && <span>{municipality}</span>}
-            {province && municipality && <span>·</span>}
+            {munic && <span>{munic}</span>}
+            {province && munic && <span>·</span>}
             {province && <span>{province}</span>}
           </div>
         ) : (
@@ -207,19 +246,32 @@ function SupplyRow({ supply, idx }: { supply: DatadisSupply; idx: number }) {
         )}
       </td>
       <td className="px-4 py-3">
-        <span className="text-xs text-slate-500">{POINT_TYPE[pointType] ?? '---'}</span>
+        <span className="text-xs text-slate-500">
+          {POINT_TYPE[tipoPunto] ?? (tipoPunto ? `Tipo ${tipoPunto}` : '---')}
+        </span>
       </td>
       <td className="px-4 py-3 text-right">
-        <ChevronRight className="ml-auto h-4 w-4 text-slate-300" />
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={handleAsociarClick}
+          className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600"
+          title="Asociar a empresa"
+        >
+          <Link2 className="h-4 w-4" />
+        </Button>
       </td>
     </tr>
   )
 }
 
-// --- Pagina principal ---
+// --- Página principal ---
 
 export default function DatadisPage() {
   const [activeCreds, setActiveCreds] = useState<DatadisCreds | undefined>()
+  const [asociarDialogOpen, setAsociarDialogOpen] = useState(false)
+  const [selectedSupplyForAsociar, setSelectedSupplyForAsociar] = useState<DatadisSupply | null>(null)
 
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } =
     useDatadisSupplies(activeCreds)
@@ -228,9 +280,10 @@ export default function DatadisPage() {
   const errorSupplies     = data?.errorSupplies ?? []
   const isPartialResponse = data?.CodError === '902'
 
+  // Agrupar por distribuidora usando label legible
   const byDistributor = supplies.reduce<Record<string, number>>((acc, s) => {
-    const d = s.distributor ?? (s['cod_disitribuidora'] as string) ?? 'Desconocida'
-    acc[d] = (acc[d] ?? 0) + 1
+    const label = distributorLabel(s)
+    acc[label] = (acc[label] ?? 0) + 1
     return acc
   }, {})
 
@@ -313,7 +366,7 @@ export default function DatadisPage() {
                     <span className="font-semibold">
                       {errorSupplies.map(e => e.distributor ?? e.cups ?? '?').join(', ')}
                     </span>{' '}
-                    pueden estar incompletos. Reintenta mas tarde.
+                    pueden estar incompletos. Reintenta más tarde.
                   </p>
                 </div>
               </div>
@@ -348,12 +401,12 @@ export default function DatadisPage() {
                   Desglose por distribuidora
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(byDistributor).map(([code, count]) => (
+                  {Object.entries(byDistributor).map(([label, count]) => (
                     <span
-                      key={code}
+                      key={label}
                       className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs"
                     >
-                      <span className="font-semibold text-slate-700">{distributorName(code)}</span>
+                      <span className="font-semibold text-slate-700">{label}</span>
                       <span className="rounded-full bg-blue-100 px-1.5 py-px text-[10px] font-bold text-blue-700">{count}</span>
                     </span>
                   ))}
@@ -373,15 +426,26 @@ export default function DatadisPage() {
                       <tr className="border-b border-slate-100 bg-slate-50">
                         <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">CUPS</th>
                         <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Distribuidora</th>
-                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tarifa</th>
-                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Ubicacion</th>
+                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Tarifa
+                          <span className="ml-1 text-slate-300 font-normal normal-case">(del contrato)</span>
+                        </th>
+                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Ubicación</th>
                         <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tipo</th>
                         <th className="px-4 py-2.5" />
                       </tr>
                     </thead>
                     <tbody>
                       {supplies.map((supply, idx) => (
-                        <SupplyRow key={supply.cups ?? idx} supply={supply} idx={idx} />
+                        <SupplyRow
+                          key={supply.cups ?? idx}
+                          supply={supply}
+                          idx={idx}
+                          onOpenAsociar={(s) => {
+                            setSelectedSupplyForAsociar(s)
+                            setAsociarDialogOpen(true)
+                          }}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -394,13 +458,28 @@ export default function DatadisPage() {
                 <p className="mt-1 text-xs text-slate-400">
                   {activeCreds
                     ? `Comprueba que ${activeCreds.username} tiene suministros autorizados en Datadis.`
-                    : 'Comprueba que las credenciales Datadis estan configuradas y que el NIF tiene suministros autorizados.'}
+                    : 'Comprueba que las credenciales Datadis están configuradas y que el NIF tiene suministros autorizados.'}
                 </p>
               </div>
             )}
           </>
         )}
       </div>
+
+      {/* Modal Asociar a empresa */}
+      {selectedSupplyForAsociar && (
+        <AsociarEmpresaDialog
+          supply={selectedSupplyForAsociar}
+          open={asociarDialogOpen}
+          onClose={() => {
+            setAsociarDialogOpen(false)
+            setSelectedSupplyForAsociar(null)
+          }}
+          onSuccess={() => {
+            void refetch()
+          }}
+        />
+      )}
     </div>
   )
 }
