@@ -37,6 +37,9 @@ const AsistentePanel = lazy(() => import('./features/asistente-crm/AsistentePane
 const SeguimientoFVPage = lazy(() => import('./features/seguimiento-fv/SeguimientoFVPage'))
 const DatadisPage = lazy(() => import('./features/datadis/DatadisPage'))
 const SupplyDetailPage = lazy(() => import('./features/datadis/SupplyDetailPage'))
+const CaptacionPage = lazy(() => import('./features/captacion/CaptacionPage'))
+const AnalisisCaptacionPage = lazy(() => import('./features/captacion/AnalisisPage'))
+const CarteraSeniorPage = lazy(() => import('./features/captacion/CarteraSeniorPage'))
 
 function LoadingScreen() {
   return (
@@ -144,6 +147,10 @@ export default function App() {
       <Route path="/seguimiento-fv" element={<AuthGuard><SeguimientoFVPage /></AuthGuard>} />
       <Route path="/datadis" element={<AuthGuard><DatadisPage /></AuthGuard>} />
       <Route path="/datadis/:cups" element={<AuthGuard><SupplyDetailPage /></AuthGuard>} />
+
+      <Route path="/captacion" element={<AuthGuard><CaptacionPage /></AuthGuard>} />
+      <Route path="/analisis-captacion" element={<AuthGuard><AnalisisCaptacionPage /></AuthGuard>} />
+      <Route path="/cartera-senior" element={<AuthGuard><CarteraSeniorPage /></AuthGuard>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

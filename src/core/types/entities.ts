@@ -43,6 +43,7 @@ export interface UserProfile {
   status: string | null
   approved: boolean | null
   avatar_url: string | null
+  funciones: string[]
   created_at: string | null
   updated_at: string | null
 }
