@@ -38,15 +38,21 @@ export default function KanbanColumn({
           {probabilidad}%
         </span>
       </div>
-      <div className="mb-3 flex items-baseline justify-between text-xs text-slate-500">
-        <span>{items.length} opp.</span>
-        <span className="tabular-nums">{eur(totalValor)}</span>
+      <div className="mb-3 space-y-1">
+        <div className="flex items-baseline justify-between text-xs text-slate-500">
+          <span>{items.length} opp.</span>
+        </div>
+        {totalValor > 0 && (
+          <p className="text-sm font-semibold text-slate-900 tabular-nums">
+            {eur(totalValor)}
+          </p>
+        )}
+        {totalAhorro > 0 && (
+          <p className="rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+            Ahorro: {eur(totalAhorro)}/año
+          </p>
+        )}
       </div>
-      {totalAhorro > 0 && (
-        <p className="mb-3 rounded-xl bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
-          Ahorro: {eur(totalAhorro)}/año
-        </p>
-      )}
       <div className="flex flex-col gap-2">
         {items.map((op) => (
           <KanbanCard

@@ -11,7 +11,18 @@ export type TipoPrecio = 'fijo' | 'indexado' | 'mixto'
 export type EstadoContrato = 'borrador' | 'tramite' | 'activo' | 'vencido' | 'baja' | 'incidencia' | 'cancelado'
 export type EstadoCups = 'activo' | 'baja' | 'pendiente'
 export type TipoOportunidad = 'nueva_venta' | 'renovacion' | 'ampliacion' | 'recuperacion'
-export type EtapaOportunidad = 'prospecto' | 'contactado' | 'analisis' | 'propuesta_enviada' | 'negociacion' | 'ganada' | 'perdida' | 'cancelada' | 'auditoria_consumo' | 'oferta_presentada' | 'contrato_firmado' | 'activo' | 'cerrada_ganada' | 'cerrada_perdida'
+// FASE 30.3 (1 mayo 2026): pipeline 100% energético, etapas legacy retiradas.
+// Genéricas viejas (contactado, analisis, propuesta_enviada, ganada, perdida,
+// cancelada) ya migradas en BD a sus equivalentes energéticos.
+export type EtapaOportunidad =
+  | 'prospecto'
+  | 'auditoria_consumo'
+  | 'oferta_presentada'
+  | 'negociacion'
+  | 'contrato_firmado'
+  | 'activo'
+  | 'cerrada_ganada'
+  | 'cerrada_perdida'
 export type TipoIncidencia = 'facturacion' | 'cambio_comercializadora' | 'corte_suministro' | 'potencia' | 'acceso_red' | 'otro'
 export type EstadoIncidencia = 'abierta' | 'en_gestion' | 'pendiente_cliente' | 'pendiente_comercializadora' | 'resuelta' | 'cerrada'
 export type PrioridadIncidencia = 'baja' | 'media' | 'alta' | 'critica'
@@ -443,3 +454,31 @@ export type EventoInsert = Insert<Evento>
 export type EventoUpdate = Update<Evento>
 
 // Datadis (Insert/Update ya definidos inline arriba para evitar conflicto con helper genérico)
+
+// =====================================================================
+// Tipos migrados desde repo musing-kalam (Potencias) — 2026-04-30
+// Necesarios para src/core/pdf/, src/core/email/, src/core/excel/,
+// src/features/potencias/lib/.
+// =====================================================================
+
+export type TariffType = '2.0TD' | '3.0TD' | '6.1TD' | '6.2TD' | '6.3TD' | '6.4TD'
+
+export interface PowerValues {
+  p1: number
+  p2: number
+  p3: number
+  p4: number
+  p5: number
+  p6: number
+}
+
+export interface RegulatedRate {
+  id: string
+  tariff_type: TariffType
+  period: string  // 'P1', 'P2', ...
+  rate_eur_kw_day: number
+  valid_from: string
+  valid_to: string | null
+  updated_at?: string
+  updated_by?: string | null
+}

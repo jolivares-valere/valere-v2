@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { supabase } from '../supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { logError, logInfo } from '../utils/logger'
+import { setSentryUser } from '../utils/sentry'
 import type { Session } from '@supabase/supabase-js'
 import type { UserProfile } from '../types/entities'
 
@@ -66,8 +67,11 @@ function ensureAuthInitialized() {
 
     if (session?.user) {
       store.setUser(bootstrapFromSession(session))
+      // Asociar usuario a eventos Sentry (FASE 30.10). No-op si DSN no definido.
+      setSentryUser({ id: session.user.id, email: session.user.email ?? null })
     } else {
       store.setUser(null)
+      setSentryUser(null)
     }
 
     store.setLoading(false)

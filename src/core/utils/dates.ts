@@ -50,3 +50,6 @@ export function parseCSVDate(raw: string | null | undefined): string | null {
   if (isNaN(d.getTime())) return null
   return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
 }
+
+/** Alias de formatDate para compatibilidad con codigo de Potencias migrado desde POT */
+export const formatFecha = formatDate

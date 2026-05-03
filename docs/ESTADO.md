@@ -1,112 +1,585 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-04-29 por Cowork (sesión noche — bugs críticos + ExpedienteDetail)**
+> **Última actualización (más reciente): 2026-05-01 noche por Cowork — Schema CONGELADO. Próximo: saneamiento.**
 >
-> ## ✅ COMPLETADO EN ESTA SESIÓN (commits 3614d96 + a3d4a21 en main)
+> ## 🛑 SCHEMA CONGELADO (decisión final aceptada por ChatGPT)
+>
+> ChatGPT da dictamen final tras revisar fixes post-audit:
+>
+> > *"ACEPTAR. Schema ya está suficientemente bien para MVP. NO seguir refinando base de datos salvo bug real. La frase: el modelo de datos ya soporta el flujo real; el riesgo ya no está en el schema, está en empezar UI sin cerrar la deuda crítica."*
+>
+> ### Últimas correcciones documentales aplicadas (1 mayo noche)
+>
+> 1. ✅ Eliminada contradicción en `SCHEMA_MVP_CAPTACION_FINAL_2026-05-01.md` sobre "trigger motivo_perdida obligatorio" → marcado como decisión final SIN trigger, gestión UI/backend.
+> 2. ✅ Eliminada misma contradicción en `RELEASE_1_CAPTACION_2026-05-01.md` (bloque SQL CREATE TRIGGER → reemplazado por nota explicativa).
+> 3. ✅ Añadida nota de dependencia en `20260501_mvp_captacion_multi_rol_schema.sql` indicando que debe aplicarse junto con el fix post-audit (evita reintroducir bugs en entornos nuevos).
+>
+> ### Defaults validados por ChatGPT para las 3 preguntas críticas pendientes
+>
+> 1. **Criterio "alto consumo / cliente complejo"**: decisión MANUAL de Carolina Maciñeiras. CRM puede mostrar sugerencias visuales (consumo alto / multi-CUPS / tarifa 6.x / potencia elevada) pero NO autoasignar.
+> 2. **Emails Carolina Maciñeiras + Antonio**: pendientes de Juan.
+> 3. **Intentos antes de marcar `no_envia_factura`**: regla simple inicial = 3 intentos en 10 días (día 0 / día 3 / día 7 / día 10 cierre sugerido). CRM sugiere, Carolina confirma. NO automático.
+>
+> ### Funciones por user (validadas)
+>
+> ```
+> Juan:                ['admin', 'asesor_senior']
+> Antonio:             ['asesor_senior']
+> Carolina Aroca:      ['telemarketing']
+> Carolina Maciñeiras: ['analista']
+> ```
+>
+> ### Frase guía actualizada
+>
+> > *El modelo de datos ya soporta el flujo real. El riesgo ya no está en el schema; está en empezar UI sin cerrar la deuda crítica.*
+>
+> ### Orden inflexible de saneamiento (sin desviación)
+>
+> ```
+> 1. Cerrar TSC Potencias                    [Code/Juan, ~2.5h]
+> 2. QA + commit Sprint A                    [Juan, ~45min]
+> 3. Regenerar tipos Supabase                [Code, prohíbe nuevos `as never`]
+> 4. Crear users Maciñeiras + Antonio        [Cowork, cuando Juan dé emails]
+> 5. Asignar funciones a los 4 users         [Cowork]
+> 6. Sembrar responsable_actual_id 4 oport.  [Cowork, manual case-by-case]
+> 7. Empezar UI MVP por BANDEJAS por rol     [no dashboards, no Kanban genérico]
+> ```
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Fixes post-audit ChatGPT aplicados**
+>
+> ## ✅ FIXES POST-AUDIT CHATGPT APLICADOS EN BD
+>
+> ChatGPT auditó el schema MVP recién aplicado. Veredicto: **ACEPTAR CON CONDICIONES**. Detectó 3 problemas técnicos pequeños pero importantes. Corregidos vía MCP. Migration espejo: `supabase/migrations/20260501_mvp_captacion_fixes_post_audit_chatgpt.sql`.
+>
+> ### Fix 1 — `to_user_id` FK incoherencia
+>
+> Era `NOT NULL + ON DELETE SET NULL` (contradictorio: Postgres lo acepta pero falla en runtime al borrar usuario).
+> ✅ Cambiado a `ON DELETE RESTRICT` (un handoff histórico nunca pierde a quién recibió el caso).
+>
+> ### Fix 2 — `v_mis_oportunidades` security_invoker
+>
+> Falta `WITH (security_invoker = true)` — buena práctica Supabase para que filtrado RLS use el rol del consumidor, no del creador. Crítico para futuro portal cliente.
+> ✅ Recreada con `security_invoker = true` + `GRANT SELECT TO authenticated`.
+>
+> ### Fix 3 — Catálogo motivo_perdida (inconsistencia documental)
+>
+> Estaba documentado en RELEASE_1 pero la migration MVP no lo incluyó. ChatGPT detectó la inconsistencia.
+> ✅ Aplicado `motivo_perdida_enum` (21 valores en 4 familias: A_contacto / B_estatus / C_funnel / D_fuera_perfil) + columnas `motivo_perdida_codigo` + `motivo_perdida_detalle` + vista `v_motivos_perdida_familia`.
+> ⚠️ SIN trigger obligatorio (lo gestionará UI cuando llegue, según recomendación ChatGPT).
+>
+> ### QA test trigger handoff
+>
+> Test end-to-end con rollback: trigger `tg_oportunidad_handoff_apply` actualiza correctamente `responsable_actual_id` y `etapa_operativa` al insertar handoff. Sin residuos. ✓
+>
+> ### Veredicto ChatGPT
+>
+> > *"ACEPTAR CON CONDICIONES. No revertiría. Schema multi-rol es mejora clara, refleja flujo real, aditivo, no toca frontend. PERO no dejaría que Claude empiece UI todavía."*
+>
+> ChatGPT también valida la concepción rectora: **"Cada usuario ve solo lo que le toca AHORA"** vía `v_mis_oportunidades`. Y refuerza un principio UX clave: **"Diseña bandejas, no pantallas genéricas. Que diga 'esto es lo que tienes que resolver ahora'"**.
+>
+> ### Pasos antes de UI MVP (orden inflexible)
+>
+> 1. Cerrar TSC sprint Potencias (Code, ~2.5h).
+> 2. QA + commit Sprint A (`docs/CHECKLIST_QA_SPRINT_A_2026-05-01.md`, ~45 min).
+> 3. **Regenerar tipos Supabase** `npx supabase gen types typescript` antes de UI (evitar más `as never`).
+> 4. Crear users Carolina Maciñeiras + Antonio en BD (cuando Juan dé emails).
+> 5. Asignar `funciones` a los 4 users (Juan/Antonio/Aroca/Maciñeiras).
+> 6. Sembrar `responsable_actual_id` en las 4 oportunidades existentes.
+> 7. **Empezar UI por bandejas, no por dashboard** (principio ChatGPT).
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Schema MVP multi-rol APLICADO en BD**
+>
+> ## ✅ SCHEMA MVP CAPTACIÓN APLICADO (saneamiento estructural sin código frontend)
+>
+> Tras feedback ChatGPT al modelo multi-rol (3/4 ajustes aceptados, 1 matizado), aplicado a BD prod vía MCP. Documento decisiones: `docs/SCHEMA_MVP_CAPTACION_FINAL_2026-05-01.md`.
+>
+> ### Aplicado en BD producción
+>
+> - **`oportunidades` ALTER**: 8 columnas nuevas (etapa_operativa, responsable_actual_id, decisor_identificado, factura_recibida_at, factura_documento_id, propuesta_documento_id, propuesta_enviada_at, visita_programada_at).
+> - **CHECK etapa_operativa** con 10 valores: nuevo / contactado / esperando_factura / factura_recibida / en_analisis / propuesta_en_preparacion / propuesta_lista / propuesta_enviada / seguimiento / cerrado.
+> - **Tabla `oportunidad_handoffs`** con trigger `handoff_apply` que actualiza `responsable_actual_id` automáticamente.
+> - **Tabla `oportunidad_emails`** (concepto decisor vs ejecutor — aporte ChatGPT).
+> - **Vista `v_mis_oportunidades`** filtra por `responsable_actual_id = auth.uid()`.
+> - **`user_profiles.funciones text[]`** para telemarketing/analista/asesor_senior/admin.
+>
+> Migration espejo: `supabase/migrations/20260501_mvp_captacion_multi_rol_schema.sql`.
+>
+> ### Decisiones tras ChatGPT
+>
+> - ✅ Aceptado: simplificar de 17 a 10 estados operativos (no 9 — necesito distinguir factura_recibida de en_analisis).
+> - ✅ Aceptado: tabla emails con decisor + ejecutor.
+> - ✅ Aceptado: minimizar triggers (solo handoff_apply + motivo_perdida).
+> - 🔧 Matizado: NO añadido `tipo_atencion` (se deriva de funciones del responsable).
+>
+> ### Lo que NO se ha hecho (sigue regla "no programar UI encima de base inestable")
+>
+> - Cero código frontend nuevo.
+> - Cero modificación a `src/`.
+> - Cero migration nuevas pendientes.
+>
+> ### Pendiente para arrancar UI MVP
+>
+> 1. **Cerrar TSC sprint Potencias** (Code en PowerShell, ~2.5h).
+> 2. **Commit Sprint A actual** (~30+ archivos working tree).
+> 3. **Crear users en BD** para Carolina Maciñeiras y Antonio (cuando Juan dé emails).
+> 4. **Asignar `funciones`** a los 4 users.
+> 5. Entonces UI MVP 7 días siguiendo `FLUJO_REAL_CAPTACION_VALERE_2026-05-01.md`.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — FLUJO REAL multi-rol descubierto**
+>
+> ## 🚨 DESCUBRIMIENTO CRÍTICO — flujo de captación es MULTI-ROL, no 1 vendedor
+>
+> Juan describió el flujo real. Cambia profundamente el diseño del MVP. Doc: `docs/FLUJO_REAL_CAPTACION_VALERE_2026-05-01.md`.
+>
+> ### 4 roles operativos identificados
+>
+> | Persona | Rol | Función |
+> |---|---|---|
+> | Carolina Aroca | Telemarketing + envío + seguimiento | Llama lead, pide decisor, manda presentación, pide factura, recibe propuesta lista, la envía, llama seguimiento |
+> | Carolina Maciñeiras | Análisis + decisión asignación + propuestas estándar | Recibe factura, analiza, decide complejidad, hace propuesta estándar, decide a qué asesor asignar |
+> | Antonio | Asesor senior | Atiende casos complejos directamente, propuesta personalizada, cierre directo |
+> | Juan | Asesor senior + master | Idem Antonio + visión global |
+>
+> ### Workflow con handoffs explícitos
+>
+> ```
+> Carolina Aroca llama → manda presentación → pide factura
+>   ├── No factura → cierre `no_envia_factura`
+>   └── Factura recibida → handoff a Carolina Maciñeiras
+>           ├── Estándar → Maciñeiras hace propuesta → handoff a Carolina Aroca
+>           │              └── Aroca envía email + llama seguimiento → cierre
+>           └── Complejo → Maciñeiras decide asesor → handoff a Antonio o Juan
+>                          └── Asesor contacta DIRECTAMENTE al cliente → cierre directo
+> ```
+>
+> ### Modelo de datos propuesto (cambia el MVP)
+>
+> - ALTER `oportunidades`: `etapa_operativa`, `responsable_actual_id`, `tipo_atencion` (estandar/senior), `factura_recibida_at`, `factura_documento_id`, `propuesta_documento_id`.
+> - Nueva tabla `oportunidad_handoffs` con trigger que actualiza `responsable_actual_id` automáticamente.
+> - Vista `v_mis_oportunidades` filtra por `responsable_actual_id = auth.uid()`.
+> - ALTER `user_profiles`: `funciones text[]` con valores telemarketing/analista/asesor_senior/admin.
+>
+> ### MVP redimensionado (de 3-5 días → 7 días)
+>
+> - Día 1: schema multi-rol + crear users Carolina M. y Antonio en BD.
+> - Día 2: UI Carolina Aroca (3 tabs: por llamar / propuestas para enviar / seguimientos).
+> - Día 3: UI Carolina Maciñeiras (facturas pendientes + propuestas en preparación).
+> - Día 4: UI asesores senior (cartera asignada a mí).
+> - Día 5: subida factura + propuesta documento.
+> - Día 6: compliance básico + motivos pérdida.
+> - Día 7: QA con los 4 roles + ajustes.
+>
+> Esto **es un MVP que refleja la realidad**. El v1 anterior (1 vendedor) habría fallado en simulación.
+>
+> ### 10 preguntas pendientes a Juan antes de empezar
+>
+> Críticas (1, 4, 8): criterio "alto consumo", users en BD, intentos antes de marcar perdida.
+> Importantes (2, 3, 5, 6): handoff post-asesor senior, formato propuestas, visita, multi-CUPS.
+> Refinamiento (7, 9, 10): reasignaciones, generar propuesta sin factura, cliente recuperación.
+>
+> ### Confirmación de la hipótesis ChatGPT
+>
+> ChatGPT predijo: *"es bastante posible que descubramos que el modelo de datos es incorrecto"*. **Confirmado**: el modelo "1 vendedor → cliente" no encaja. Necesitamos modelo multi-rol con handoffs. Esto valida la regla "diseña → prueba → corrige → repite": antes de programar más, modelar bien la realidad.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Reenfoque pre-producto + MVP validación**
+>
+> ## 🔁 REENFOQUE ESTRATÉGICO (tercera ronda ChatGPT — auditor externo)
+>
+> Tras leer el handoff completo, ChatGPT corrige el diagnóstico:
+>
+> > *"No es problema de adopción. Es producto en construcción con datos heredados. Estado natural de pre-producto. Pero estás diseñando SIN datos reales de uso → riesgo de sobre-diseño antes de validación."*
+>
+> **Acepto el reenfoque con un matiz**: ChatGPT propone "Release 1 en 3 días" — discrepo en formulación, **acepto en espíritu**: 3-5 días MVP pelado + 1 semana simulación + 4-6 días R1 final.
+>
+> ### Regla nueva (sustituye a 70/30):
+> > *Diseña → prueba → corrige → repite. Construir el siguiente paso pequeño, ponerlo en manos de Carolina, observar, decidir con esa información.*
+>
+> ### Plan próximas 4 semanas
+>
+> | Semana | Foco | Outcome |
+> |---|---|---|
+> | 1 | L-M cierre TSC + commit + 30.2/30.3 · X-V construcción **MVP pelado** | MVP usable mínimo (5 días) |
+> | 2 | Simulación uso real Carolina · NO construir nada nuevo · solo observar | datos de uso real |
+> | 3 | L sesión revisión + decisiones · M-V Release 1 final ajustado | R1 validado por uso |
+> | 4 | Sprint B (FASE 31 modelo energético) o pivot según aprendizajes | siguiente sprint |
+>
+> ### MVP pelado (3-5 días) — qué entra
+> - `/captacion` lista priorizada manual (sin scoring matemático).
+> - Ficha llamada activa + outcomes con motivos pérdida (catálogo cerrado).
+> - Botón `tel:` (sin CTI).
+> - Alta empresa+contacto+oportunidad unificada.
+> - Schema mínimo: `origen_canal`, `motivo_perdida` enum, `no_llamar`.
+> - Aviso LOPDGDD verbal (sin auditoría sofisticada).
+>
+> ### MVP NO incluye
+> - PDF diagnóstico, plantilla email Gmail, lead scoring, cadencias, dashboard supervisor, tracking apertura, compliance profundo. **Solo si Carolina lo pide post-simulación**.
+>
+> ### Criterios éxito simulación (≥3 de 5)
+> - Carolina logra 4h+ continuas con CRM 1 día concreto.
+> - Tiempo cerrar llamada < 60 seg.
+> - ≥50% llamadas registradas vs hechas.
+> - Cualitativamente: "es mejor que mi Excel".
+> - ≥1 propuesta enviada desde CRM.
+>
+> Documento ejecutable: `docs/REENFOQUE_USO_REAL_2026-05-01.md`.
+>
+> ### Compromiso Cowork durante simulación
+> NO construir nada nuevo, NO arreglar a mitad de jornada, observar + recopilar feedback en `docs/SIMULACION_CAROLINA_FEEDBACK.md` (futuro).
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — FASE 30.3 + paquete handoff auditor externo**
+>
+> ## ✅ FASE 30.3 cerrada (saneamiento autorizado dentro regla 70/30)
+>
+> Aplicada autónomamente vía MCP + edits TS:
+> - BD prod: UPDATE 1 fila `contactado`→`auditoria_consumo` + ALTER CHECK a 8 etapas + comment.
+> - TS: `EtapaOportunidad` en `entities.ts` reducido a 8 valores.
+> - TS: `OportunidadForm.tsx` ETAPAS array limpio.
+> - Mapeo defensivo legacy→canónica mantenido en KanbanColumn/OportunidadForm como capa seguridad.
+> - Migration espejo: `supabase/migrations/20260501_fase30_3_cerrar_etapas_legacy.sql`.
+>
+> Estado BD post-aplicación: 3 `cerrada_ganada` + 1 `auditoria_consumo`. Pipeline 100% energético.
+>
+> ## 📦 PAQUETE HANDOFF PARA AUDITOR EXTERNO (ChatGPT u otro)
+>
+> A petición de Juan, generado paquete autocontenido para auditoría sin acceso al repo:
+>
+> **5 documentos nuevos:**
+> - `docs/HANDOFF_CHATGPT_AUDITOR_VALERE_2026-05-01.md` — documento maestro (11 secciones).
+> - `docs/INDEX_PROYECTO_VALERE.md` — punto de entrada general.
+> - `docs/ESTADO_TECNICO_ACTUAL.md` — stack + arquitectura.
+> - `docs/ROADMAP_VIGENTE.md` — roadmap condensado.
+> - `docs/DEUDA_TECNICA_PRIORIZADA.md` — deuda con coste de cierre.
+>
+> **ZIP descargable:**
+> - `valere-crm-audit-pack-2026-05-01.zip` — 1.5 MB, 438 archivos.
+> - Incluye: docs/, supabase/migrations, supabase/functions, src/, scripts/, package.json, tsconfig*, vite.config, .env.example, CLAUDE.md, index.html.
+> - Excluye: .env real, .git, node_modules, .venv, __pycache__.
+> - El `.env` real de `scripts/fv-sync/` redactado a `[REDACTED]`.
+>
+> ## ➡️ PRÓXIMO PASO INMEDIATO (Juan en PowerShell)
+>
+> 1. Cerrar TSC sprint Potencias (`docs/SPRINT3_TSC_PENDIENTE.md`, ~2.5h).
+> 2. Ejecutar `CHECKLIST_QA_SPRINT_A_2026-05-01.md` (30-45 min).
+> 3. Si todo verde → commit + push según comando del checklist (incluye los 30+ archivos de hoy).
+> 4. Para auditoría: subir ZIP + handoff a ChatGPT (o cualquier auditor externo).
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 Cowork — Módulo Datadis completo: tabs funcionales + caché persistente Supabase**
+>
+> ## ✅ MÓDULO DATADIS — SPRINT COMPLETADO
+>
+> | Item | Estado | Detalle |
+> |---|---|---|
+> | `DatadisPage` — filas navegables | ✅ | `<Link>` en CUPS + `onClick` en fila → `/datadis/:cups`. `distributorLabel()` resuelve nombre completo |
+> | `SupplyDetailPage` — 4 tabs | ✅ | Información, Contrato, Curva, Cierres. Helper `sf()` mapea claves español↔inglés |
+> | Ruta `/datadis/:cups` | ✅ | Registrada en `App.tsx`, lazy loaded |
+> | Fixes auditoría P0/P1/P2 | ✅ | Claves API en español, tipoPunto guard en CurveTab, distribuidoras, tildes, badge "Sincronizado", botón volver |
+> | Tabla `datadis_proxy_cache` | ✅ APLICADA en prod | Cache read-through con TTL por action. RLS authenticated=SELECT, service_role=write |
+> | Edge Function `datadis-proxy` v8 | ✅ DESPLEGADA (version 8, ACTIVE) | Cache HIT fresco → devuelve sin llamar Datadis. Cache MISS → llama y guarda. Fallo Datadis → fallback stale |
+> | Scripts commit | ✅ | `COMMIT_DATADIS_AUDIT_FIXES.ps1`, `COMMIT_DATADIS_PROXY_V8.ps1`, `COMMIT_DATADIS_MAIN.ps1` **ejecutados por Juan** |
+>
+> ## ➡️ SIGUIENTE SESIÓN
+>
+> - TSC `claude/sprint2-lib-potencias` sigue pendiente (~60 errores documentados en `docs/SPRINT3_TSC_PENDIENTE.md`)
+> - Sprint A sub-fases pendientes: 30.2 (DROP renovaciones), 30.3 (etapas legacy), 30.7 (vinculación masiva NIF), 30.9 (RLS granular)
+> - Cuando Datadis tenga acceso API funcional: añadir botón "Actualizar desde Datadis" en `SupplyDetailPage` con `force_refresh: true`
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Opción A reducida aceptada + verificaciones BD**
+>
+> ## ✅ DECISIÓN ESTRATÉGICA — Opción A reducida (saneamiento primero)
+>
+> Tras segunda crítica ChatGPT, aceptado plan: **2-3 días de saneamiento técnico obligatorio antes de arrancar Release 1**. Frase guía:
+>
+> > *"Podemos seguir pensando ideas nuevas, pero no seguir programando encima de una base inestable."*
+>
+> Regla operativa nueva: **no más de 1 sprint abierto + 1 rama experimental simultáneos**.
+>
+> ## 🔬 VERIFICACIONES BD ejecutadas hoy (informan decisiones Sprint A)
+>
+> | Verificación | Resultado | Implicación |
+> |---|---|---|
+> | `renovaciones` filas vivas | **0** | FASE 30.2: DROP totalmente seguro |
+> | `oportunidades` etapas legacy | **1 sola** (`contactado`) | FASE 30.3: trivial, 1 UPDATE |
+> | RAG asistente uso 30d | 15 consultas, 100% encontradas, 4.6s avg | NO eliminar. NO priorizar mejoras |
+> | Lista Robinson integrada | NO | R2 según RELEASE_1_CAPTACION |
+> | Cron `daily_contract_check` | Activo (jobid 3, próxima 04:00 UTC mañana) | FASE 30.1 cerrada ✅ |
+>
+> ## 📋 ENTREGABLES SESIÓN (sin código nuevo, solo investigación + planificación)
+>
+> - `docs/CHECKLIST_QA_SPRINT_A_2026-05-01.md` — checklist 6 tests para validar antes de commit (30-45 min de QA manual).
+> - `docs/INDICE_2026-05-01.md` — mapa único de los 11 documentos creados hoy + contradicciones detectadas + plan de retirada de docs obsoletos.
+> - Verificaciones BD ejecutadas vía MCP (no destructivas).
+>
+> ## ➡️ PASOS INMEDIATOS (TÚ EN POWERSHELL)
+>
+> 1. Cerrar TSC sprint Potencias siguiendo `docs/SPRINT3_TSC_PENDIENTE.md`.
+> 2. Ejecutar `CHECKLIST_QA_SPRINT_A` (30-45 min QA manual).
+> 3. Si todo verde → commit + push según comando del checklist.
+> 4. Decisiones 30.2/30.3: con la BD verificada, son ejecuciones triviales que puedo hacer en próxima sesión Cowork si lo apruebas.
+>
+> ## ➡️ COWORK PRÓXIMA SESIÓN (con repo verde)
+>
+> 1. FASE 30.2: DROP `renovaciones` (vacía, sin riesgo).
+> 2. FASE 30.3: 1 UPDATE oportunidades + restringir CHECK + actualizar EtapaOportunidad enum TS.
+> 3. Sprint Release 1 día 1-3 (schema motivos pérdida + origen canal + UI lista + UI ficha).
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Plan depuración + Release 1 integrado**
+>
+> ## ⚖️ REGLA OPERATIVA NUEVA — depuración + nuevas ideas en paralelo
+>
+> Tras preocupación válida de Juan ("no quiero acumular deuda mientras avanzo en propuestas"), establecida la regla:
+> **70% nueva funcionalidad / 30% depuración. NO abrir sprint nuevo sin cerrar el anterior.**
+>
+> Documento ejecutable: `docs/PLAN_DEPURACION_2026-05-01.md` con inventario completo de loose ends, calendario 4 semanas integrando depuración + Release 1, y 29 archivos pendientes de commit identificados explícitamente.
+>
+> **Loose ends críticos:**
+> - 🔴 TSC roto en `claude/sprint2-lib-potencias` (~60 errores) — bloquea merge a main.
+> - 🔴 Sprint A aplicado hoy NO commiteado (29 archivos working tree).
+> - 🔴 Wizard contacto decisor sin validar uso real con Juan/Carolina.
+>
+> **Loose ends importantes:**
+> - 🟠 Sprint A pendientes (30.2, 30.3, 30.7, 30.9).
+> - 🟠 111 `as never` legados.
+> - 🟠 15 documentos creados hoy sin índice consolidado.
+>
+> **Documento ejecutable Release 1 captación**: `docs/RELEASE_1_CAPTACION_2026-05-01.md` redimensionado a 11 días (de 18-20) tras crítica ChatGPT. SIN Gmail API auto, SIN CTI, SIN SIPS pilar único, CON motivos de pérdida estructurados (20 valores) y compliance LOPDGDD día 1.
+>
+> **Pregunta concreta a Juan para próxima sesión**: ¿100% depuración, mezclado, o 100% Release 1 asumiendo cierre TSC paralelo?
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Plan captación profesional + Workspace**
+>
+> ## ⚙️ DISEÑO PROFESIONAL MÓDULO CAPTACIÓN — `docs/PLAN_CAPTACION_PROFESIONAL_2026-05-01.md`
+>
+> Aplicado conocimiento industria call center / sales development B2B + integraciones Google Workspace (sustituyen a Office).
+>
+> **Aporta:**
+> - Wireframe ASCII pantallas `/captacion` lista + llamada activa.
+> - Cadencia 8-12 touches en 14-21 días (llamada + email + LinkedIn).
+> - Lead scoring algorítmico (sector × tamaño × tarifa × recencia × comportamiento).
+> - Compliance LOPDGDD + Lista Robinson ADIGITAL + LSSI-CE.
+> - Email outbound con Gmail API + service account + DKIM/SPF/DMARC.
+> - Telefonía Aircall/Ringover (€60-120/mes operación 1-3 personas).
+> - Integraciones Google Workspace: Gmail API send/sync threading, Calendar, Drive (espejo PDFs), Identity (SSO).
+> - Anti-patrones evitar: 50 campos obligatorios, vigilancia agresiva, automatización prematura, Apollo/ZoomInfo.
+> - 13 KPIs reales (no vanity): connect rate, conversation rate, qualification rate, win rate, tiempo medio llamada→propuesta.
+>
+> **Sprint Carolina v2 redimensionado**: 18-20 días en 4 semanas con paralelismo (era 5-6 días, era ingenuo).
+>
+> **7 preguntas concretas pendientes a Juan** para arrancar (telefonía, volumen, origen leads, cadencia actual, plantilla email, Lista Robinson, Workspace admin).
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Plan Carolina-as-engine**
+>
+> ## 🔴 INSIGHT GO-TO-MARKET — Carolina es el motor real de captación
+>
+> Tras describir Juan los 3 canales (Carolina telemarketing, comerciales, cartera), todo el plan estratégico se reordena. Documento: `docs/PLAN_CAROLINA_ENGINE_2026-05-01.md`.
+>
+> **Insight:** el cuello de botella real del Canal 1 (Carolina) NO es "no hay leads" — es el ciclo "llamada → pedir factura → esperar 5-7 días → análisis manual → propuesta". Reducible a "llamada → CUPS → click → propuesta enviada en minutos" usando SIPS + heurísticas + OMIE.
+>
+> **Plan revisado mes 1-3:**
+> - **Mes 1 (~14 días)**: cerrar Sprint A + adopción interna + SIPS/OMIE + **Sprint Carolina FASE 41** (pantalla `/captacion` + diagnóstico + flow rápido). Outcome: Carolina genera 10 propuestas/día desde CRM.
+> - **Mes 2 (~10 días)**: FASE 42 generador propuesta avanzada (Canal 2) + FASE 36-bis validador facturas (Canal 3) + cifra "€ recuperados" home.
+> - **Mes 3 (~5 días)**: FASE 43 optimización trimestral + reporting mensual cliente (Canal 3 retención).
+>
+> **Diferidos a mes 4+**: FV calculator, CAEs, portal cliente, Sentry DSN.
+>
+> **Pendiente input Juan**: 6 preguntas concretas sobre Carolina (volumen llamadas, herramientas actuales, acceso SIPS, plantilla email) para diseñar wireframe `/captacion` óptimo. Ver doc.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Comparativa con ChatGPT + plan revisado**
+>
+> ## 🟠 SEGUNDA OPINIÓN CHATGPT — `docs/COMPARATIVA_COWORK_VS_CHATGPT_2026-05-01.md`
+>
+> ChatGPT validó el plan estratégico con 2 correcciones importantes y 1 idea nueva:
+>
+> 1. **Modelo híbrido empresa/CUPS** (no sustituir uno por otro): CRM=empresa, Operaciones=CUPS. Mejor formulación que la propuesta original.
+> 2. **Adopción interna como prioridad #1** (Sprint 30.bis): el equipo no usa el CRM. Sin esto, el resto es teoría. Matiz Cowork: la adopción se gana con flujos donde "CRM > Excel", no se fuerza por disciplina.
+> 3. **IDEA NUEVA — Modo diagnóstico primera reunión** (FASE 41): SIPS + heurísticas sectoriales + OMIE → PDF de 30 segundos con "pagas €X, ahorrarías €Y". Sin Datadis, sin facturas. Arma comercial concreta.
+>
+> Plan revisado de prioridades 2 meses (~25 días-persona):
+> - Cerrar Sprint A pendiente.
+> - Sprint adopción interna (KPI uso CRM por usuario).
+> - Sprint sector mínimo (SIPS + OMIE, sin BOE scraper ni eSIOS).
+> - **Sprint modo diagnóstico (FASE 41) — nueva prioridad #1**.
+> - Sprint generador propuesta (FASE 42).
+> - Sprint validador v0 con 3 reglas críticas.
+> - Sprint € trofeo + vista `/suministros`.
+>
+> Diferidos: FV + CAEs (mes 3+), descartado de momento CSRD/PPA/CER/auditoría obligatoria.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Auditoría profesional sector**
+>
+> ## 🟣 AUDITORÍA PROFESIONAL DEL SECTOR — `docs/AUDIT_2026-05-01_PROFESIONAL_SECTOR.md`
+>
+> Tras el audit técnico (mañana) y el sprint autónomo (tarde), Juan pidió una auditoría con lente de profesional del sector consultoría energética. Resultado: documento de 13 secciones que identifica 3 grandes ejes:
+>
+> 1. **El CRM hoy es un CRM general aplicado a energía, no un CRM vertical**: el objeto central debe ser el suministro/CUPS, no la empresa.
+> 2. **5 fuentes públicas gratuitas no consumidas**: SIPS, OMIE, REE/eSIOS, BOE, CNMC. Cada una desbloquea features comerciales.
+> 3. **Los servicios adyacentes son donde está el ticket grande**: autoconsumo FV, CAEs, CER, auditoría obligatoria RD 56/2016, CSRD/CBAM, PPA.
+>
+> Roadmap ampliado FASES 34-40 propuesto. Las 3 prioridades 60d:
+> - Cerrar bucle Datadis (auditoría inicial automatizada).
+> - Validador de facturas v0 (reglas críticas + plantilla reclamación).
+> - Cifra trofeo "€ recuperados a clientes 12m" en home + material comercial.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 tarde por Cowork — Sprint A autónomo aplicado**
+>
+> ## 🟢 SPRINT A AUTÓNOMO — 6/10 sub-fases aplicadas
+>
+> Tras la auditoría, Juan dio luz verde para avanzar autónomamente. Aplicado vía Supabase MCP + edits frontend:
+>
+> | Sub-fase | Estado | Aplicado |
+> |---|---|---|
+> | 30.1 — pg_cron daily-contract-check | ✅ | BD prod: cron jobid 3, 04:00 UTC. Función SQL `run_daily_contract_check()`. Migration espejo `20260501_fase30_1_*` |
+> | 30.4 — Importes en Kanban | ✅ | KanbanCard + KanbanColumn editados |
+> | 30.5 — Wizard contacto decisor | ✅ | EmpresasPage convertido a wizard 2 pasos en CREATE |
+> | 30.6 — Asociar Datadis↔Empresa | ✅ | AsociarEmpresaDialog (nuevo) + hook `useAsociarSuministroAEmpresa` + botón en DatadisPage |
+> | 30.8 (aditiva) — incidencias.cups_id | ✅ | BD prod: ALTER + index + populate. Migration espejo `20260501_fase30_8_*` |
+> | 30.10 — Sentry SDK base | ✅ | sentry.ts wrapper lazy + integrado en main.tsx, useAuth, logger.ts. `.env.example` actualizado. `@sentry/react@^10` añadido a package.json |
+>
+> Pendientes Sprint A (con razón documentada):
+> - **30.2 / 30.3** — necesitan decisión de Juan (consolidar renovaciones, etapas legacy).
+> - **30.7** — vinculación masiva Datadis por NIF, requiere nueva Edge Function.
+> - **30.9** — RLS granular, mejor en sesión coordinada con observación tabla a tabla.
+>
+> **PRE-REQUISITO MERGE A MAIN:** cerrar TSC pendiente de `claude/sprint2-lib-potencias` (`docs/SPRINT3_TSC_PENDIENTE.md`).
+>
+> **Pasos siguientes (Code, PowerShell):**
+> 1. `npm install` (instala `@sentry/react`)
+> 2. `npx tsc --noEmit` (verifica integración)
+> 3. `npm test -- --run` (33 tests deben pasar)
+> 4. Sanity check manual en localhost:3000
+> 5. Commit con el comando del handoff: `.cowork/outbox/2026-05-01-sprint-a-autonomo-aplicado.md`
+>
+> ---
+>
+> ## 🟦 AUDITORÍA 2026-05-01 — `docs/AUDIT_2026-05-01_MEJORAS_CRM.md`
+>
+> Disparada por análisis estratégico de Juan en navegador (5 áreas + matriz de priorización). Verificación rigurosa contra código + ampliación con capa técnica y UX.
+>
+> **Hallazgos clave:**
+> - Pipeline energético existe (FASE 21.a) pero **migración a medias**: etapas legacy aún vivas en BD y Dashboard.
+> - Edge Function `daily-contract-check` lista pero **sin programar pg_cron** — la automatización del rollover no se ejecuta.
+> - Datadis aislado del CRM: ningún flujo asocia los CUPS bajados con empresas. **Es el cable más rentable.**
+> - RLS granular FASE 20.9 escrita pero **no aplicada** — bloquea portal cliente.
+> - Tabla `incidencias` con `cups: text` (no FK uuid) — vinculación débil.
+> - Validador de facturas y portal cliente: ❌ inexistentes (producto nuevo, sprint completo cada uno).
+> - 111 `as never` legados, sólo 6 ficheros test (33 tests reales, no 39).
+> - Dos escuelas visuales (CRM `rounded-md` vs Calc `rounded-xl`) — design review 2026-04-20 sigue vigente.
+>
+> **Plan propuesto:** 3 sprints (FASES 30, 31, 32) + diferidos (FASE 33+) integrados en `docs/ROADMAP_FUSION.md`:
+> - **Sprint A (FASE 30) · 5 d** — "Cablear lo que ya existe": cron, RLS, vinculación Datadis↔Empresa.
+> - **Sprint B (FASE 31) · 5 d** — "Ampliar el modelo energético": precios P1–P6, oportunidad_cups, historial, informes.
+> - **Sprint C (FASE 32) · 5 d** — "Diferenciar el servicio": validador facturas, portal cliente, autorización Datadis.
+>
+> **Pre-requisito sprint A:** cerrar TSC pendiente de `claude/sprint2-lib-potencias` (`docs/SPRINT3_TSC_PENDIENTE.md`).
+>
+> Resumen completo: `docs/AUDIT_2026-05-01_MEJORAS_CRM.md`. Mensaje detallado para Code: `.cowork/outbox/2026-05-01-audit-mejoras-crm-handoff.md`.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-04-30 por Cowork noche — Integración Datadis proxy v4 funcional**
+>
+> ## ✅ DATADIS PROXY — INTEGRACIÓN COMPLETADA (commit 6aa361c en claude/sprint2-lib-potencias)
+>
+> | Item | Estado | Detalle |
+> |---|---|---|
+> | Edge Function `datadis-proxy` v4 | ✅ ACTIVA en prod | 5 endpoints: get_supplies, get_consumption, get_max_power, get_contractual, get_reactive |
+> | Fix auth Bearer | ✅ | `/api-private/*` exige `Authorization: Bearer jwt`. Sin Bearer → 401. Verificado A/B en navegador. |
+> | Cookie JSESSIONID | ✅ | Capturada en login, reenviada en peticiones (Spring Security stateful) |
+> | Migración SQL | ✅ aplicada en prod | datadis_consumos_cache, consentimientos_datadis, columnas datadis_* en cups, datadis_provincias (52 INE) |
+> | Test get_supplies | ✅ | 14 suministros CHEMTROL, 3 distribuidoras activas, CodError 902 (EOSA+EREDES sin respuesta — normal) |
+>
+> **Próximos pasos Datadis:**
+> - Test get_consumption con CUPS concreto de CHEMTROL
+> - Exponer CodError 902 como warning en frontend (no bloquear flujo)
+> - Cache en BD: buscar en datadis_consumos_cache antes de llamar a Datadis
+> - UI en CRM: pantalla suministros por cliente + importación de consumos
+> - Solicitar acceso API oficial Datadis (datadis@enagas.es) para modo `terceros`
+>
+> ---
+>
+> **Última actualización (anterior): 2026-04-30 por Cowork tarde — Integración librerías Potencias (Sprint 1+2+3 parcial)**
+>
+> ## Cowork tarde 2026-04-30 — Sprint integración Potencias al CRM
+>
+> Rama: `claude/sprint2-lib-potencias` (sin push aún).
+>
+> | Sprint | Estado | Detalle |
+> |---|---|---|
+> | 1 P0 | ✅ | trigger `fn_calcular_alertas_solicitudes` aplicado al CRM. 41 fechas alerta calculadas. Julia Ruiz creada en auth.users. 31 expedientes huérfanos asignados. _migration_user_map actualizado. |
+> | Auditoría | ✅ | `docs/AUDITORIA_POTENCIAS_VS_CRM.md` con 4 gaps identificados (triggers, lib, componentes, endpoint). |
+> | 2 (copiar archivos) | ✅ | 16 archivos `musing-kalam` → CRM en estructura `src/core/pdf/`, `src/core/email/`, `src/core/excel/`, `src/features/potencias/lib/`, `src/features/potencias/components/shared/`, `api/`. |
+> | 3 primera pasada | ✅ | Imports `@/lib/*` → `@/core/*`. 12 nombres tablas reemplazados. Tipos `TariffType`, `PowerValues`, `RegulatedRate` añadidos a entities.ts. Reemplazos `client_id → empresa_id`, FKs renamed. |
+> | 3 segunda pasada | ⏳ pendiente | ~60 errores TSC documentados en `docs/SPRINT3_TSC_PENDIENTE.md`. Plan Sprint 4 detallado por fases (A-E, ~2.5h). |
+>
+> **Estado BD CRM:** trigger alertas activo, datos completos (41 expedientes con created_by), sin advisors RLS pendientes.
+>
+> ⚠️ **NO mergear `claude/sprint2-lib-potencias` hasta que TSC = 0** (si no, CI bloquea futuros PRs).
+>
+> Pendientes próxima sesión: ver `.cowork/outbox/2026-04-30-sprint3-tsc-pendiente.md`.
+>
+> ---
+>
+> **Última actualización (Code mañana): 2026-04-30 por Cowork (sesión — FV schema redesign + mantenimiento + informes)**
+>
+> ## ✅ COMPLETADO EN ESTA SESIÓN (commits 00243bd + a388e04 en main)
 >
 > | Componente | Estado | Detalle |
 > |---|---|---|
-> | Fix Dashboard Potencias (0 clientes/CUPS) | ✅ | useSupabaseQuery usaba .eq(col,null) → PostgREST no hace IS NULL; corregido a .is() |
-> | Fix Asistente RAG (500 error) | ✅ | gemini-2.5-flash lanza en .text con thinking parts; extraer de candidates[0].content.parts |
-> | ask-crm-docs v18 desplegada | ✅ | Catch devuelve 200 en lugar de 500; SDK entrega el mensaje al cliente |
-> | ExpedienteDetailPage mejorado | ✅ | Edición inline solicitud (ref, fechas, notas) + botón Nuevo ciclo |
-> | Archivos truncados NTFS restaurados | ✅ | App.tsx, Sidebar.tsx, EmpresaDetailPage.tsx desde git HEAD |
-> | seguimiento-fv/api.ts cast (supabase as any) | ✅ | Tablas fv_* no están en database.ts → cast necesario |
-> | TSC = 0 errores verificado | ✅ | Antes del commit |
+> | fix(fv-sync): fill(force=True) eliminado | ✅ | Playwright Python: fill() no acepta force=True; causaba TypeError en 10s. Corregido. |
+> | database.ts regenerado con tablas fv_* | ✅ | 5011 líneas, incluye todas las tablas fv_*. Elimina (supabase as any) en api.ts |
+> | Schema FV rediseñado (multi-credencial) | ✅ aplicado en prod | UNIQUE (plataforma,region_url,station_code): 1 planta física = 1 fila. fv_planta_credencial N:M. fv_upsert_planta() protege empresa_id |
+> | fv_planta: nombre_interno + nombre_fusionsolar | ✅ | Valere puede poner nombre personalizado; sync no lo sobreescribe |
+> | fv_credenciales: tipo + descripcion | ✅ | instalador_multicliente / cliente_monoplanta / cliente_multiplanta. JOLIVARES etiquetado. |
+> | Password JOLIVARES actualizado | ✅ | Nuevo hash xa1Y/hIblHe3JqD8:... aplicado en Supabase |
+> | fv_empresa_mantenimiento | ✅ aplicado en prod | Registro empresas externas de mantenimiento (datos, contacto, contrato) |
+> | fv_mantenimiento | ✅ aplicado en prod | Intervenciones por planta: preventiva, correctiva, limpieza, inspección |
+> | fv_config_informe | ✅ aplicado en prod | Config entrega informes por cliente: modo_envio, gestor_id, asesor_id, destinatarios |
+> | fv_informe_mensual extendido | ✅ aplicado en prod | Estados: borrador→revision_pendiente→aprobado→enviado. Edición contenido, notas gestor |
+> | Trigger notificación informe pendiente | ✅ | Crea notif CRM al gestor cuando informe pasa a revision_pendiente |
 >
-> ## 📋 PENDIENTE REAL (no implementado, bloqueado o decisión)
+> ## ⏳ PENDIENTE INMEDIATO
 >
-> | Item | Bloqueador | Notas |
+> | Item | Responsable | Notas |
 > |---|---|---|
-> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
-> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
-> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
-> | Credenciales FV primer cliente | Acción Juan | Ver scripts/fv-sync/README.md |
-> | Regenerar database.ts con tablas fv_* | Próxima sesión | Eliminar casts (supabase as any) en seguimiento-fv |
-
-# Estado actual del proyecto Valere v2
-
-> **Última actualización: 2026-04-29 por Cowork (sesión noche — Módulo Seguimiento Planta FV — COMPLETADO)**
+> | Lanzar Run #15 en GitHub Actions | Juan | Fix fill(force=True) ya commiteado en 00243bd |
+> | .\COMMIT_FV_MANT_INFORMES.ps1 | ✅ HECHO | a388e04 en main |
+> | Verificar plantas en fv_planta tras Run #15 | Juan + Cowork | Si verde: ejecutar SQL asignación empresas |
+> | RESEND_API_KEY en GitHub Actions secrets | Juan | Settings → Secrets → Actions (ya está en Supabase EF) |
 >
-> ## ✅ COMPLETADO EN ESTA SESIÓN (commits 032bbcd + 2d0185f en main)
+> ## 🔮 SIGUIENTE SPRINT (Fase B módulo FV)
 >
-> | Componente | Estado | Detalle |
+> | Item | Estado | Notas |
 > |---|---|---|
-> | SQL migration fv_* | ✅ aplicada en prod | 7 tablas: fv_credenciales, fv_planta, fv_dispositivo, fv_kpi_realtime, fv_kpi_diario, fv_alarma, fv_sync_log + RLS granular |
-> | Conector Python FusionSolar | ✅ commiteado | scripts/fv-sync/: crypto.py (AES-256-GCM), fusionsolar_client.py (WebAuth+Northbound stub), sync_job.py |
-> | GitHub Actions cron | ✅ commiteado | .github/workflows/fv-sync.yml — diario 02:00 ES, dispatch manual con dry-run |
-> | Frontend feature seguimiento-fv | ✅ commiteado | SeguimientoFVPage (vista global), PlantaFVTab (tab empresa), api.ts hooks React Query |
-> | Sidebar + rutas | ✅ commiteado | Entrada "Plantas FV" en sidebar, ruta /seguimiento-fv, tab ☀️ en EmpresaDetailPage |
-> | GitHub Secrets | ✅ configurados | SUPABASE_URL, SUPABASE_SERVICE_KEY, FV_ENCRYPTION_KEY ya en repo |
->
-> **COMMIT_FV.ps1 ejecutado**: commits 032bbcd (feature completa) + 2d0185f (fix SQL USING) pusheados a main ✅
->
-> **⚠️ ACCIÓN PENDIENTE JUAN (~2 min)**: Ejecutar `CHECK_FV_FILES.ps1` en raíz — el sandbox detectó que
-> `src/App.tsx`, `src/components/layout/Sidebar.tsx`, `src/features/empresas/EmpresaDetailPage.tsx`
-> pueden mostrar como "modified" en Windows por un artefacto del mount. El script verifica y restaura si necesario.
->
-> **Pendiente de Juan** (manual, fuera del código):
-> 1. ~~Aplicar migración SQL en Supabase Dashboard~~ → ✅ Aplicada via Supabase MCP en sesión
-> 2. ~~Configurar GitHub Secrets~~ → ✅ Configurados
-> 3. Guardar `FV_ENCRYPTION_KEY` en 1Password (la clave está en los secrets de GitHub Actions)
-> 4. Añadir credenciales del primer cliente FV (ver `scripts/fv-sync/README.md`)
->
-> ## 📋 PENDIENTE REAL (no implementado, bloqueado o decisión)
->
-> | Item | Bloqueador | Notas |
-> |---|---|---|
-> | Añadir credenciales clientes FV | Acción Juan | Ver scripts/fv-sync/README.md |
-> | Migración a Northbound API | Por cliente (pide usuario Northbound a Huawei) | NorthboundClient ya implementado |
-> | Soporte GoodWe / iSolarCloud / SMA | Futuro | Arquitectura preparada, añadir new_client.py |
-> | Panel admin gestión credenciales FV | Próxima iteración | Actualmente se insertan via SQL |
-> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
-> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
-> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
-
-# Estado actual del proyecto Valere v2
-
-> **Última actualización: 2026-04-29 por Cowork (sesión tarde — Suministros + tipos Cups)**
->
-> ## ✅ COMPLETADO EN ESTA SESIÓN
->
-> | Componente | Estado | Detalle |
-> |---|---|---|
-> | Página Suministros Potencias | ✅ | /potencias/suministros — tabla 73 CUPS + filtros + exptes activos |
-> | Sidebar Suministros fix | ✅ | Antes apuntaba a /datos (error), ahora a /potencias/suministros |
-> | Tipo Cups completo | ✅ | Añadidos p1_kw..p6_kw, legacy_potencia_id, ciudad_suministro, etc. |
-> | NuevoExpedienteModal | ✅ | Usa Pick<Cups> en lugar de interfaz local redundante |
-> | DatosPage location.state | ✅ | Pre-selecciona empresa+CUPS al llegar desde Suministros |
-> | Commit tipos reales (sesión mañana) | ✅ | 76ba02c — database.ts 4549 líneas + EmpresaDetailPage timeline |
->
-> **Pendiente ejecutar**: `COMMIT_SUMINISTROS.ps1` en raíz del repo
->
-> ## 📋 PENDIENTE REAL (no implementado, bloqueado o decisión)
->
-> | Item | Bloqueador | Notas |
-> |---|---|---|
-> | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
-> | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
-> | Unificación Supabase Fase 2 | Datos reales cross-proyecto | Protocolo en scripts/unificacion_fase2_* |
-> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
-
-# Estado actual del proyecto Valere v2
-
-> **Última actualización: 2026-04-29 por Cowork (Sprint autónomo — fases técnicas completadas)**
->
-> ## ✅ COMPLETADO HOY (sesión 2026-04-29)
->
-> | Fase | Estado | Detalle |
-> |---|---|---|
-> | Sidebar colapsable | ✅ | Icon-rail w-16 desktop, drawer móvil, localStorage |
-> | Normativa expedientes | ✅ | Catálogo + dropdown inline + badge Comunicaciones + docs Documentación |
-> | FASE 20.9 RLS hardening | ✅ | Ya activo en prod (verificado vía MCP) |
-> | FASE 20.1 Tipos Supabase | ✅ | 4549 líneas tipos reales regenerados, TSC=0 |
-> | FASE 20.8 Gemini server | ✅ | Ya en Edge Functions (chat-consultor + ask-crm-docs) |
-> | FASE 21.a Pipeline | ✅ | Kanban oportunidades con etapas energéticas ya activo |
-> | FASE 21.b Alertas contratos | ✅ | AlertaBadge + VencimientoList ya activo |
-> | FASE 21.c Timeline empresa | ✅ | RecentActivityCard en sidebar ficha empresa |
->
-> **Pendiente ejecutar**: `COMMIT_HOY.ps1` en raíz del repo
+> | Refactor SeguimientoFVPage con tabs | Pendiente | Dashboard global, vista por cliente, detalle planta |
+> | Gráfico producción 30 días (recharts) | Pendiente | Usa fv_kpi_diario |
+> | Edición nombre_interno desde CRM | Pendiente | Inline edit en tarjeta planta |
+> | UI mantenimiento por planta | Pendiente | Tabla intervenciones + próximas fechas |
+> | UI fv_config_informe por empresa | Pendiente | Panel configuración en EmpresaDetailPage |
 >
 > ## 📋 PENDIENTE REAL (no implementado)
 >
@@ -114,679 +587,17 @@
 > |---|---|---|
 > | Integración Datadis | Trámite Juan (registro terciario) | Plan en docs/PLAN_INTEGRACION_DATADIS.md |
 > | Auth Google Identity | Decisión producto | Plan en docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md |
-> | Unificación Supabase Fase 2 | Datos reales cross-proyecto | Protocolo en scripts/unificacion_fase2_* |
-> | RESEND_API_KEY secret | Acción Juan en Supabase Dashboard | Para emails aprobación usuarios |
-
-# Estado actual del proyecto Valere v2
-
-> **Última actualización: 2026-04-29 por Cowork (Integración completa Gestión de Potencias)**
->
-> ## ✅ INTEGRACIÓN GESTIÓN DE POTENCIAS — COMPLETADA
->
-> | Feature | Estado | Notas |
-> |---|---|---|
-> | PotenciasDashboardPage | ✅ real data | KPIs, alertas RDL, bajadas aprobadas, distribución estados |
-> | ComunicacionesPage | ✅ nueva | Expedientes agrupados por acción requerida |
-> | InformesPotenciasPage | ✅ nueva | Bar chart recharts + top clientes |
-> | DocumentacionPage | ✅ nueva | Upload/download Supabase Storage bucket `documentos` |
-> | ConfiguracionPotenciasPage | ✅ nueva | Parámetros RDL, distribuidoras, flujo, notificaciones |
-> | Sidebar collapsible | ✅ | "Gestion de Potencias" cerrado por defecto, abre al click |
-> | notify-expediente-estado | ✅ integrado | Wired en avanzarEstado() — fire-and-forget |
-> | MessageBubble sin fuentes | ✅ | SourcesCitation eliminado — sin enlaces GitHub en UI |
-> | docs/help/potencias/ | ✅ | README.md para RAG assistant |
->
-> **Pendiente de ejecución por Juan**: `COMMIT_POTENCIAS.ps1` en raíz del repo (elimina lock, stages, commit, push)
->
-> ## ✅ Sprint A — COMPLETADO Y EN MAIN
->
-> Todas las ramas mergeadas a main y pusheadas. Cloudflare Pages desplegando.
->
-> | Feature | Commit en main | Notas |
-> |---|---|---|
-> | BackButton contextual | ✅ `feat(sprint-a): BackButton contextual en Empresa y Contrato` | BackButton.tsx + EmpresaDetailPage + ContratoDetailPage |
-> | Importador XLSX tarifas | ✅ `feat(fase20.7): importador XLSX tarifas + tab Admin` | XLSXImportadorTarifas.tsx + AdminPage tab |
-> | Audit Log | ✅ `feat(fase20.7): audit log - tabla, triggers, RLS, tab Auditoria` | AuditoriaTab.tsx + migration SQL + triggers 5 tablas |
-> | Kanban Oportunidades | ✅ ya estaba en main | Rama eliminada |
-> | Gestión de Potencias (sidebar) | ✅ `feat: sidebar con sección Gestión de Potencias` | Sidebar dividido en 2 secciones |
->
-> **Migration audit_log**: aplicada en Supabase prod vía MCP en sesión anterior. Triggers activos en empresas, contratos, oportunidades, contactos, user_profiles.
->
-> ## 📦 Estado de datos Potencias → CRM
->
-> - **clients → empresas**: ✅ migrado (27 empresas en CRM, todas coinciden por NIF)
-> - **supplies → cups**: ✅ migrado (73 cups en CRM, 72 con `legacy_potencia_id`)
-> - **Páginas Potencias**: ya leen de `empresas` + `cups` del CRM. Sin cambios de diseño.
->
-> ## 🎯 Próximos pasos sugeridos
->
-> 1. **Verificar CI** en GitHub Actions (build Cloudflare) — debería estar verde
-> 2. **Integración Datadis Fase 1** — requiere trámite de registro como terciario (ver `docs/PLAN_INTEGRACION_DATADIS.md`)
-> 3. **Hardening RLS** — draft en `supabase/migrations/_draft_rls_hardening_8_tables.sql`
-> 4. **Deuda técnica**: script PowerShell limpieza sprints 5+6+7+8 (git rm + commit + push)
-
-> Última actualización: 2026-04-26 por Cowork (sprint signup-aprobacion-manual) — **Flujo de alta pública con aprobación manual desplegado en prod**. (1) Migration `signup_aprobacion_manual_2026_04_26` aplicada via MCP: `handle_new_user()` reescrito para capturar nombre+apellidos del metadata + status='pendiente'/approved=false (excepto master `jolivares@valereconsultores.com` auto-aprobado), `is_approved()` helper, `admin_reject_user(uuid)` SECURITY DEFINER (callable solo por master), `cleanup_pending_users_older_than_7_days()` idempotente, extensión pg_cron instalada, cron `cleanup_pending_users_daily` schedule `0 3 * * *` ACTIVE. (2) Edge Functions v1 ACTIVE: `notify-admin-pending-user` (verify_jwt=true) y `notify-user-approval-decision` (verify_jwt=true, valida caller=master). (3) FE: `SignupPage.tsx` (/signup público con zod), `PendingApprovalPage.tsx` (landing usuario sin aprobar), AuthGuard bloquea `approved=false`→`/pending-approval`, link "Solicitar acceso" en LoginPage, tab Pendientes en AdminPage con tabla + selector rol + Aprobar/Rechazar. (4) Provider email: Resend plan Free (100/día, 3000/mes), dominio `valereconsultores.com` ya verificado, `From=Valere CRM <noreply@valereconsultores.com>`, `To admin=jolivares@valereconsultores.com`. **Pendiente Juan (~15 min)**: configurar `RESEND_API_KEY` secret en Supabase + smoke test + TSC/tests/build + commit en rama `claude/signup-aprobacion-manual` + push + PR. Detalle completo en `.cowork/outbox/2026-04-26T15-18-22-signup-aprobacion-manual-handoff.md` + `docs/SESIONES/2026-04-26-signup-aprobacion.md`.
-
-> Última actualización: 2026-04-26 por Cowork (investigación AI Studio + descubrimiento URL satélite mal configurada). **Veredicto AI Studio**: CRM y bundle Potencias en producción **limpios**, sin fingerprints. Origen Potencias **probable export AI Studio Build** (folder `musing-kalam/` patrón canónico) ya **completamente refactorizado** (cero `@google/genai` en cliente, /api/ Pages Functions desplegadas y respondiendo). 🚨 **Hallazgo crítico colateral**: `valere-gestion-potencias.pages.dev` apunta al CRM (`gtphkowfcuiqbvfkwjxb`) pero **faltan 7 tablas** en CRM (`clients`, `supplies`, `profiles`, `power_requests`, `regulated_rates`, `client_communications`, `client_documents`) y las que sí existen están **vacías** (Fase 2 datos no ejecutada). Resultado: el frontend Potencias está roto desde el cutover de URL — **explica los "datos no encontrados" del negocio**. Datos reales (~410 filas + 100 PDFs / 15 MB) confirmados sagrados por Juan, intactos en satélite. **Acción urgente**: rollback de `VITE_SUPABASE_URL` en Cloudflare Pages → satélite (5 min), no toca datos. Ver `docs/INVESTIGACION_AISTUDIO_2026-04-26.md` para informe completo, hipótesis, comandos PowerShell para Juan, y limpieza recomendada (🟢/🟡/🔴) sin tocar datos del negocio.
-
-> Última actualización: 2026-04-26 por Cowork (sprint domingo lane 3 docs/proceso) — **Plan Fase 6 + Checklist cutover + Audit RLS débil + AGENT_PLAYBOOK reforzado con lecciones noche 25-26**. (1) `docs/PLAN_UNIFICACION_FASE_6_2026-04-26.md` — cutover real + decommissioning gradual (8 subfases, rollback express por tipo, estimación 3-5 semanas calendar). (2) `docs/CHECKLIST_RELEASE_CUTOVER.md` — operativo del día del cutover (go/no-go SQL ejecutable + smoke con comercial real + 7 tipos de rollback + plantillas comunicación). (3) `docs/AUDIT_RLS_DEBIL_2026-04-26.md` — sondeo `pg_policies` completo: 8 tablas ya cubiertas en draft + **3 nuevas detectadas** (`documentos` con weak permissive que anula granulares, `incidencias` y `renovaciones` con solo policy `auth.role()='authenticated'`) + 6 duplicados SELECT + 9 lecturas amplias intencionales a documentar en SEGURIDAD. (4) `.cowork/AGENT_PLAYBOOK.md` con §8.bis "PowerShell 5.1 — el lenguaje real" + actualización §9 antipatrones: validar contra PS 5.1 no pwsh 7, `[PREFIJO]` al inicio se interpreta como `[type]`, inventario completo locks git (incluye `refs/heads/*.lock` y `refs/remotes/*.lock`), verificar `git remote -v` + `git branch --show-current` antes de generar scripts, validación 5-capas pre-entrega `.ps1` (parser + PSScriptAnalyzer compat 5.1 + severity Error + dry-run + hash MD5), patrón fallback secuencia plana copy-paste. NO commits desde este lane.
-
-> Última actualización: 2026-04-26 por Cowork (9º sprint autónomo) — **`RUNBOOK.ps1` maestro en la raíz**. Un solo comando para Juan: `powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\joliv\valere-v2\RUNBOOK.ps1"`. Automatiza reparación `.git/` (null bytes + locks) idempotente + Bloque 1 completo del `RUNBOOK_PENDIENTE_JUAN.md` (sync rama PR #6, reset CRLF, git rm legacy + framer-motion uninstall, git add 26 entregables sprints 5-8 + paralelo C, TSC, tests, commit, push) + pausas con instrucciones inline para Bloques 2/4/6/8. Flags: `-DryRun`, `-OnlyRepair`, `-SkipPush`, `-SkipTests`, `-YesToAll`. Idempotente — re-ejecutable sin romper nada.
-
-> Sprint 8 (2026-04-26 tarde) — **Validación FE refactor 100% + compat views completas (SELECT/INSERT/UPDATE/DELETE) + Plan Fase 4-5 + RLS hardening draft**. (1) Refactor FE Fase 3 cerrado: `src/types/database.ts` actualizado (`RetailerOffer.retailer_id`→`comercializadora_id`, `RetailerOfferWithName.retailers`→`comercializadoras`); 0 refs legacy en `src/`. (2) Compat views validadas via MCP — INSERT vía view legacy mapea trigger → tabla canónica con `comercializadora_id` correctamente; UPDATE/DELETE auto-updatable de Postgres también funciona (incluso con column alias). FE legacy puede coexistir sin tocar nada. (3) `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` — plan ejecutivo Fases 4 (deploy + apps satélite con compat views) y 5 (cleanup). Decisión arquitectónica para Potencias-app: views CRM (`clients`, `supplies`, `profiles`, etc.) que minimizan refactor. (4) Riesgo storage identificado: PDFs de Potencias en bucket separado — pendiente decisión Juan. (5) `supabase/migrations/_draft_rls_hardening_8_tables.sql` — 8 tablas Potencias-side con USING(true) → 4 policies granulares cada una (select/insert/update/delete), patrón comercial-creador o manager+. (6) Inventory limpieza completo para script PowerShell git rm.
-
-> Sprint 7 (2026-04-26 tarde) — **Unificación Supabase Fase 1 APLICADA en prod + Fase 3 FE refactor APLICADO + Fase 2 datos preparada para Juan**. Aplicada migration `fase1_unificacion_renames_schema` (renames retailers→comercializadoras, retailer_offers→comercializadora_ofertas, boe_regulated_prices→precios_regulados_boe, comercializadora_ofertas.retailer_id→comercializadora_id, +7 cols precios_regulados_boe con backfill 29/29). `proposals` queda viva (decisión Juan). Plus: vistas legacy retailers/retailer_offers/boe_regulated_prices con SECURITY INVOKER + INSTEAD OF INSERT triggers — red de seguridad para FE no migrado (drop tras tests). Refactor FE en src/features/admin/AdminPage.tsx + src/features/analisis/AnalisisPage.tsx (8 cambios: tabla strings, retailer_id→comercializadora_id, .retailers?.→.comercializadoras?.). Tipos TS regenerados post-rename en src/core/types/database.ts (3727 líneas, ahora con nombres canónicos). Advisors: 4 ERRORs cerrados (security_definer_view via SECURITY INVOKER), quedan 9 WARNs (RLS USING(true) heredados de sprint 4 + auth Pro). Fase 2 datos NO ejecutada por Cowork (bridge MCP cross-project token-prohibitivo a 408 filas) — Juan lo ejecuta vía pg_dump+psql siguiendo `scripts/unificacion_fase2_protocolo.md`.
-
-> Sprint 6 (2026-04-25 tarde) — **Unificación Supabase Fase 1 lista para aplicar + Fase 2 scripts cross-proyecto + Fase 3 refactor FE mapeado**. Hallazgo clave: la migración de schema en sprint 4 (`unificacion_potencias_aditiva`) ya añadió todas las tablas Potencias en el CRM — solo faltan **3 renames** (retailers→comercializadoras, retailer_offers→comercializadora_ofertas, boe_regulated_prices→precios_regulados_boe), drop `proposals` (0 rows), y añadir 7 columnas a `precios_regulados_boe` con backfill. Todo en `supabase/migrations/20260426_fase1_unificacion_renames_schema.sql`, validado vía dry-run con transacción ROLLBACK contra prod. **Decisión arquitectónica**: migración in-place sobre CRM (no proyecto nuevo) — CRM ya está en eu-west-1, ahorra coste, rollback trivial. Fase 2 (import 408 filas Potencias→CRM): protocolo + 3 scripts SQL preparados en `scripts/unificacion_fase2_*` con dedupe por CIF/CUPS normalizado, mapeo legacy→canonical, transacción única. Fase 3 (FE refactor): 8 archivos mapeados en `docs/REFACTOR_FE_FASE3_2026-04-26.md`. Tipos canónicos regenerados en `src/core/types/database_canonical_2026-04-26.ts` (3520 líneas). Pendiente Juan: revisar Fase 1 SQL y aplicar, luego ejecutar protocolo Fase 2 con backups + connection strings.
-
-> Sprint 5 (2026-04-25 mañana) — **Asistente RAG verificado en producción + sync repo↔deployed + inventario Gemini cross-app + decisión chat-ia**. (1) `ask-crm-docs` Edge Function v9 ACTIVE confirmada vía Supabase MCP: 216 embeddings cargados + 12 consultas reales hoy (sim 0.56-0.90, ~3-7s/req) → asistente operativo end-to-end. Pipeline embeddings ya corrió. (2) `supabase/functions/_shared/ai-adapter.ts` actualizado en repo para alinear con producción: `gemini-embedding-001` (outputDimensionality=768) + `gemini-2.5-flash` (los modelos antiguos fueron deprecados para cuentas nuevas en abril 2026). (3) `docs/INVENTARIO_GEMINI_2026-04-25.md` — inventario completo de valere-v2 (todo server-side, cero exposición frontend) + script PowerShell para inventariar apps satélite + estrategia de revocación segura (no revocar hasta que Potencias se refactorice). (4) Decisión `chat-ia` huérfano: **eliminar** — ningún import en src/, redundante con asistente RAG. Comandos rm preparados para Juan. (5) Reparado index.lock + null sha1 corruption del repo `.git/`. Pendiente: ejecución del script PowerShell de cierre (rm chat-ia + chat-consultor + basura raíz + commit + push al PR #6) + cierre inventario Gemini en repos satélite.
-
-> Sprint 4 (2026-04-25 madrugada) — **Diseño Fase 0 Unificación Supabase + tabla asistente_log + plan Auth Google + 3 docs calculadora**: (1) `docs/PLAN_UNIFICACION_SUPABASE_FASE_0.md` — schema canónico SQL completo de las 36 tablas + scripts de migración con dedupe por CIF/NIF y CUPS + plan rollback + verificación post-migración (ahorra 2-3 días del sprint dedicado). (2) Tabla `crm_asistente_log` aplicada en Supabase + Edge Function actualizada para loggear preguntas (anonimizado, RGPD) — habilita métricas de uso + detección automática de gaps de doc. (3) `docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md` — plan paso a paso 6 fases (4-6h trabajo + comunicación + dual-mode + cleanup). (4) 3 docs help/ calculadora (captura facturas, análisis comparativo, generar propuesta) → 23 docs help/ totales. Pendiente urgente: backup Arsys (Claude web).
-
-## Sesión 2026-04-26 — Sprint autónomo 8 (Validación + Plan + Hardening drafts)
-
-**Contexto inicial**: sprint 7 dejó Fase 1 + FE refactor aplicados pero Juan pidió completar lo que quedase + validación + Fase 4-5. Carta blanca autónoma sin commits ni Fase 2 (passwords).
-
-### Acciones
-
-#### Refactor FE — completar refs legacy
-- ✅ `src/types/database.ts` actualizado: `RetailerOffer.retailer_id`→`comercializadora_id` + `RetailerOfferWithName.retailers`→`comercializadoras` (interface aliases).
-- ✅ Grep exhaustivo confirmó **0 refs legacy en `src/`** tras update. `calculator.ts` no necesita cambios (lee solo campos genéricos del offer). Tests no mockean tablas viejas.
-- ✅ Decisión `src/types/database.ts`: NO borrar — 8 archivos lo importan para tipos calculator-internos (`SupplyPoint`, `Powers`, `InvoiceData`, etc. que NO viven en BD).
-
-#### Validación compat views (red de seguridad)
-- ✅ SELECT counts cuadran: 6/6 retailers/comercializadoras, 0/0 ofertas, 29/29 precios.
-- ✅ INSERT vía view legacy `retailers` → trigger `legacy_retailers_insert` mapea a `comercializadoras` correctamente.
-- ✅ INSERT vía `retailer_offers` → trigger mapea `retailer_id`→`comercializadora_id`. Verificado: `comercializadora_id = 5e35c61e... (Iberdrola)` post-insert.
-- ✅ UPDATE vía view (incluyendo cambiar `retailer_id`) → auto-updatable de Postgres llega a tabla canónica.
-- ✅ DELETE vía view → 0 filas en tabla canónica post-delete. **FE legacy puede coexistir 100% sin tocar nada**.
-
-#### Plan Fases 4 y 5
-- ✅ `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` — runbook ejecutivo (~250 líneas):
-  - **Fase 4**: deploy CRM + smoke tests + decisión apps satélite (recomendación: views CRM en lugar de refactor masivo) + opción habilitar features Potencias en CRM (decisión producto pendiente).
-  - **Fase 5**: drop compat views + drop `proposals` + pausar proyecto Potencias + cleanup repo + hardening RLS + auditoría final + post-mortem.
-  - **Riesgo Storage**: PDFs en bucket Potencias — `client_documents.storage_path` apunta al bucket viejo. Requiere migración bucket o CDN compartida. **Pendiente decisión Juan**.
-  - **Estimación restante**: 5-7 días persona (vs 10-12 originales).
-
-#### RLS hardening draft
-- ✅ `supabase/migrations/_draft_rls_hardening_8_tables.sql` (prefijo `_draft_` no se auto-aplica). Sustituye las 8 USING(true) por 4 policies granulares cada una (select/insert/update/delete). Patrón: SELECT abierto a authed (info compartida), INSERT/UPDATE solo creador o manager+, DELETE solo manager+. Caso especial `alertas`: cualquier authed puede marcar leída.
-- 🟡 **Aplicar tras Fase 2 datos completa** para poder testear con usuarios reales.
-
-#### Inventory limpieza
-- ✅ `git ls-files` confirma archivos a borrar: `q`, `useAuth.ts`, dos `.txt`, `supabase-migration.sql`, `src/features/chat-ia/ChatIAPanel.tsx`, `supabase/functions/chat-consultor/{index.ts,README.md}`, `src/core/types/database_canonical_2026-04-26.ts` (duplicado idéntico, `diff -q` sin output).
-- ✅ Untracked (ya en .gitignore): `tsc_output.txt`, carpeta `CRM VALERE/` vacía. No requieren `git rm`.
-
-### Pendientes inmediatos para Juan
-
-1. **Ejecutar Fase 2 datos** (~30 min vía pg_dump+psql, protocolo en sprint 6/7).
-2. **Ejecutar script PowerShell de cierre** (sprint 5+6+7+8 acumulados): commits + git rm + push. Script en handoff sprint 7 todavía válido + adiciones del sprint 8 abajo.
-3. **Decisión storage PDFs Potencias**: ver `docs/PLAN_UNIFICACION_FASES_4_5_2026-04-26.md` §Riesgos.
-4. **Decisión apps satélite Opción A vs B**: separadas vs absorbidas por CRM. Ver §4.D del plan.
-5. **Sprint dedicado: aplicar `_draft_rls_hardening_8_tables.sql`** tras Fase 2 (rename a sin prefijo `_draft_` y aplicar via MCP).
-
-### Pendientes heredados
-- Backup Arsys (Claude web).
-- Refactor Potencias app a serverless (`docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md`).
-- Migración Auth → Google Identity.
-- Inventario Gemini cross-app (script PowerShell en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
-
-
-## Sesión 2026-04-26 (anterior) — Sprint autónomo 7 (Unificación Supabase Fase 1 + Fase 3 FE EJECUTADAS)
-
-**Contexto inicial**: sprint 6 dejó Fase 1 lista para aplicar, Fase 2 preparada, Fase 3 mapeada. Juan da OK y restricción dura: no Pro plan (sin branches). Pide ejecutar las 3 fases con la mejor estrategia de aislamiento posible sin coste.
-
-### Estrategia de aislamiento adoptada (sin Pro)
-
-Híbrida en 3 capas defensivas:
-1. **DDL (Fase 1)**: dry-run via `BEGIN…ROLLBACK` contra prod con verificación inline → aplicar via MCP `apply_migration` → rollback documentado.
-2. **Datos (Fase 2)**: schema `_potencia_staging` en CRM. Bridge cross-project intentado vía MCP (`row_to_json` desde Potencias → `jsonb_populate_recordset` en CRM). Funciona técnicamente (58 filas migradas) pero token-prohibitivo a 516 filas — pivotada a `pg_dump+psql` para Juan.
-3. **Snapshot full antes de COMMIT real**: delegado a Juan vía PowerShell (sin connection string en sandbox).
-
-### Acciones — Fase 1 ✅ APLICADA EN PROD
-
-- ✅ `apply_migration fase1_unificacion_renames_schema`:
-  - Renames: `retailers`→`comercializadoras` (6 filas), `retailer_offers`→`comercializadora_ofertas` (0 filas), `boe_regulated_prices`→`precios_regulados_boe` (29 filas).
-  - Rename FK col `retailer_id`→`comercializadora_id`.
-  - Add 7 cols a `precios_regulados_boe` (`tariff_type`, `rate_eur_kw_day`, `valid_from`, `valid_to`, `updated_by`, `updated_at`, `legacy_potencia_id`). Backfill 29/29 desde `tariff`/`price` legacy.
-  - **Decisión Juan**: `proposals` NO se dropea — queda viva hasta sprint FE consolide AnalisisPage/TrackingPage/PropuestasEnergiaPage bajo `propuestas` canónica.
-- ✅ `apply_migration fase1b_legacy_compat_views`: red de seguridad para que el FE legacy siga funcionando mientras se migra:
-  - `create or replace view retailers/retailer_offers/boe_regulated_prices` apuntando a las renombradas.
-  - `INSTEAD OF INSERT` triggers para que `useSupabaseMutation('retailers')` siga escribiendo.
-- ✅ `apply_migration fase1c_compat_views_security_invoker`: cierra los 4 ERRORs `security_definer_view` (también la vista heredada `crm_asistente_top_no_respondidas`). `set search_path = public` en functions legacy.
-- ✅ `apply_migration fix_normalizar_nombre_retailer_search_path`: search_path fijo en función residual del sprint 4.
-
-### Acciones — Fase 2 🟡 PREPARADA, JUAN EJECUTA
-
-- ✅ Schema `_potencia_staging` creado en CRM (16 tablas espejo Potencias).
-- ✅ Bridge cross-project demostrado funcional: 58 filas migradas vía MCP en una sesión de prueba (profiles, comercializadoras, regulated_rates, email_templates, comercializadora_docs, documentacion, clients).
-- ⏸️ **Bridge full vía MCP descartado** por consumo de contexto (cada tabla 30-100K tokens entre dump+insert). Para 516 filas restantes: token-prohibitivo en una sola sesión.
-- ✅ Staging vacío reset (drop schema) — Juan parte de fresh con `pg_dump+psql` siguiendo `scripts/unificacion_fase2_protocolo.md`.
-
-### Acciones — Fase 3 ✅ APLICADA (FE)
-
-- ✅ `src/features/admin/AdminPage.tsx`: 5 cambios. RetailersTab + OffersTab usan `comercializadoras`/`comercializadora_ofertas`. Form `retailer_id`→`comercializadora_id` (state, value, onChange). Nested select `retailers(name)`→`comercializadoras(name)`. Display `o.retailers?.name`→`o.comercializadoras?.name`.
-- ✅ `src/features/analisis/AnalisisPage.tsx`: 4 cambios. `from('retailer_offers')`→`from('comercializadora_ofertas')`, `select '*, retailers(name)'`→`select '*, comercializadoras(name)'`, `from('boe_regulated_prices')`→`from('precios_regulados_boe')`, `offer.retailers?.name`→`offer.comercializadoras?.name`.
-- ⏸️ **proposals** (decisión Juan): `AnalisisPage:248` `supabase.from('proposals').insert`, `TrackingPage`, `PropuestasEnergiaPage` — no tocados, tabla viva.
-- ✅ Tipos TS regenerados post-rename via `mcp__generate_typescript_types`. Reemplazado `src/core/types/database.ts` (3727 líneas — ahora con `comercializadoras`/`comercializadora_ofertas`/`precios_regulados_boe` como tablas reales + `retailers`/`retailer_offers`/`boe_regulated_prices` como views).
-
-### Cambios de seguridad y advisors
-
-- **Antes Fase 1**: 1 WARN (auth Pro) + N ERRORs sobre tablas vacías (no contaba).
-- **Después Fase 1+vistas**: 4 ERRORs (security_definer_view en compat views + heredada).
-- **Después fixes**: 0 ERRORs + 9 WARNs (8 RLS USING(true) heredados sprint 4 + auth Pro). Las RLS USING(true) son intencionales hasta que la Fase 2 datos esté completa y se pueda definir RLS granular por `comercial_id`/`asignado_a`.
-
-### Pendientes inmediatos para Juan
-
-1. **Ejecutar Fase 2 datos** vía PowerShell (`scripts/unificacion_fase2_protocolo.md`):
-   - Backups completos de los 2 proyectos (`pg_dump`).
-   - Recrear `_potencia_staging` en CRM (script `scripts/unificacion_fase2_a_staging.sql` o el migration `fase2a_staging_schema` ya aplicado — drop+recreate desde el script).
-   - `pg_dump --data-only` Potencias filtrado por las 16 tablas relevantes → load en `_potencia_staging`.
-   - Ejecutar `scripts/unificacion_fase2_b_dedupe_y_transform.sql` con ROLLBACK primero (validar counts, 0 orphans, 0 duplicados via `_c_verificacion.sql`).
-   - Si OK, repetir con COMMIT.
-2. **Revisar PR (cuando exista)**: el FE refactor + tipos canónicos van al PR #6 vía script PowerShell.
-3. **Smoke test manual**: tras refactor FE, login → Admin/Comercializadoras y Admin/Ofertas → Análisis → propuesta. Confirmar no roturas visibles.
-4. **Sprint futuro: drop legacy compat views** (`retailers`, `retailer_offers`, `boe_regulated_prices`) cuando esté seguro que no quedan refs.
-5. **Sprint futuro: tightening RLS** sobre las 7 tablas con `USING(true)`.
-6. **Sprint futuro: consolidar `proposals`** bajo `propuestas` canónica + drop tabla.
-
-### Pendientes heredados
-- Backup Arsys (Claude web).
-- Refactor Potencias app a serverless.
-- Migración Auth → Google Identity.
-- Inventario Gemini cross-app (script PowerShell en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
-- Sprint anterior pending: ejecutar el script PowerShell de cierre del sprint 5+6 (rm chat-ia + commit + push).
-
-
-## Sesión 2026-04-26 (anterior) — Sprint autónomo 6 (Unificación Supabase Fase 1+2 listas)
-
-**Contexto inicial**: Sprint 4 (madrugada) había diseñado el schema canónico Fase 0. Pendiente: ejecutar Fases 1-5 del plan unificación (~7-9d). Sprint 5 (mañana) verificó asistente RAG y dejó pendiente. Juan pide arrancar 6º sprint para iniciar la unificación de los 2 proyectos Supabase.
-
-### Acciones
-
-#### Audit y decisión arquitectónica
-- ✅ **Audit completo de los 2 proyectos** vía MCP. CRM (`gtphkowfcuiqbvfkwjxb`, eu-west-1, 36 tablas, datos test): empresas (3 test), cups (1 test), user_profiles (3), retailers (6), boe_regulated_prices (29). Potencias (`alesfvxqtwlrwlmkoosg`, eu-central-1, 18 tablas, **datos prod**): 30 clients (24 CIFs únicos, 6 dups internos), 75 supplies (72 CUPS únicos, 3 dups), 41 expedientes/ciclos/power_requests/savings_calc, 70 client_documents, 91 status_log, etc. = **~408 filas a migrar**.
-- ✅ **Hallazgo crítico**: la migration `unificacion_potencias_aditiva` del sprint 4 ya añadió en el CRM las 10 tablas que venían de Potencias (expedientes, ciclos, solicitudes_potencia, savings_calculations, comercializadora_docs, comunicaciones_cliente, alertas, email_templates, excel_import_templates, status_log). Todas vacías esperando datos.
-- ✅ **Decisión arquitectónica documentada**: migración **IN-PLACE sobre CRM** (no nuevo proyecto). Razones: CRM ya está en eu-west-1 (objetivo), schema casi completo, sin coste de proyecto nuevo, rollback trivial. Sprint pasa de 7-9d a ~3-5d gracias a esto.
-- ⏸️ **Branch Supabase** intentado pero requiere Pro plan ($25/mo). Pivotada estrategia: dry-run de migrations vía transacción ROLLBACK contra prod, archivos `.sql` en repo para Juan aplicar.
-
-#### Fase 1 — schema renames (lista para aplicar)
-- ✅ `supabase/migrations/20260426_fase1_unificacion_renames_schema.sql` (no aplicada todavía):
-  - Drop `proposals` (0 rows, residuo Calculadora pre-fusión).
-  - Renames: `retailers`→`comercializadoras`, `retailer_offers`→`comercializadora_ofertas`, `boe_regulated_prices`→`precios_regulados_boe`.
-  - Rename FK col `retailer_id`→`comercializadora_id`.
-  - Add columns a `precios_regulados_boe`: `tariff_type`, `rate_eur_kw_day`, `valid_from`, `valid_to`, `updated_by`, `updated_at`, `legacy_potencia_id`. Backfill 29/29 filas.
-- ✅ Validado vía `BEGIN…ROLLBACK` contra prod: 0 vistas/funciones referencian las tablas a renombrar (solo policies, que se auto-renombran con la tabla).
-
-#### Fase 2 — data import cross-proyecto (preparada, no ejecutada)
-- ✅ `scripts/unificacion_fase2_protocolo.md` — runbook PowerShell con backups + pg_dump + load + transform + verificación + plan rollback.
-- ✅ `scripts/unificacion_fase2_a_staging.sql` — schema `_potencia_staging` con 18 tablas espejo de Potencias.
-- ✅ `scripts/unificacion_fase2_b_dedupe_y_transform.sql` (~400 líneas) — funciones `norm_cif/cups/nombre`, 7 tablas mapping legacy→canonical, dedupe interno+vs CRM, FK re-mapeadas. Polimórfico documentos (consolidación de 3 tablas Potencias en una `documentos`). Todo en transacción única.
-- ✅ `scripts/unificacion_fase2_c_verificacion.sql` — counters esperados, integridad, duplicados, mapping cardinality.
-- 🟡 **NO ejecutados**: requieren backups completos + connection strings de los 2 proyectos + decisión de Juan (operación destructiva sobre prod).
-
-#### Fase 3 — refactor FE (mapeado, no ejecutado)
-- ✅ `docs/REFACTOR_FE_FASE3_2026-04-26.md` — mapping antes/después + 8 archivos a tocar:
-  - `src/features/admin/AdminPage.tsx` (3 refs + uso de `retailer_id`).
-  - `src/features/analisis/AnalisisPage.tsx` (3 refs).
-  - `src/features/tracking/TrackingPage.tsx`, `src/features/propuestas-energia/PropuestasEnergiaPage.tsx` (1 ref cada uno, sobre `proposals` — caso especial: decidir consolidar bajo `propuestas` canónica o conservar `proposals` viva).
-  - `src/types/database.ts` y `src/core/types/database.ts` (regenerar tras Fase 1).
-- ✅ Recomendación documentada: **comentar el `DROP TABLE proposals`** en Fase 1 hasta limpiar el FE, así no se rompe nada al aplicar.
-
-#### Tipos TS canónicos
-- ✅ `src/core/types/database_canonical_2026-04-26.ts` (115KB, 3520 líneas) — generado vía MCP desde el estado actual del CRM. Incluye las tablas Potencias añadidas en sprint 4. Reemplaza `database.ts` cuando Juan haga sprint FE refactor (después de Fase 1 aplicada — regenerar entonces para que aparezcan los nombres canónicos `comercializadoras`/`comercializadora_ofertas`/`precios_regulados_boe`).
-
-### Lo que NO hizo este sprint (y por qué)
-
-- ❌ **Aplicar Fase 1 en prod** — el sprint dijo "operaciones destructivas en prod sin rollback claro" requieren tu OK. Aunque la migration es reversible, prefiero entregar el SQL y que tú decidas el momento. Aplicación: `mcp__apply_migration` o `psql` desde PowerShell.
-- ❌ **Ejecutar Fase 2** — requiere connection strings y backups previos (no disponibles en sandbox).
-- ❌ **Ejecutar Fase 3 (FE refactor)** — depende de Fase 1 estar aplicada y de la decisión sobre `proposals`. Trabajo de 1-2 días persona.
-- ❌ **Branch Supabase para test** — Pro plan requerido.
-
-### Pendientes inmediatos para Juan
-
-1. **Revisar `supabase/migrations/20260426_fase1_unificacion_renames_schema.sql`**. Si OK:
-   - Decidir si conservar tabla `proposals` (comentar el `drop`) o limpiarla — depende de si quieres limpiar el FE en este sprint o el siguiente.
-   - Aplicar via `psql` o desde Supabase Dashboard SQL Editor.
-2. **Ejecutar protocolo Fase 2** (`scripts/unificacion_fase2_protocolo.md`):
-   - `pg_dump` backup de los 2 proyectos.
-   - `pg_dump --data-only` Potencias.
-   - Cargar staging → run transform → verificar.
-   - Esto es el grueso (1-2 horas).
-3. **Sprint FE refactor** (`docs/REFACTOR_FE_FASE3_2026-04-26.md`) — 1-2 días persona.
-4. **Apuntar Potencias y Excedentes apps al CRM** (cambio env vars + tests). Día 4-5.
-5. **Limpieza Fase 5**: tras 1 semana estable, pausar/borrar proyecto Potencias.
-
-### Pendientes heredados (sin tocar hoy)
-- ⏳ Backup Arsys terminando (Claude web).
-- ⏳ Refactor Potencias app a serverless (`docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md`).
-- ⏳ Migración Auth → Google Identity (cuando Workspace estable).
-- ⏳ Inventario Gemini cross-app (script en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
-- ⏳ Ejecutar script PowerShell sprint 5 (rm chat-ia + commit + push PR #6).
-
-
-## Sesión 2026-04-25 (mañana) — Sprint autónomo 5 (verificación + sync + inventario)
-
-**Contexto inicial**: Juan pide arrancar 5º sprint autónomo, prioridades (1) activación operativa asistente RAG, (2) commit + push sprint 4 al PR #6, (3) inventario Gemini cross-app, (4) si margen: chat-ia huérfano + limpieza raíz. Repositorio con corrupción Windows en `.git/` (null bytes en config/HEAD/refs + index.lock huérfano). Working tree con ruido CRLF/LF (no real).
-
-### Acciones
-- ✅ **Reparada corrupción git**: stripped null bytes de `.git/config`, `HEAD`, `packed-refs`, todos los `refs/`, `ORIG_HEAD`, `FETCH_HEAD`. Movido `index.lock` huérfano + `index` corrupto, reconstruido con `git reset`. `.git/config.lock` y `HEAD.lock` que aparecieron tras un `git switch` fallido también renombrados. Git lee bien ahora; las escrituras siguen fallando ocasionalmente por ACLs Windows → commits delegados a PowerShell de Juan (patrón ya establecido).
-- ✅ **Asistente RAG verificado end-to-end**:
-  - Edge Function `ask-crm-docs` v9 ACTIVE en Supabase (vía `mcp__list_edge_functions`).
-  - Código desplegado incluye `logAsistente()` del sprint 4.
-  - Tabla `crm_help_embeddings`: **216 chunks** indexados (pipeline ya ejecutado al menos una vez).
-  - Tabla `crm_asistente_log`: **12 consultas reales** hoy 2026-04-25 entre 10:49-11:02 UTC, todas con `encontrada_respuesta=true`, `num_chunks=5`, similarities 0.56-0.90, durations 1.2-10s, provider=gemini.
-  - Edge logs: ~13 POSTs en v9, mayoría 200, 1 transient 500 a las 11:02 UTC (siguientes peticiones recuperan).
-- ✅ **Drift repo↔deployed corregido en `supabase/functions/_shared/ai-adapter.ts`**:
-  - `text-embedding-004` → `gemini-embedding-001` con `outputDimensionality: 768` (modelo deprecado para cuentas nuevas en abril 2026).
-  - `gemini-2.0-flash` → `gemini-2.5-flash` (idem).
-  - Si no se sincroniza, el siguiente redeploy desde repo regresaría a modelos rotos.
-- ✅ **Inventario Gemini valere-v2** completo en `docs/INVENTARIO_GEMINI_2026-04-25.md`:
-  - 5 ubicaciones, todas server-side (Edge Functions + script CI). `ChatIAPanel.tsx` invoca Edge Function (no expone key).
-  - Cero exposición en bundle frontend de valere-v2.
-- 🟡 **Inventario apps satélite pendiente** — sandbox no tiene mounted los repos `valere-gestion-potencias`, `valere-gestion-excedentes`, `valere-gestion-energetica`. Script PowerShell preparado en el inventario para que Juan lo cierre en 30 segundos.
-- ✅ **Decisión `chat-ia` huérfano**: **eliminar**. `src/features/chat-ia/ChatIAPanel.tsx` no tiene ningún import en `src/`. `chat-consultor` Edge Function en Supabase (v7 ACTIVE) inalcanzable. Asistente RAG cubre la función con doc grounding (sin hallucinations). Reduce attack surface de `GEMINI_API_KEY`. Comandos `rm` y delete Edge Function preparados en handoff.
-- 🟡 **Commit + push al PR #6 pendiente** — sandbox no puede commitear (las escrituras a `.git/` corrompen por ACLs Windows). Script PowerShell completo preparado en el handoff (incluye reset CRLF noise + add nuevos archivos + delete + commit + push). Verificado que `public/_redirects`, `docs/PLAN_UNIFICACION_SUPABASE_FASE_0.md`, `docs/PLAN_MIGRACION_AUTH_GOOGLE_IDENTITY.md`, `supabase/migrations/20260425_asistente_log.sql` **ya están en `origin/claude/docs-cierre-2026-04-23`** (sprint 4 ya pusheado).
-
-### Entregables nuevos del sprint
-- `docs/INVENTARIO_GEMINI_2026-04-25.md` — inventario completo + script PowerShell satélite + estrategia revocación.
-- `supabase/functions/_shared/ai-adapter.ts` — modelos actualizados para no regresionar al redeploy.
-- `.cowork/outbox/2026-04-25T<TS>-sprint-autonomo-5-rag-verificado-y-sync.md` — handoff con script PowerShell de cierre.
-
-### Pendientes inmediatos para Juan (PowerShell, ~10-15 min)
-1. Cerrar inventario Gemini en apps satélite (script en `docs/INVENTARIO_GEMINI_2026-04-25.md`).
-2. Ejecutar script de cierre del sprint 5 (limpieza + delete chat-ia + commit + push).
-3. Borrar Edge Function `chat-consultor` desde Supabase Dashboard (MCP no expone delete).
-4. Confirmar (vía Dashboard) qué key concreta está como `GEMINI_API_KEY` en Supabase secrets — esa es la que NO se puede revocar.
-
-### Pendientes heredados (sin tocar hoy)
-- ⏳ Backup Arsys terminando (Claude web).
-- ⏳ Refactor Potencias a serverless (`docs/PLAN_MIGRACION_POTENCIAS_CLOUDFLARE.md`) — bloquea revocación segura keys Gemini.
-- ⏳ Migration unificación `oportunidades.etapa` (`ganada` vs `cerrada_ganada`).
-- ⏳ Sprint dedicado Unificación Supabase (7-9d con Fase 0 lista).
-- ⏳ Migración Auth → Google Identity (4-6h cuando Workspace estable).
-- ⏳ Subir excedentes Drive a GitHub (agente browser).
-
-
-## Sesión 2026-04-24 (tarde) — Migración Cloudflare + 2ª fuga de credencial
-
-**Contexto inicial**: cuenta Vercel `valere-consultores` suspendida por billing. `valere-v2.vercel.app` caído. Compañeros de Valere usan el CRM en pre-producción para feedback.
-
-### Acciones
-- ✅ **Migración a Cloudflare Pages**: nuevo deploy en https://valere-v2.pages.dev. Build OK en 28s. Sin cambios en código (Vite SPA puro, no había dependencias Vercel-specific).
-- ✅ Añadido `public/_redirects` (`/* /index.html 200`) para SPA routing en Cloudflare. **Pendiente de commitear al PR #6**.
-- ✅ Env vars copiadas: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (las 2 únicas que el código usa según grep `import.meta.env`).
-- ⚠️ **Hallazgo clave: `VITE_GEMINI_API_KEY` estaba en Vercel** y se copió por error a Cloudflare. Análisis del código (`grep -rn VITE_GEMINI_API_KEY src/`) confirmó que **no se usa en ningún sitio** — es residual del frontend pre-FASE 20.8. Eliminada de Cloudflare (Production + Preview) + redeploy.
-- ⚠️ **Hallazgo crítico: el chat IA es código huérfano**. `ChatIAPanel.tsx` existe en `src/features/chat-ia/` y la Edge Function `chat-consultor` está ACTIVE v2 en Supabase (verificado vía MCP), pero **no hay `<Route path="/chat-ia">` en `App.tsx` ni link en Sidebar**. Inaccesible para los usuarios desde el refactor 20.8 — probablemente nunca se cableó la ruta.
-- ⏸️ **Revocación Gemini PAUSADA por riesgo cross-app**: las 2 keys (`...R_Vs` y `...wqag`) están en proyecto Google "Default Gemini Project" de cuenta `valereconsultores.com`. Antes de revocar hay que **inventariar qué otras apps de Valere las usan** — `valere-gestion-potencias`, `valere-gestion-excedentes`, `valere-gestion-energetica` podrían depender de alguna. Plan ajustado abajo.
-
-### Fugas cerradas en esta sesión
-| Credencial | Origen | Estado anterior | Acción |
-|-----------|--------|----------------|--------|
-| `RESEND_API_KEY` (proyecto valere-gestion-potencias) | Expuesta en chat 2026-04-23 | activa | Revocada en Resend, key nueva creada |
-| `VITE_GEMINI_API_KEY` (CRM frontend) | Expuesta en bundle público desde antes del refactor 20.8 | activa, abusable vía DevTools | Eliminada de Cloudflare + ambas keys de Google AI Studio revocadas + secret Supabase eliminado |
-
-### Pendientes inmediatos (próximas 48h)
-- ⏳ **Commit + push del `public/_redirects`** al PR #6 (Juan via PowerShell).
-- ⏳ **Avisar a compañeros de Valere** del nuevo URL `valere-v2.pages.dev`.
-- ⏳ **Dejar Vercel 1-2 días** antes de bajar a Hobby / borrar proyectos. Por si hay que rollback.
-- ⏳ **Inventario Gemini cross-app** antes de revocar las 2 keys: revisar `valere-gestion-potencias`, `valere-gestion-excedentes`, `valere-gestion-energetica` por uso de Google Generative AI / Gemini API. Solo después decidir qué keys son zombies y cuáles vivas.
-- ✅ Eliminar secret `GEMINI_API_KEY` de Supabase (CRM) — seguro, sin afectar otras apps.
-
-### Pendientes heredados (sin tocar hoy)
-- ⏳ Investigar repo privado `jolivares-valere/valere-gestion-energetica`.
-- ⏳ Borrar carpeta vacía `CRM VALERE/` en raíz Windows.
-- ⏳ Migration unificación `oportunidades.etapa` (`ganada` vs `cerrada_ganada`).
-- ⏳ **Decidir destino del chat-ia huérfano**: cablear ruta + Sidebar, o eliminar feature completa. Mientras tanto código zombie en `src/features/chat-ia/`.
-- ⏳ PR #6 pendiente de merge.
-
-
-## Sesión 2026-04-24 (mañana) — Limpieza merge huérfano + PR #6 docs
-
-
-## Sesión 2026-04-24 — Limpieza merge huérfano + PR #6 docs
-
-**Rama:** `claude/docs-cierre-2026-04-23` → PR #6 abierto contra main.
-
-### Qué pasaba
-Working tree de Cowork tenía un `git merge` de `origin/main` (`ef3aa68`) en `claude/mcp-setup` (`5a7590e`) **a medio cerrar**: 6 lock files huérfanos (`.git/index.lock`, `HEAD.lock`, `ORIG_HEAD.lock`, `refs/heads/claude/mcp-setup.lock`) que el sandbox no podía borrar (`Operation not permitted` por mount Windows), 198 ficheros mostrados como "modified" que en realidad eran 100% ruido CRLF/LF (mismo nº de inserciones que de borrados línea a línea), y 3 docs sin commitear de la sesión cowork del día anterior.
-
-Como PR #5 ya se había mergeado a main por **squash** (`ef3aa68`), `claude/mcp-setup` y `origin/main` contenían exactamente el mismo código — la rama local quedaba obsoleta.
-
-### Acciones
-- ✅ `mcp__cowork__allow_cowork_file_delete` para desbloquear los locks → `rm -f` los 6 lock files.
-- ✅ `git merge --abort` + `git checkout -- .` → working tree limpio (sólo 3 untracked docs reales).
-- ✅ Rama nueva `claude/docs-cierre-2026-04-23` desde `origin/main` (ef3aa68) con los 3 docs.
-- ✅ Commit `68720bd` + push + **PR #6** abierto (`docs: cierre sesión 2026-04-23 + planning apps satélite`).
-- ✅ Rama local `claude/mcp-setup` borrada (estaba squash en main).
-
-### Docs commiteados en PR #6
-- `docs/PLANNING_APPS_SATELITE.md` (12.9 KB)
-- `docs/SCRIPT_SUBIR_POTENCIAS_A_GITHUB.md` (8.8 KB)
-- `docs/SESIONES/2026-04-23-cierre-tarde.md` (4.2 KB)
-
-### Pendientes que siguen vivos (de sesión 2026-04-23)
-- ⏳ Regenerar `RESEND_API_KEY` (expuesta en chat).
-- ⏳ Investigar repo privado `jolivares-valere/valere-gestion-energetica`.
-- ⏳ Borrar carpeta vacía `CRM VALERE/` en raíz del clone Windows.
-- ⏳ Migration unificación `oportunidades.etapa` (`ganada` vs `cerrada_ganada`).
-- ⏳ Activar Pro plan Supabase cuando se escale.
-- ⏳ Cerrar PR #6 (mergear cuando CI pase).
-
-
-## Sesion 2026-04-23 — MCPs + hardening seguridad
-
-**Rama:** claude/mcp-setup (PR #5 abierto -> main).
-
-### Hitos
-- Supabase MCP conectado desde Cowork - operativo contra gtphkowfcuiqbvfkwjxb
-- Vercel MCP conectado desde Cowork
-- GitHub fuera de MCP (decision opcion b) - gh CLI instalado localmente
-- Migration fase28_6_rls_policies_cleanup aplicada
-- Migration fase28_7a_views_security_invoker aplicada (8 ERRORs cerrados)
-- Migration fase28_7b_rls_policies_tightening aplicada (15 WARNs cerrados)
-- Migration fase28_7c_functions_search_path aplicada (6 WARNs cerrados)
-- Auth password hardening: minimum length 12 + mixed complexity
-- docs/ARQUITECTURA_PROYECTOS.md nuevo
-- docs/SEGURIDAD.md nuevo
-- docs/MCP_SETUP.md actualizado a opcion b
-
-### Advisors Supabase: 34 -> 1
-Solo queda auth_leaked_password_protection WARN - requiere Pro plan, mitigado.
-
-### Pendientes abiertos
-- Localizar repo valere-gestion-potencias
-- Carpeta CRM VALERE/ vacia en mount Cowork - borrar o reutilizar
-- Activar Pro plan cuando se escale
-- PR #5 pendiente de merge cuando CI pase
-
-
-## Sesión 2026-04-23 — MCPs + hardening seguridad
-
-**Rama:** `claude/mcp-setup` (PR #5 abierto → main).
-
-### Hitos
-- ✅ Supabase MCP conectado desde Cowork — `list_projects`, `execute_sql`, `apply_migration`, `get_advisors` operativos contra `gtphkowfcuiqbvfkwjxb`
-- ✅ Vercel MCP conectado desde Cowork
-- ✅ GitHub fuera de MCP (decisión "opción b") — `gh` CLI instalado localmente; `.mcp.json` sólo tiene supabase + vercel
-- ✅ Migration `fase28_6_rls_policies_cleanup` aplicada (notificaciones granular + drop policies duplicadas custom_fields)
-- ✅ Migration `fase28_7a_views_security_invoker` aplicada (8 vistas → SECURITY INVOKER, 8 ERRORs cerrados)
-- ✅ Migration `fase28_7b_rls_policies_tightening` aplicada (9 policies granularizadas, 15 WARNs cerrados)
-- ✅ Migration `fase28_7c_functions_search_path` aplicada (6 funciones con search_path fijo, 6 WARNs cerrados)
-- ✅ Auth password hardening en dashboard: minimum length 12 + lowercase/uppercase/digits/symbols
-- ✅ `docs/ARQUITECTURA_PROYECTOS.md` nuevo — mapea CRM + valere-gestion-potencias + futuras apps satélite
-- ✅ `docs/SEGURIDAD.md` nuevo — registro de decisiones de seguridad (incluye decisión de no upgrade a Pro por leaked password protection)
-- ✅ `docs/MCP_SETUP.md` actualizado para opción b (GitHub vía gh, no MCP)
-
-### Advisors Supabase: 34 → 1
-Solo queda `auth_leaked_password_protection` WARN — requiere Pro plan, mitigado con password length + complexity. Decisión documentada en `docs/SEGURIDAD.md` §1.
-
-### Pendientes abiertos
-- Localizar repo de `valere-gestion-potencias` (búsqueda GitHub jolivares-valere devuelve solo valere-v2 público → repo privado o local sin subir)
-- Carpeta `CRM VALERE/` vacía en mount Cowork — borrar o reutilizar
-- Activar Pro plan cuando se escale (desbloquea leaked password protection + PITR)
-- PR #5 `claude/mcp-setup` pendiente de merge cuando CI pase
-
-
-
-## Rama de desarrollo
-
-`claude/valere-crm-architecture-2vvEV` — PR #1 abierto → main.
-HEAD actual: `f0ac5fa`. 27 commits desde la última actualización de este fichero.
-
-## Resumen ejecutivo
-
-CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). **27 fases del roadmap completadas + FASE 28 completa (3 ejes) + FASE 28.1–28.5 hardening y polish**. TSC 0 errores · 39/39 tests · build OK.
-
-**Audit completo 2026-04-19:** 0 P0 pendientes · 0 P1 pendientes. Consolidado en `docs/AUDIT_2026-04-19.md`.
-
-**DROP legacy ejecutado 2026-04-21**: Cowork dropeó `clients` y `supply_points` en Supabase (datos de PAZ Y BIEN test migrados a empresas). `proposals` (EN) se queda — la usa activamente AnalisisPage/PropuestasEnergiaPage/TrackingPage.
-
-## Commits (sesiones 2026-04-20 y 2026-04-21)
-
-### FASE 28 — Personalización + Eje 1/2/3 (2026-04-20 AM)
-
-| Commit | Qué hace |
-|--------|----------|
-| `a29ac79` | FASE 28.1 — Refactor 4 features Calculadora → cups/empresas/facturas (adapter pattern) |
-| `4aaf82f` | FASE 28 Eje 2 — Dashboards por rol (useDashboardScope + badge visual) |
-| `f28d9a3` | FASE 28 Eje 1 — Custom fields (useCustomFields, CustomFieldsPanel, CustomFieldsManager, tab "campos" en empresas y oportunidades) |
-| `abff85a` | FASE 28 Eje 3 — Automatizaciones (oportunidad ganada → borrador contrato; contrato activado → tarea 30d) |
-| `f51bfc8` | Hardening: role gating /admin, focus trap ConfirmDialog, CSP meta tag |
-| `be8585b` | FASE 28.2 fixes post-test Cowork: slug custom fields, profileLoaded flag (fix BUG 5 /admin directo), encoding â€" → —, migration SQL con RLS policies + recrear FKs a user_profiles |
-| `2df6d7e` | FASE 28.3: fix automatización ganada→contrato con canonicalEtapa, logger con serializeError (elimina [object Object]), +11 tests (17→28) |
-| `29d2eff` | FASE 28.4: eliminar etapas legacy del form de oportunidades; normalizarEtapa() convierte legacy→canónica al cargar |
-| `c9e2594` | CI de GitHub Actions (tsc + test + build) + ESTADO.md |
-| `a40634e` | Persistir fix get_user_rol() (master/manager → admin) en migration fase28.2 |
-| `6c5d9aa` | Handoff doc `docs/HANDOFF_2026-04-20.md` |
-| `9f22a8c` | Informe de diseño `docs/DESIGN_REVIEW_2026-04-20.md` (hallazgos priorizados en 3 sprints) |
-| `79a7b6b` | Referenciar informe de diseño desde handoff |
-
-### Integración Datadis + sistema multi-agente (2026-04-22 Cowork)
-
-| Commit | Qué hace |
-|--------|----------|
-| `29b3e97` | Sprint 2 parte 3: skeleton DatosPage facturas + ESTADO.md |
-| `8073c71` | feat(agentes): sistema multi-agente + CLAUDE.md actualizado + Datadis integration (service, hooks, panel, migration) |
-
-### Sprint 2 visual (2026-04-22 autónomo)
-
-| Commit | Qué hace |
-|--------|----------|
-| `0c6eea2` | Sprint 2 parte 1: toasts faltantes (useUpdateEtapa, useToggleTareaCompletada, useMarcarTodasLeidas) + skeletons en PropuestasEnergiaPage y TrackingPage + badges inline de ActividadesPage y Dashboard → StatusBadge + eliminar interface `Client` legacy (0 consumidores tras DROP) |
-| `3422117` | Sprint 2 parte 2: skeletons en AdminPage (3 tabs) + CustomFieldsManager |
-| `TBD` | Sprint 2 parte 3: skeleton en DatosPage listado de facturas + actualización ESTADO.md |
-
-### FASE 28 continuación — Sprint 1 A11y + Sprint 2 visual + DROP legacy (2026-04-21)
-
-| Commit | Qué hace |
-|--------|----------|
-| `5b7d0ff` | Sprint 1 accesibilidad: 5 confirm() nativos → ConfirmDialog, aria-labels + focus-visible, bonus OffersTab con confirmación |
-| `b1169f5` | README deploy Edge Function `chat-consultor` (código ya hardeniado: JWT + CORS + validación) |
-| `f855890` | +11 tests de hooks (useAutomatizaciones + useCustomFields, total 28→39) + dashboard tokens valere (bg-valere-blue vs bg-blue-500 decorativos) |
-| `359a0fb` | BUG 6 (fecha display) + aria-labels contextuales en contactos/contratos/incidencias/renovaciones/documentos + NotificationBell aria-expanded/haspopup |
-| `6905bd4` | `docs/LEGACY_TABLES_KILL_LIST.md` + test refuerzo BUG 6 (fecha_actividad ≠ fecha_vencimiento) |
-| `d665f24` | Frontend pre-DROP: elimina fallback `supply_points?.clients?.company_name` en TrackingPage y PropuestasEnergiaPage |
-| `397fdc1` | **TAREA 2 unificación visual**: rounded-md/lg → rounded-xl en 11 features CRM, H1 homologados al estilo Calc, StatusBadge genérico con 7 variantes semánticas, migración de EstadoBadge + IncidenciasPage + RenovacionesPage |
-| `d90a97a` | BUG 7 migration SQL (FK eventos.asignado_a — fallará y se corrige en f0ac5fa) + rounded-md residuales (ExportButton, Sidebar, ConfirmDialog, LoginPage, GlobalSearch, Skeleton, DocumentosTab) |
-| `7f38b2b` | Post-DROP: limpiar tipos TS (`src/core/types/database.ts` -145 líneas, 0 refs a clients/supply_points) |
-| `f0ac5fa` | **BUG 7 corregido**: la columna real es `usuario_id` (no `asignado_a`). Migration + interface Evento + useEventosEnRango + EventoForm alineados al schema real |
-
-## Fases completadas (27/27 + FASE 28)
-
-*(FASE 20–27 igual que antes)*
-
-### FASE 28 — Personalización ✅
-
-| Eje | Descripción | Estado |
-|-----|-------------|--------|
-| **28.1** | Refactor 4 features Calculadora → `cups/empresas/facturas` | ✅ |
-| **Eje 2** | Dashboards por rol: `useDashboardScope` filtra por `comercial_id`; master/manager ven todo; badge visual en header | ✅ |
-| **Eje 1** | Custom fields: admin define campos por entidad (empresa/oportunidad/contacto/contrato); comerciales rellenan en la ficha | ✅ |
-| **Eje 3** | Automatizaciones: oportunidad `cerrada_ganada` → auto-borrador contrato; contrato `activo` → auto-tarea seguimiento 30d | ✅ |
-
-## Hardening aplicado (2026-04-20)
-
-| Mejora | Archivo | Estado |
-|--------|---------|--------|
-| Role gating `/admin` — solo `master`/`manager` | `App.tsx`, `Sidebar.tsx` | ✅ |
-| Focus trap en ConfirmDialog (Tab cíclico, restore foco) | `ConfirmDialog.tsx` | ✅ |
-| CSP meta tag (default-src 'self', Supabase WSS, Fonts, Gemini) | `index.html` | ✅ |
-
-## Archivos clave nuevos (FASE 28)
-
-| Archivo | Propósito |
-|---------|-----------|
-| `src/core/hooks/useCustomFields.ts` | CRUD hooks para custom_fields_schema + values |
-| `src/core/hooks/useAutomatizaciones.ts` | useCrearContratoDesdeOportunidad + useCrearTareaDesdeContrato |
-| `src/core/components/CustomFieldsPanel.tsx` | Render/edit genérico para valores de campos personalizados |
-| `src/features/admin/components/CustomFieldsManager.tsx` | UI admin para definir campos personalizados por entidad |
-| `src/core/energia/adapters.ts` | cupsToSupplyPoint, supplyPointFormToCupsPayload, empresaToClient |
-
-## Pendientes (NO bloqueantes)
-
-| Tarea | Bloqueador | Urgencia |
-|-------|-----------|---------|
-| ~~Ejecutar SQL fase28.5 corregido (FK eventos_usuario_id_fkey, BUG 7)~~ | ~~Cowork aplicó 2026-04-21 y verificó end-to-end~~ | ✅ Cerrado |
-| ~~Sprint 2 del informe de diseño: toasts + skeletons + badges inline~~ | ~~Aplicado 2026-04-22 (commits 0c6eea2, 3422117)~~ | ✅ Cerrado |
-| ~~Policies granulares para `notificaciones`~~ | ~~Migration `fase28.6` preparada~~ | ✅ Ejecutado en Supabase 2026-04-22 |
-| ~~Retirar policies duplicadas `cfs_admin/cfv_admin`~~ | ~~Incluido en `fase28.6`~~ | ✅ Ejecutado en Supabase 2026-04-22 |
-| ~~Integración Datadis~~ | ~~Migration + service + hooks + panel~~ | ✅ Completo 2026-04-22 |
-| Regenerar tipos TypeScript con `supabase gen types` automático | Requiere `SUPABASE_ACCESS_TOKEN` en harness | Baja |
-| Deploy Edge Function `chat-consultor` | CLI: `supabase functions deploy chat-consultor` + secrets GEMINI_API_KEY/ALLOWED_ORIGIN | Media |
-| ~~Retirar policies duplicadas `cfs_admin/cfv_admin` (duplicado arriba)~~ | Incluido en `fase28.6` | ✅ Código listo |
-| Tipos legacy `Client`/`SupplyPoint` en `src/types/database.ts` | Sin consumidores tras el DROP; eliminar en sprint dedicado | Baja |
-| Testar CSP en dev (`npm run dev`) | Si algo falla: aflojar `connect-src` o `script-src` | Baja |
-
-## Acciones completadas esta semana (2026-04-20/21)
-
-- ✅ FASE 28 Eje 1 (Custom fields), Eje 2 (Dashboards por rol), Eje 3 (Automatizaciones)
-- ✅ Sprint 1 a11y del informe de diseño (ConfirmDialog, aria-labels, focus-visible)
-- ✅ TAREA 2 escuela visual rounded-xl unificada + H1 homologados + StatusBadge genérico
-- ✅ DROP `clients` + `supply_points` ejecutado por Cowork en Supabase (2026-04-21)
-- ✅ Tipos TS limpiados post-DROP (-145 líneas en database.ts)
-- ✅ Migration fase28.2: RLS policies para custom_fields + recrear FKs a user_profiles
-- ✅ Fix get_user_rol() persistido en migration (master/manager → admin)
-- ✅ CI GitHub Actions (tsc + test + build en cada push)
-- ⏳ Migration fase28.5: BUG 7 FK eventos.usuario_id — SQL corregido, pendiente ejecución por Cowork
-
-## Re-test Cowork 2026-04-20 (tras aplicar fase28.2 SQL)
-
-| Bloque | Estado |
-|--------|--------|
-| A — Custom fields (crear/editar/guardar/toggle) | ✅ PASA (tras fix RLS adicional: get_user_rol() mapea master/manager → 'admin') |
-| B — Automatización ganada→contrato | ⚠️ Pendiente re-test tras commit 2df6d7e (canonicalEtapa fix) |
-| B — Automatización contrato activo→tarea | ⚠️ Pendiente (depende de B.1) |
-| C — Dashboard badge vista global/personal | ✅ PASA |
-| D — /admin directo URL | ✅ PASA (tras commit be8585b profileLoaded) |
-| D — CSP sin errores en consola | ✅ PASA |
-| Extra — BUG 2 slug autogenera `sector_empresa` | ✅ PASA |
-| Extra — encoding placeholders `—` en lugar de `â€"` | ✅ PASA |
-
-### Fix RLS aplicado por Cowork (PERMANENTE, excelente)
-
-```sql
--- Hace que master/manager hereden permisos de admin en las 20 policies existentes
--- sin tocarlas una a una. También beneficia a policies futuras.
-CREATE OR REPLACE FUNCTION public.get_user_rol() RETURNS text
-LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT CASE
-    WHEN (SELECT role FROM user_profiles WHERE id = auth.uid()) IN ('master', 'manager') THEN 'admin'
-    ELSE (SELECT role FROM user_profiles WHERE id = auth.uid())
-  END;
-$$;
-```
-
-## Estado de las tablas
-
-| Tabla | Estado | Notas |
-|-------|--------|-------|
-| `user_profiles` | ✅ activa | Canónica |
-| `empresas` | ✅ activa | |
-| `cups` | ✅ activa | |
-| `facturas` | ✅ activa | Renombrada de invoice_history |
-| `clients` | ❌ DROPPED | Cowork 2026-04-21. Fallback eliminado en frontend previamente. |
-| `supply_points` | ❌ DROPPED | Cowork 2026-04-21. Ídem. |
-| `proposals` (Calc EN) | ✅ activa | NO dropear: uso activo en AnalisisPage (insert) + PropuestasEnergiaPage/TrackingPage (listados). Vacía en prod hoy. |
-| `custom_fields_schema` | ✅ activa | UI implementada en admin |
-| `custom_fields_values` | ✅ activa | UI implementada en fichas. Unique index (schema_id, entidad_id) en fase28.2 |
-| `contratos` | ✅ activa | |
-| `oportunidades` | ✅ activa | |
-| `incidencias` | ✅ activa | |
-| `renovaciones` | ✅ activa | |
-| `actividades` | ✅ activa | |
-| `documentos` (tabla + bucket) | ✅ activa | |
-| `eventos` | ✅ activa | Columna real: `usuario_id` (no `asignado_a` como asumió el código originalmente). FK pendiente de aplicar con fase28.5. |
-
-## Migrations aplicadas en Supabase
-
-- `20260418_fase20.9_rls_granular.sql`: RLS granular para 11 tablas CRM, helper `is_manager_or_above()`.
-- `20260419_fase28_1b_cups_id_fk.sql`: `cups_id` FK en facturas y proposals (FASE 28.1).
-- `20260420_fase28_2_fixes_rls_fks.sql`: RLS custom_fields, recrear FKs a user_profiles (16 tablas), mapeo `get_user_rol()` → 'admin' para master/manager. ✅ Cowork aplicó 2026-04-20.
-- DROP manual: `clients`, `supply_points` + 2 DELETE previos del registro PAZ Y BIEN test. ✅ Cowork aplicó 2026-04-21. 60 → 52 policies tras CASCADE.
-- `20260421_fase28_5_fk_eventos_asignado_a.sql`: FK `eventos.usuario_id` → `user_profiles(id)` (corrigió asunción inicial de `asignado_a`). ✅ Cowork aplicó 2026-04-21. BUG 7 cerrado end-to-end (verificado `/calendario` sin PGRST200).
-- `20260422_fase28_6_rls_policies_cleanup.sql`: policies granulares para `notificaciones` + limpieza de policies duplicadas. ✅ Ejecutado en Supabase 2026-04-22.
-- `20260422_datadis_integracion.sql`: columnas datadis_* en cups + tabla datadis_tokens + tabla datadis_consumptions + RLS granular. ✅ Ejecutado en Supabase 2026-04-22.
-
-## Cómo arrancar una nueva sesión
-
-### Claude Code (CLI/Desktop)
-```bash
-cd ~/valere-v2 && claude -c
-```
-
-### Claude Cowork (Web — claude.ai/code)
-```
-Trabajas en valere-v2, rama claude/valere-crm-architecture-2vvEV.
-git pull origin claude/valere-crm-architecture-2vvEV
-cat CLAUDE.md docs/ESTADO.md
-ls .cowork/outbox/ .cowork/inbox/
-git log --oneline -10
-```
-
-
-## Rama de desarrollo
-
-`claude/valere-crm-architecture-2vvEV` — **88 commits ahead de `main`**.
-
-## Resumen ejecutivo
-
-CRM + Calculadora fusionados bajo arquitectura feature-based (`src/features/`). **27 de 27 fases del roadmap completadas** (código + SQL) + 2 mejoras de plataforma (code-splitting, Vitest). TSC 0 errores · 17/17 tests · build OK (253 kB main).
-
-**Audit completo 2026-04-19 (3 agentes):** Cowork (backend/DB) + Claude Code (frontend/UX/security) + Security Reviewer.
-- Resultado: ✅ 0 P0 pendientes · ✅ 0 P1 pendientes · 2 P2 (info)
-- Consolidado en: `docs/AUDIT_2026-04-19.md` (commit 3fa667c)
-
-## Fases completadas (27/27 + 2 mejoras plataforma)
-
-| FASE | Descripción | Tipo |
+> | RESEND_API_KEY secret GitHub Actions | Acción Juan | Para emails alarmas FV |
+> | Más credenciales FV (otros instaladores) | Acción Juan | Dar cuando pipeline esté estable |
+> | fv_actuacion (actuaciones Valere + ROI) | Sprint 3 | Ver plan módulo FV |
+> | Informes PDF integrados FV+facturas | Sprint 4 | Ver plan módulo FV |
+> | fv_alarma_procedimiento (catálogo resolución) | Sprint 2 | Ver plan módulo FV |
+
+## Historial de sesiones relevantes
+
+| Fecha | Commits | Resumen |
 |---|---|---|
-| 20.0–20.6 | Fusión CRM+Calc, migrar módulos, unificar auth, eliminar legacy | Arquitectura |
-| 20.7.a | users_profile merge → no-op (ya era user_profiles) | SQL ✅ |
-| 20.7.b | clients → empresas (1 fila: PAZ Y BIEN 5002AP) | SQL ✅ |
-| 20.7.c | supply_points → cups (1 fila migrada, contrato_id nullable) | SQL ✅ |
-| 20.7.d | invoice_history → facturas (rename) | SQL ✅ |
-| 20.8 | Edge Function chat-consultor + refactor ChatIAPanel (API key fuera del cliente) | Feature + SQL ✅ |
-| 20.9 | RLS granular multitenant (SQL creado, no aplicado) | SQL ✅ |
-| 20.10 | Audit: ediciones, autoprefixer, shadcn config | Limpieza |
-| 21.a | Pipeline energético: Kanban 8 etapas, ahorro anual, probabilidades | Feature + SQL ✅ |
-| 21.b | Alertas vencimiento contratos: semáforo + widget dashboard | Feature + SQL ✅ |
-| 21.c | Timeline actividades en fichas empresa y contrato | Feature |
-| 22 | Incidencias: tabla + listado + filtros + KPI | Feature + SQL ✅ |
-| 23 | Renovaciones: tabla + listado + filtros + KPI | Feature + SQL ✅ |
-| 24 | Documentos/Storage: tabla + upload/download + DocumentosTab | Feature + SQL ✅ |
-| 25 | Notificaciones in-app con badge en header | Feature |
-| 26.a | Exportación CSV en todos los listados | Feature |
-| 26.b | Informes predefinidos (comercial mensual + cartera activa) | Feature |
-| 27 | Calendario/Agenda: tabla eventos + vista mes + CRUD | Feature + SQL ✅ |
-| Plataforma | Code-splitting React.lazy + Vitest + 17 tests | Calidad |
-| Audit P0/P1 | useAuth StrictMode + signed URLs + navegación + UX | Fix |
-
-## Fixes aplicados en audit 2026-04-19
-
-| Fix | Estado |
-|-----|--------|
-| P0.1: Bucket `documentos` creado (50MB, private, 4 policies) | ✅ HECHO |
-| P0.2: RLS incidencias+renovaciones `public→authenticated` | ✅ HECHO |
-| P1.1: 10 tablas con trigger `updated_at` aplicado | ✅ HECHO |
-| P1.2: 3 índices creados (eventos, notificaciones, oportunidades) | ✅ HECHO |
-| P1.3: cups RLS policy NULL support | ✅ HECHO |
-| Security: Edge Function JWT+CORS+rate-limit hardening | ✅ HECHO |
-| Security: sanitize file extension upload | ✅ HECHO |
-| Security: VITE_GEMINI_API_KEY eliminado de .env.example | ✅ HECHO |
-| 3 console.error → logError | ✅ HECHO |
-
-## Tareas pendientes antes de FASE 28 personalización
-
-| Tarea | Bloqueador | Urgencia |
-|-------|-----------|---------|
-| Deploy Edge Function chat-consultor | CLI: `supabase functions deploy chat-consultor` | Alta |
-| Secrets Supabase | `supabase secrets set GEMINI_API_KEY=<valor> ALLOWED_ORIGIN=<url>` | Alta |
-| **FASE 28.1a** — Refactor 4 features Calculadora → empresas/cups | Claude Code (próxima sesión) | Alta |
-| **FASE 28.1b** — Migración datos + ACK DROP legacy | Cowork + Claude Code + ACK cruzado | Media |
-| Regenerar tipos TypeScript | `npx supabase gen types typescript` | Baja |
-
-## Próximas fases
-
-| FASE | Descripción | ETA |
-|------|-------------|-----|
-| **28.1a** | Refactor Calculadora: DatosPage, AnalisisPage, TrackingPage, PropuestasEnergiaPage → `empresas/cups` | Próxima sesión Claude Code |
-| **28.1b** | Migración datos residuales clients→empresas + ACK DRO
+| 2026-04-29 mañana | e8ed8c2…6464a89 | Reescritura Playwright, fixes CI ubuntu-22.04, fix login |
+| 2026-04-29 noche | a3d4a21 | Fix dashboard, asistente RAG, ExpedienteDetail |
+| 2026-04-30 | 00243bd, a388e04 | Schema FV multi-credencial, mantenimiento, workflow informes |
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
