@@ -103,7 +103,7 @@ export default function OportunidadAcciones({ detalle, onClose }: Props) {
       {modo === 'esperando_factura' && (
         <FormEsperandoFactura
           oportunidadId={detalle.id}
-          contactoEmailDefault={detalle.contactos[0]?.email ?? ''}
+          contactoEmailDefault={detalle.contactos?.[0]?.email ?? ''}
           onCancel={() => setModo(null)}
           onDone={() => { setModo(null) }}
         />
@@ -149,7 +149,7 @@ export default function OportunidadAcciones({ detalle, onClose }: Props) {
       {modo === 'marcar_propuesta_enviada' && (
         <FormMarcarPropuestaEnviada
           oportunidadId={detalle.id}
-          contactoEmailDefault={detalle.contactos[0]?.email ?? ''}
+          contactoEmailDefault={detalle.contactos?.[0]?.email ?? ''}
           onCancel={() => setModo(null)}
           onDone={() => { setModo(null) }}
         />
