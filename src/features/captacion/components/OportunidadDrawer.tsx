@@ -3,6 +3,7 @@ import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity }
 import { useOportunidadDetalle, useActividadesOportunidad, ETAPA_LABELS, ETAPA_COLORS } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
+import OportunidadAcciones, { DescargarPropuestaInline } from './OportunidadAcciones'
 
 interface Props {
   oportunidadId: string | null
@@ -207,6 +208,18 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                     <dd className="text-slate-900 font-medium">{detalle.decisor_identificado ? 'Sí' : 'No'}</dd>
                   </div>
                 </dl>
+
+                {/* Botones de descarga si hay documentos asociados */}
+                {(detalle.factura_documento_id || detalle.propuesta_documento_id) && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {detalle.factura_documento_id && (
+                      <DescargarPropuestaInline documentoId={detalle.factura_documento_id} />
+                    )}
+                    {detalle.propuesta_documento_id && (
+                      <DescargarPropuestaInline documentoId={detalle.propuesta_documento_id} />
+                    )}
+                  </div>
+                )}
               </section>
 
               {/* Notas */}
@@ -260,12 +273,12 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
           )}
         </div>
 
-        {/* Footer (placeholder para Día 2-4: aquí van las acciones contextuales) */}
-        <div className="border-t border-slate-200 px-5 py-3 bg-slate-50">
-          <p className="text-xs text-slate-500 text-center">
-            Las acciones contextuales se añaden en Día 2-4 del sprint.
-          </p>
-        </div>
+        {/* Footer — acciones contextuales por etapa */}
+        {detalle && (
+          <div className="border-t border-slate-200 px-5 py-3 bg-slate-50">
+            <OportunidadAcciones detalle={detalle} onClose={onClose} />
+          </div>
+        )}
       </aside>
     </>
   )

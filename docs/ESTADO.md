@@ -1,6 +1,53 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización (más reciente): 2026-05-04 por Cowork — Smoke test 4 perfiles + onboarding + feedback ready. Listo para arrancar uso real.**
+> **Última actualización (más reciente): 2026-05-04 tarde por Cowork (sesión autónoma) — Sprint Operativo Captación COMPLETO en disco (Días 1-5). Pendiente PS1 commit + push.**
+>
+> ## ✅ SPRINT OPERATIVO CAPTACIÓN — COMPLETO
+>
+> Carolina Aroca ya puede operar end-to-end. La sesión autónoma de la tarde cerró Días 2-5.
+>
+> **Día 1 commiteado en main** (commit `4dfc3b1`): permisos por funciones, drawer base, RPC lead.
+>
+> **Días 2-5 en disco, pendiente commit** (script `COMMIT_SPRINT_DIAS2_5_2026-05-04.ps1`):
+> - Modal "+ Nuevo lead" con form mínimo viable
+> - 14 forms contextuales por etapa cubriendo todo el ciclo:
+>   - Por llamar: No contesta / No es decisor / Esperando factura / No interesa
+>   - Esperando factura: Recordatorio / Factura recibida (upload) / Pasar a análisis / No envía
+>   - Factura recibida (Carolina M): Empezar análisis / Asignar a senior
+>   - En análisis / Propuesta en preparación: Subir propuesta lista
+>   - Asignada a senior: Empezar a preparar propuesta
+>   - Propuestas para enviar: Marcar enviada
+>   - Seguimientos: Cliente acepta / rechaza (con motivo) / Pedir visita / Programar
+> - Upload Supabase Storage con validaciones (PDF/JPG/PNG, max 15MB, sanitización)
+> - Handoffs manuales con triggers BD (responsable_actual_id se actualiza solo)
+> - Tab "Todos mis casos" cross-bandeja para Carolina A
+> - 35 tests nuevos (motivos, storage, permissions)
+>
+> ### BD aplicada en prod
+>
+> 1. `20260504_sprint_operativo_captacion_dia1.sql` (commiteada)
+> 2. `20260504_sprint_captacion_dia3_storage_policies.sql` (en disco):
+>    - helper `user_has_funcion(text)` STABLE SECURITY DEFINER
+>    - policies adicionales en bucket `documentos` para funciones telemarketing/analista/asesor_senior/admin
+>    - policies adicionales en tabla `public.documentos`
+>
+> ### Pendiente operativo Juan
+>
+> 1. Ejecutar `.\COMMIT_SPRINT_DIAS2_5_2026-05-04.ps1` (valida TSC + tests + build, commit + push, ~2 min).
+> 2. Esperar deploy Cloudflare Pages (~2 min).
+> 3. Smoke test login Carolina Aroca + ciclo completo.
+> 4. Si OK → enviar onboarding actualizado al equipo.
+>
+> ### Próximos pasos posibles tras uso real
+>
+> - Sprint plantillas propuestas (PDF auto)
+> - Google Calendar integración para visitas
+> - Permisos capa B/C/D del backlog
+> - Notificaciones push/email
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-04 por Cowork — Smoke test 4 perfiles + onboarding + feedback ready. Listo para arrancar uso real.**
 >
 > ## ✅ DÍA 1 USO REAL — TODO PREPARADO (2026-05-04)
 >

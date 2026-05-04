@@ -1,5 +1,86 @@
 # Sprint Operativo Captación — 2026-05-04
 
+> **ESTADO 2026-05-04 (cierre autónomo Días 2-5):** ✅ Completado en disco. Pendiente validar TSC + tests + commit + push vía PS1 cuando Juan vuelva.
+
+## Resumen rápido
+
+| Día | Estado | Entregables |
+|---|---|---|
+| 1 | ✅ commiteado en main | Permisos por funciones + drawer base + RPC lead + migration BD |
+| 2 | ✅ en disco | NuevoLeadModal + hook useCrearLead + botón en CaptacionPage + drawer interactivo + tab "Todos mis casos" |
+| 3 | ✅ en disco | Acciones contextuales (no contesta, esperando factura, no interesa) + upload factura Storage + handoff manual a analista + RLS policies bucket por funciones |
+| 4 | ✅ en disco | Acciones propuestas-enviar, seguimientos (acepta/rechaza/visita/programar), acciones analista (empezar análisis, asignar senior, subir propuesta) y senior (preparar propuesta, subir propuesta) |
+| 5 | ✅ tests + script | Tests unitarios (motivos, storage, permissions) + script PS1 final |
+
+## Archivos producidos / modificados
+
+**BD (2 migrations aplicadas vía MCP):**
+- `supabase/migrations/20260504_sprint_operativo_captacion_dia1.sql` (Día 1 ya commiteado)
+- `supabase/migrations/20260504_sprint_captacion_dia3_storage_policies.sql` (Día 3 — helper user_has_funcion + policies bucket documentos)
+
+**Frontend nuevo:**
+- `src/features/captacion/storage.ts` — upload + download Supabase Storage
+- `src/features/captacion/components/NuevoLeadModal.tsx` — modal "+ Nuevo lead"
+- `src/features/captacion/components/OportunidadAcciones.tsx` — todos los forms contextuales por etapa
+
+**Frontend modificado:**
+- `src/features/captacion/api.ts` — hooks useCrearLead, useCambiarEtapa, useRegistrarActividad, useHacerHandoff, useAnalistas, useAsesoresSenior
+- `src/features/captacion/components/OportunidadDrawer.tsx` — integra OportunidadAcciones + DescargarPropuestaInline
+- `src/features/captacion/CaptacionPage.tsx` — botón "+ Nuevo lead" + tab "Todos mis casos"
+
+**Tests nuevos:**
+- `src/features/captacion/motivos.test.ts` (10 tests)
+- `src/features/captacion/storage.test.ts` (9 tests)
+- `src/core/auth/permissions.test.ts` (16 tests)
+
+## Flujo completo cubierto (end-to-end)
+
+1. **Carolina A** abre `/captacion` → ve sus 5 pestañas (4 operativas + "Todos mis casos")
+2. Click en `+ Nuevo lead` → modal con form mínimo (empresa nombre+tel obligatorios; resto expandible)
+3. Aparece en tab "Por llamar" → click en card → drawer con detalle + timeline vacía + acciones "No contesta / No es decisor / Esperando factura / No interesa"
+4. Si "Esperando factura" → form con email + fecha prevista → caso pasa a tab "Esperando factura"
+5. Cuando recibe factura → click "Factura recibida" → upload PDF/JPG/PNG (validación MIME + 15MB + sanitiza nombre + path determinístico) → registra en tabla documentos → vincula factura_documento_id + factura_recibida_at + etapa_operativa='factura_recibida'
+6. Click "Pasar a análisis" → handoff manual a Carolina M (selector entre analistas) → trigger BD aplica responsable_actual_id+etapa
+7. **Carolina M** abre `/analisis-captacion` → ve la card → drawer → "Empezar análisis" o "Asignar a senior"
+8. Si análisis estándar → "Empezar análisis" mueve a en_analisis → "Subir propuesta lista" sube PDF + handoff de vuelta a Carolina A
+9. **Carolina A** abre tab "Propuestas para enviar" → click → "Descargar propuesta" (URL firmada 1h) + "Marcar enviada" (con email destinatario) → caso pasa a "Seguimientos"
+10. **Carolina A** llama → "Cliente acepta" / "Cliente rechaza" (motivo simplificado + libre) / "Pedir visita" (handoff a senior) / "Programar próximo contacto"
+
+Cada acción registra fila en `actividades` (timeline visible en drawer ordenado DESC).
+
+## Robustez upload (validada con ChatGPT)
+
+- Tamaño max 15 MB (`MAX_FILE_BYTES`)
+- Tipos: `application/pdf`, `image/jpeg`, `image/png`
+- Sanitización de nombre (sin diacríticos, sin chars problemáticos, max 100 chars)
+- Path determinístico: `oportunidades/{id}/{categoria}/{YYYYMMDD}_{timestamp}_{filename}`
+- Si upload OK pero INSERT en `documentos` falla → cleanup del blob (best-effort)
+- Si upload + INSERT OK pero UPDATE oportunidad falla → toast warning con instrucción "reintentar etapa, archivo guardado"
+- Si todo lo anterior OK pero handoff falla → toast warning con instrucción "reintentar handoff, propuesta guardada"
+
+## Decisiones implementadas
+
+✅ Supabase Storage como fuente de verdad (no Drive)
+✅ Reuso tabla `documentos` polimorfica existente (no schema nuevo)
+✅ Enum `motivo_perdida_enum` BD intacto, UI filtrada por funciones (7 telemarketing + otro / 16 avanzado + otro)
+✅ `factura_fecha_prevista` + `factura_recibida_at` para medir tiempo de cumplimiento
+✅ Handoff factura → analista MANUAL (no trigger automático)
+✅ Vista cross-bandeja `v_captacion_todos_mis_casos` para que Carolina A siga el hilo
+✅ Trazabilidad completa en `actividades` (cada acción registra fila)
+✅ Drawer modo solo-lectura cuando user no es responsable actual
+
+## Pendientes diferidos (NO en este sprint)
+
+- Plantillas de propuestas / generación PDF auto
+- Google Calendar integración para visitas
+- Permisos capa B/C/D (RLS por entidad, por campo, RPCs con check)
+- Notificaciones push/email cuando case llega a tu bandeja
+- OCR factura
+- Edición inline de campos desde el drawer (los datos faltantes)
+
+---
+
+
 > **Origen:** primera revisión de Juan al MVP captación detectó que las 3 bandejas son solo lectura (cards muestran datos pero no permiten capturar nada). Las acciones de Carolina Aroca (lead → llamar → factura → propuesta → seguimiento → cierre) no están implementadas.
 >
 > **Estado anterior:** "no más features hasta uso real" (directriz ChatGPT). **Este sprint la sustituye** porque el feedback real válido (de Juan, fundador) llegó antes incluso del primer login del equipo. La directriz era no añadir features sin evidencia; ya hay evidencia.

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../core/supabase/client'
 import { logError } from '../../core/utils/logger'
 
@@ -112,6 +112,64 @@ export function useMisOportunidades() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabaseAny = supabase as any
 
+/* ============================================================
+ * Inputs y helpers de mutación (Día 2 sprint operativo)
+ * ============================================================ */
+
+export type CrearLeadInput = {
+  empresa_nombre: string
+  empresa_nif?: string
+  empresa_telefono?: string
+  empresa_email?: string
+  empresa_ciudad?: string
+  empresa_segmento?: 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
+  contacto_nombre?: string
+  contacto_cargo?: string
+  contacto_telefono?: string
+  contacto_email?: string
+  origen?: 'cold' | 'web' | 'recomendacion' | 'contacto_previo' | 'otro'
+  notas?: string
+}
+
+/**
+ * Hook para crear un lead nuevo desde Captación.
+ * Invoca RPC `crear_lead_captacion` que en una transacción atómica inserta:
+ *   - empresa
+ *   - contacto (si hay datos)
+ *   - oportunidad (etapa_operativa='nuevo', responsable=auth.uid())
+ * Devuelve el `oportunidad_id` creado.
+ */
+export function useCrearLead() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CrearLeadInput): Promise<string> => {
+      const { data, error } = await supabaseAny.rpc('crear_lead_captacion', {
+        p_empresa_nombre:   input.empresa_nombre,
+        p_empresa_nif:      input.empresa_nif ?? null,
+        p_empresa_telefono: input.empresa_telefono ?? null,
+        p_empresa_email:    input.empresa_email ?? null,
+        p_empresa_ciudad:   input.empresa_ciudad ?? null,
+        p_empresa_segmento: input.empresa_segmento ?? 'comercial',
+        p_contacto_nombre:   input.contacto_nombre ?? null,
+        p_contacto_cargo:    input.contacto_cargo ?? null,
+        p_contacto_telefono: input.contacto_telefono ?? null,
+        p_contacto_email:    input.contacto_email ?? null,
+        p_origen: input.origen ?? 'cold',
+        p_notas:  input.notas ?? null,
+      })
+      if (error) {
+        logError(error, 'useCrearLead')
+        throw error
+      }
+      return String(data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+    },
+  })
+}
+
 export function useTodosMisCasosCaptacion() {
   return useQuery({
     queryKey: ['captacion_todos_mis_casos'],
@@ -189,6 +247,231 @@ export function useActividadesOportunidad(oportunidadId: string | null) {
         throw error
       }
       return (data ?? []) as ActividadRow[]
+    },
+  })
+}
+
+/* ============================================================
+ * Mutaciones de etapas / handoffs / actividades (Día 3-4 sprint)
+ * ============================================================ */
+
+async function obtenerUsuarioId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user) throw new Error('No autenticado')
+  return data.user.id
+}
+
+export type RegistrarActividadInput = {
+  oportunidadId: string
+  tipo: string  // ej: 'llamada', 'email', 'cambio_etapa', 'nota'
+  titulo: string
+  descripcion?: string
+  resultado?: string
+  fecha?: string  // ISO; default = NOW
+  adjunto_url?: string
+  adjunto_nombre?: string
+}
+
+/**
+ * Registrar actividad sobre una oportunidad (timeline).
+ * Llamadas, emails, recordatorios, cambios de etapa, etc.
+ */
+async function registrarActividad(input: RegistrarActividadInput): Promise<void> {
+  const userId = await obtenerUsuarioId()
+  const { error } = await supabaseAny
+    .from('actividades')
+    .insert({
+      entidad_tipo: 'oportunidad',
+      entidad_id: input.oportunidadId,
+      tipo: input.tipo,
+      titulo: input.titulo,
+      descripcion: input.descripcion ?? null,
+      resultado: input.resultado ?? null,
+      fecha_actividad: input.fecha ?? new Date().toISOString(),
+      usuario_id: userId,
+      adjunto_url: input.adjunto_url ?? null,
+      adjunto_nombre: input.adjunto_nombre ?? null,
+      privada: false,
+    })
+  if (error) {
+    logError(error, 'registrarActividad')
+    throw error
+  }
+}
+
+/**
+ * Cambiar etapa_operativa + registrar actividad atómicamente (best-effort).
+ * Si la actividad falla, no rollback de etapa (Postgres no soporta tx desde JS).
+ * En caso de fallo de actividad, queda log pero etapa está cambiada.
+ */
+export type CambiarEtapaInput = {
+  oportunidadId: string
+  etapaOperativa: string
+  // Campos opcionales para actualizar junto con la etapa
+  factura_fecha_prevista?: string | null
+  factura_recibida_at?: string | null
+  factura_documento_id?: string | null
+  propuesta_documento_id?: string | null
+  propuesta_enviada_at?: string | null
+  visita_programada_at?: string | null
+  decisor_identificado?: boolean
+  motivo_perdida_codigo?: string | null
+  motivo_perdida_detalle?: string | null
+  etapa?: 'prospecto' | 'auditoria_consumo' | 'oferta_presentada' | 'negociacion' | 'contrato_firmado' | 'activo' | 'cerrada_ganada' | 'cerrada_perdida'
+  notasAppend?: string  // texto a añadir a notas existentes
+}
+
+export function useCambiarEtapa() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CambiarEtapaInput) => {
+      // 1) Si hay notasAppend, leer notas actuales + concat
+      let notasFinales: string | null | undefined
+      if (input.notasAppend) {
+        const { data, error: errLoad } = await supabase
+          .from('oportunidades')
+          .select('notas')
+          .eq('id', input.oportunidadId)
+          .maybeSingle()
+        if (errLoad) throw errLoad
+        const previas = data?.notas ?? ''
+        const ts = new Date().toLocaleString('es-ES')
+        notasFinales = previas
+          ? `${previas}\n\n[${ts}] ${input.notasAppend}`
+          : `[${ts}] ${input.notasAppend}`
+      }
+
+      // 2) Actualizar oportunidad
+      const updates: Record<string, unknown> = {
+        etapa_operativa: input.etapaOperativa,
+      }
+      if (input.etapa !== undefined) updates.etapa = input.etapa
+      if (input.factura_fecha_prevista !== undefined) updates.factura_fecha_prevista = input.factura_fecha_prevista
+      if (input.factura_recibida_at !== undefined) updates.factura_recibida_at = input.factura_recibida_at
+      if (input.factura_documento_id !== undefined) updates.factura_documento_id = input.factura_documento_id
+      if (input.propuesta_documento_id !== undefined) updates.propuesta_documento_id = input.propuesta_documento_id
+      if (input.propuesta_enviada_at !== undefined) updates.propuesta_enviada_at = input.propuesta_enviada_at
+      if (input.visita_programada_at !== undefined) updates.visita_programada_at = input.visita_programada_at
+      if (input.decisor_identificado !== undefined) updates.decisor_identificado = input.decisor_identificado
+      if (input.motivo_perdida_codigo !== undefined) updates.motivo_perdida_codigo = input.motivo_perdida_codigo
+      if (input.motivo_perdida_detalle !== undefined) updates.motivo_perdida_detalle = input.motivo_perdida_detalle
+      if (notasFinales !== undefined) updates.notas = notasFinales
+
+      const { error } = await supabaseAny
+        .from('oportunidades')
+        .update(updates)
+        .eq('id', input.oportunidadId)
+      if (error) {
+        logError(error, 'useCambiarEtapa')
+        throw error
+      }
+    },
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+      queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', input.oportunidadId] })
+      queryClient.invalidateQueries({ queryKey: ['actividades_oportunidad', input.oportunidadId] })
+    },
+  })
+}
+
+/**
+ * Registrar actividad sobre una oportunidad (sin cambiar etapa).
+ * Usado para llamadas sin respuesta, recordatorios, notas.
+ */
+export function useRegistrarActividad() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: RegistrarActividadInput) => {
+      await registrarActividad(input)
+    },
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: ['actividades_oportunidad', input.oportunidadId] })
+    },
+  })
+}
+
+/**
+ * Hacer un handoff de oportunidad a otro user (Carolina A → Carolina M, etc.).
+ * Inserta fila en oportunidad_handoffs (trigger BD aplica responsable_actual_id).
+ */
+export type HandoffInput = {
+  oportunidadId: string
+  toUserId: string
+  motivo: string  // NOT NULL en BD; descriptor: 'pasar_a_analisis', 'pedir_visita', etc.
+  etapaOperativaDestino?: string  // ej: 'factura_recibida', 'asignada_a_senior'
+  notas?: string
+}
+
+export function useHacerHandoff() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: HandoffInput) => {
+      const fromUserId = await obtenerUsuarioId()
+      const { error } = await supabaseAny
+        .from('oportunidad_handoffs')
+        .insert({
+          oportunidad_id: input.oportunidadId,
+          from_user_id: fromUserId,
+          to_user_id: input.toUserId,
+          motivo: input.motivo,
+          etapa_operativa_destino: input.etapaOperativaDestino ?? null,
+          notas: input.notas ?? null,
+          created_by: fromUserId,
+        })
+      if (error) {
+        logError(error, 'useHacerHandoff')
+        throw error
+      }
+    },
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+      queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', input.oportunidadId] })
+      queryClient.invalidateQueries({ queryKey: ['actividades_oportunidad', input.oportunidadId] })
+    },
+  })
+}
+
+/** Lista de usuarios senior (asesor_senior) para selector de "Pedir visita" */
+export type SeniorRow = { id: string; full_name: string | null; email: string }
+export function useAsesoresSenior() {
+  return useQuery({
+    queryKey: ['asesores_senior'],
+    queryFn: async (): Promise<SeniorRow[]> => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, email')
+        .eq('approved', true)
+        .eq('status', 'active')
+        .contains('funciones', ['asesor_senior'])
+        .order('full_name', { ascending: true })
+      if (error) {
+        logError(error, 'useAsesoresSenior')
+        throw error
+      }
+      return (data ?? []) as SeniorRow[]
+    },
+  })
+}
+
+/** Usuario(s) con función analista (típicamente Carolina M) para handoff factura */
+export function useAnalistas() {
+  return useQuery({
+    queryKey: ['analistas'],
+    queryFn: async (): Promise<SeniorRow[]> => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, email')
+        .eq('approved', true)
+        .eq('status', 'active')
+        .contains('funciones', ['analista'])
+        .order('full_name', { ascending: true })
+      if (error) {
+        logError(error, 'useAnalistas')
+        throw error
+      }
+      return (data ?? []) as SeniorRow[]
     },
   })
 }
