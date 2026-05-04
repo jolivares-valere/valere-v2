@@ -25,6 +25,23 @@ interface Props {
   onClose: () => void
 }
 
+/**
+ * Extrae mensaje legible de un error (Error / PostgrestError / unknown).
+ * Necesario porque los errores de Supabase no son Error instance — son
+ * objetos planos con .message + .code + .details + .hint.
+ */
+function errMsg(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err !== null) {
+    const obj = err as Record<string, unknown>
+    const msg = typeof obj.message === 'string' ? obj.message : null
+    const details = typeof obj.details === 'string' ? obj.details : null
+    const hint = typeof obj.hint === 'string' ? obj.hint : null
+    return [msg, details, hint].filter(Boolean).join(' — ') || JSON.stringify(err)
+  }
+  return String(err)
+}
+
 type Modo =
   | null
   | 'no_contesta'
@@ -190,7 +207,7 @@ export default function OportunidadAcciones({ detalle, onClose }: Props) {
           nuevaEtapa="en_analisis"
           tituloFormulario="Empezar análisis estándar"
           tituloActividad="Análisis iniciado"
-          tipoActividad="cambio_etapa"
+          tipoActividad="cambio_estado"
           onCancel={() => setModo(null)}
           onDone={() => { setModo(null) }}
         />
@@ -209,7 +226,7 @@ export default function OportunidadAcciones({ detalle, onClose }: Props) {
           nuevaEtapa="propuesta_en_preparacion"
           tituloFormulario="Empezar a preparar propuesta"
           tituloActividad="Inicio preparación de propuesta"
-          tipoActividad="cambio_etapa"
+          tipoActividad="cambio_estado"
           onCancel={() => setModo(null)}
           onDone={() => { setModo(null) }}
         />
@@ -375,7 +392,7 @@ function FormNoContesta({ oportunidadId, onCancel, onDone }: {
         tipo: 'llamada',
         titulo: 'Llamada sin respuesta',
         descripcion: nota || undefined,
-        resultado: 'no_contesta',
+        resultado: 'sin_respuesta',
       })
       // Mover a 'contactado' (intentado) si estaba en 'nuevo'
       await cambiar.mutateAsync({
@@ -385,7 +402,7 @@ function FormNoContesta({ oportunidadId, onCancel, onDone }: {
       toast.success('Intento registrado')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -418,7 +435,7 @@ function FormNoDecisor({ oportunidadId, onCancel, onDone }: {
         tipo: 'llamada',
         titulo: 'No es decisor',
         descripcion: desc,
-        resultado: 'no_es_decisor',
+        resultado: 'neutral',
       })
       await cambiar.mutateAsync({
         oportunidadId,
@@ -429,7 +446,7 @@ function FormNoDecisor({ oportunidadId, onCancel, onDone }: {
       toast.success('Registrado')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -480,12 +497,12 @@ function FormEsperandoFactura({ oportunidadId, contactoEmailDefault, onCancel, o
         tipo: 'llamada',
         titulo: 'Cliente acepta enviar factura',
         descripcion: `Email donde envía: ${emailEnvio}\nFecha prevista: ${new Date(fechaPrev).toLocaleDateString('es-ES')}`,
-        resultado: 'compromiso_factura',
+        resultado: 'positivo',
       })
       toast.success('Caso movido a Esperando factura')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -537,15 +554,15 @@ function FormCerrarPerdida({ oportunidadId, funciones, onCancel, onDone }: {
       })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'cierre',
+        tipo: 'cambio_estado',
         titulo: 'Cerrado como perdida',
         descripcion: `Motivo: ${codigo}${detalle ? ` — ${detalle}` : ''}`,
-        resultado: 'cerrado_perdida',
+        resultado: 'negativo',
       })
       toast.success('Caso cerrado como perdida')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -593,12 +610,12 @@ function FormRecordatorio({ oportunidadId, onCancel, onDone }: {
         tipo,
         titulo: tipo === 'llamada' ? 'Llamada recordatorio enviada' : 'Email recordatorio enviado',
         descripcion: nota || undefined,
-        resultado: 'recordatorio',
+        resultado: 'neutral',
       })
       toast.success('Recordatorio registrado')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -665,10 +682,10 @@ function FormSubirFactura({ oportunidadId, empresaId, onCancel, onDone }: {
         })
         await registrar.mutateAsync({
           oportunidadId,
-          tipo: 'factura_subida',
+          tipo: 'documento',
           titulo: `Factura subida (${result.nombre})`,
           descripcion: 'Subida correcta. Actualización de estado pendiente — reintentar.',
-          resultado: 'factura_recibida_pendiente_estado',
+          resultado: 'sin_respuesta',
           adjunto_url: result.rutaStorage,
           adjunto_nombre: result.nombre,
         })
@@ -676,10 +693,10 @@ function FormSubirFactura({ oportunidadId, empresaId, onCancel, onDone }: {
       }
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'factura_subida',
+        tipo: 'documento',
         titulo: `Factura recibida — ${result.nombre}`,
         descripcion: `Fecha real de recepción: ${new Date(fechaReal).toLocaleDateString('es-ES')}`,
-        resultado: 'factura_recibida',
+        resultado: 'positivo',
         adjunto_url: result.rutaStorage,
         adjunto_nombre: result.nombre,
       })
@@ -764,15 +781,15 @@ function FormPasarAAnalisis({ oportunidadId, analistas, onCancel, onDone }: {
       })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'handoff',
+        tipo: 'cambio_estado',
         titulo: 'Caso pasado a analista',
         descripcion: nota || undefined,
-        resultado: 'handoff_a_analista',
+        resultado: 'neutral',
       })
       toast.success('Caso pasado a análisis')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -822,15 +839,15 @@ function FormNoEnviaFactura({ oportunidadId, onCancel, onDone }: {
       })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'cierre',
+        tipo: 'cambio_estado',
         titulo: 'Cerrado: no envía factura',
         descripcion: detalle || undefined,
-        resultado: 'cerrado_perdida',
+        resultado: 'negativo',
       })
       toast.success('Caso cerrado')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -869,12 +886,12 @@ function FormMarcarPropuestaEnviada({ oportunidadId, contactoEmailDefault, onCan
         tipo: 'email',
         titulo: 'Propuesta enviada al cliente',
         descripcion: `Email destinatario: ${email}`,
-        resultado: 'propuesta_enviada',
+        resultado: 'positivo',
       })
       toast.success('Propuesta marcada como enviada')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -907,15 +924,15 @@ function FormClienteAcepta({ oportunidadId, onCancel, onDone }: {
       })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'cierre',
+        tipo: 'cambio_estado',
         titulo: 'Cliente acepta — cerrado ganada',
         descripcion: nota || undefined,
-        resultado: 'cerrado_ganada',
+        resultado: 'positivo',
       })
       toast.success('¡Caso cerrado como ganada!')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -961,15 +978,15 @@ function FormClienteRechaza({ oportunidadId, funciones, onCancel, onDone }: {
       })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'cierre',
+        tipo: 'cambio_estado',
         titulo: 'Cliente rechaza — cerrado perdida',
         descripcion: `Motivo: ${codigo}${detalle ? ` — ${detalle}` : ''}`,
-        resultado: 'cerrado_perdida',
+        resultado: 'negativo',
       })
       toast.success('Caso cerrado como perdida')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -1036,15 +1053,15 @@ function FormPedirVisita({ oportunidadId, senior, onCancel, onDone }: {
       })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'handoff',
+        tipo: 'cambio_estado',
         titulo: 'Visita escalada a senior',
         descripcion: nota,
-        resultado: 'handoff_a_senior',
+        resultado: 'neutral',
       })
       toast.success('Caso enviado al asesor senior')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -1091,16 +1108,16 @@ function FormProgramarContacto({ oportunidadId, onCancel, onDone }: {
     try {
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'callback_programado',
+        tipo: 'tarea',
         titulo: `Próximo contacto: ${new Date(fecha).toLocaleDateString('es-ES')}`,
         descripcion: nota || undefined,
         fecha: new Date(fecha).toISOString(),
-        resultado: 'callback_pendiente',
+        resultado: 'neutral',
       })
       toast.success('Próximo contacto programado')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -1145,14 +1162,14 @@ function FormSimpleEtapa({ oportunidadId, nuevaEtapa, tituloFormulario, tituloAc
       await cambiar.mutateAsync({ oportunidadId, etapaOperativa: nuevaEtapa })
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: tipoActividad,
+        tipo: tipoActividad,  // ya 'cambio_estado' desde el caller (FormSimpleEtapa)
         titulo: tituloActividad,
         descripcion: nota || undefined,
       })
       toast.success('Etapa actualizada')
       onDone()
     } catch (err) {
-      toast.error('Error', { description: err instanceof Error ? err.message : 'desconocido' })
+      toast.error('Error', { description: errMsg(err) })
     }
   }
 
@@ -1221,7 +1238,7 @@ function FormSubirPropuesta({ oportunidadId, empresaId, onCancel, onDone }: {
         })
         await registrar.mutateAsync({
           oportunidadId,
-          tipo: 'propuesta_subida',
+          tipo: 'documento',
           titulo: `Propuesta subida (${result.nombre})`,
           descripcion: 'Subida correcta. Actualización de estado pendiente — reintentar.',
           adjunto_url: result.rutaStorage,
@@ -1249,10 +1266,10 @@ function FormSubirPropuesta({ oportunidadId, empresaId, onCancel, onDone }: {
 
       await registrar.mutateAsync({
         oportunidadId,
-        tipo: 'propuesta_subida',
+        tipo: 'documento',
         titulo: `Propuesta lista — ${result.nombre}`,
         descripcion: 'Propuesta lista para enviar al cliente',
-        resultado: 'propuesta_lista',
+        resultado: 'positivo',
         adjunto_url: result.rutaStorage,
         adjunto_nombre: result.nombre,
       })
