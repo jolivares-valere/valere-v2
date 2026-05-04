@@ -6,7 +6,21 @@
 >
 > **Tiempo estimado total**: 25-30 min con un PDF de prueba.
 >
-> **Material necesario**: 2 PDFs cualquiera (ej. uno para "factura de prueba", otro para "propuesta de prueba"). Pueden ser archivos vacíos o documentos sin datos sensibles.
+> **Material necesario**: 2 PDFs **reales no sensibles, de 1 página cada uno, > 0 bytes**. Por ejemplo, un PDF generado de un Word de prueba o exportado del navegador. NO PDFs vacíos (la validación los rechazará correctamente). Si quieres probar las validaciones negativas, usa un PDF vacío + un PDF >15 MB + un .docx **explícitamente** en el Test 3.
+
+---
+
+## Clasificación de fallos durante el smoke test
+
+Si algo falla, clasifica antes de reaccionar:
+
+| Severidad | Definición | Acción |
+|---|---|---|
+| **P0 — bloquea onboarding** | No se puede crear lead / subir factura / handoff no cambia responsable / caso no aparece en la bandeja del siguiente rol / error rojo en consola / un usuario ve lo que no debe / cierre perdido sin motivo | **Detener smoke**. Anotar en `FEEDBACK_USO_REAL.md` con tag `[bug]` `[bloqueante]`. NO enviar onboarding hasta arreglar. |
+| **P1 — arreglar pronto** | Texto confuso / acción siguiente poco clara / documento se sube pero la UI no refresca / hay que recargar manualmente / etiqueta poco entendible | Anotar en `FEEDBACK_USO_REAL.md` con tag `[ux]` o `[bug]` no bloqueante. Continuar smoke. Fix en próxima sesión. |
+| **P2 — backlog** | Estética / espaciados / orden de tabs / nombres de badges / microcopy mejorable | Anotar en `FEEDBACK_USO_REAL.md` con tag `[mejora]`. NO interrumpir smoke. Tratar después de 1ª semana de uso. |
+
+Regla: 1 P0 = stop onboarding hasta fix. ≥3 P1 acumulados = stop. P2 nunca bloquean.
 
 ---
 
@@ -215,6 +229,46 @@ FROM public.oportunidades WHERE id = '<id>';
 
 ---
 
+## Test 6.5 — Verificación cruzada de permisos (NUEVO, ChatGPT 2026-05-04)
+
+**Antes del Test 7**, hacer 4 intentos de acceso indebido. Cada uno debe **fallar** (redirección, 404 o "no tienes permiso"). Si alguno **funciona**, es P0.
+
+### 6.5.1 Carolina A intenta abrir módulos ajenos
+Logueada como Carolina A, teclear directamente en la barra de URL:
+- `https://valere-v2.pages.dev/dashboard` → debe redirigir a `/captacion`
+- `https://valere-v2.pages.dev/empresas` → debe redirigir a `/captacion`
+- `https://valere-v2.pages.dev/datadis` → debe redirigir a `/captacion`
+- `https://valere-v2.pages.dev/admin` → debe redirigir a `/captacion`
+- `https://valere-v2.pages.dev/potencias` → debe redirigir a `/captacion`
+
+Si entra a alguna → **P0**.
+
+### 6.5.2 Carolina M intenta abrir módulos ajenos
+Logueada como Carolina M:
+- `/captacion` → redirigir a `/analisis-captacion`
+- `/cartera-senior` → redirigir
+- `/admin` → redirigir
+- `/empresas/abc-123` (id inventado) → este SÍ debe permitir abrir la página (rama de detalle empresa está en su whitelist), pero la query devolverá vacío.
+
+### 6.5.3 Antonio no ve casos no asignados a él
+Logueado como Antonio, en `/cartera-senior`:
+- Tab "Asignados a mí": debe mostrar **solo** Frigorífica Norte (su demo) y cualquier caso que se le haya asignado en los Tests 1-7.
+- Verificar que NO ve los casos de Carolina M (Hostal del Pino) ni de Carolina A (Industria Textil).
+
+Si ve casos ajenos → **P0**.
+
+### 6.5.4 Documento ajeno no accesible vía URL directa (deuda conocida)
+Esta verificación es **informativa**, no bloqueante. Sabemos que las policies de Storage son permisivas (cualquier authenticated puede SELECT del bucket). El test mide solo si la UI expone paths de docs ajenos.
+
+Logueada como Carolina A:
+- En tab "Por llamar" / "Esperando factura" / "Seguimientos", abrir DevTools → Network.
+- Verificar que las URLs firmadas que aparecen al click "Descargar" pertenecen **solo** a oportunidades de Carolina A.
+- Que la UI NO devuelva paths de Storage de oportunidades de Antonio o Carolina M.
+
+Si la UI expone paths ajenos a Carolina A → P0. Si solo es teóricamente posible vía SQL/API directa → no es P0 ahora (deuda documentada en `BACKLOG_PERMISOS_GRANULARES_2026-05-03.md`).
+
+---
+
 ## Test 7 — Caso senior
 
 **Crear lead nuevo o reutilizar Frigorífica Norte (que ya está en asignada_a_senior con Antonio)**:
@@ -239,10 +293,23 @@ FROM public.oportunidades WHERE id = '<id>';
 - Empezar **uso real ≥1 semana SIN nuevas features**.
 
 ### Si alguno falla
-- Anotar entrada en `FEEDBACK_USO_REAL.md` con detalle: qué test, qué pasó, qué esperabas.
-- Severidad alta si bloquea el flujo, media si requiere rodeo, baja si es UX.
-- Pasar a Cowork en próxima sesión para fix.
-- NO enviar onboarding hasta tests verdes.
+- Anotar entrada en `FEEDBACK_USO_REAL.md` con clasificación P0/P1/P2.
+- Si **P0**: stop, abrir próxima sesión con Cowork para hotfix mínimo.
+- Si **P1**: anotar y seguir smoke. Fix en próxima sesión, no hoy.
+- Si **P2**: anotar y seguir smoke.
+- NO enviar onboarding si hay ≥1 P0 o ≥3 P1.
+
+### Crear tag de rollback antes del uso real
+
+Independientemente del resultado del smoke (pero solo si todos los tests críticos P0 pasan), crear un git tag para tener punto de retorno claro:
+
+```powershell
+cd C:\Users\joliv\valere-v2
+git tag -a v0.1-captacion-mvp -m "Captacion MVP operativo - smoke test verde, primera version usable por equipo"
+git push origin v0.1-captacion-mvp
+```
+
+A partir de aquí, si la semana de uso descubre problemas serios, sabes desde qué versión partiste.
 
 ### Limpieza tras los tests
 Las oportunidades "Smoke Test Lead 1" se quedan en BD. Para borrarlas:
