@@ -758,7 +758,7 @@ function FormPasarAAnalisis({ oportunidadId, analistas, onCancel, onDone }: {
       await handoff.mutateAsync({
         oportunidadId,
         toUserId: toUser,
-        motivo: 'pasar_a_analisis',
+        motivo: 'factura_recibida',  // valor válido del CHECK constraint en oportunidad_handoffs
         etapaOperativaDestino: 'factura_recibida',
         notas: nota || undefined,
       })
@@ -1030,7 +1030,7 @@ function FormPedirVisita({ oportunidadId, senior, onCancel, onDone }: {
       await handoff.mutateAsync({
         oportunidadId,
         toUserId: toUser,
-        motivo: 'pedir_visita',
+        motivo: 'asignacion_a_senior',  // valor válido del CHECK constraint
         etapaOperativaDestino: 'asignada_a_senior',
         notas: nota,
       })
@@ -1236,7 +1236,7 @@ function FormSubirPropuesta({ oportunidadId, empresaId, onCancel, onDone }: {
           await handoff.mutateAsync({
             oportunidadId,
             toUserId: creadorId,
-            motivo: 'propuesta_lista_para_enviar',
+            motivo: 'propuesta_lista',  // valor válido del CHECK constraint
             etapaOperativaDestino: 'propuesta_lista',
           })
         } catch (errHandoff) {

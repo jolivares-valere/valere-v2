@@ -42,6 +42,21 @@
 
 <!-- Añadir entradas debajo de esta línea -->
 
+### 2026-05-04 (post-sprint) — Auditoría ChatGPT detecta bug bloqueante en handoffs
+
+- **Quién**: ChatGPT (auditoría externa post-sprint Días 2-5)
+- **Pantalla / ruta**: backend (`oportunidad_handoffs` CHECK constraint)
+- **Qué intentaba hacer**: validar que el sprint completo es seguro para uso real
+- **Qué pasó**: el código `useHacerHandoff` enviaba 3 valores de `motivo` que NO están en el CHECK constraint de la tabla (`pasar_a_analisis`, `pedir_visita`, `propuesta_lista_para_enviar`). Cualquier handoff habría fallado en producción.
+- **Qué esperaba**: handoffs funcionando end-to-end
+- **Severidad**: **alta** — bloquea el flujo principal
+- **Notas**: corregido. Mapeo aplicado: `pasar_a_analisis → factura_recibida`, `pedir_visita → asignacion_a_senior`, `propuesta_lista_para_enviar → propuesta_lista`. Hotfix en `COMMIT_HOTFIX_HANDOFFS_2026-05-04.ps1`.
+- **Tags**: `[bug]` `[backend]`
+
+**Acción tomada**: hotfix preparado, pendiente ejecutar PS1. Plan de auditoría completo en `docs/AUDITORIA_SPRINT_CAPTACION_2026-05-04.md`. Smoke test runbook formal en `docs/SMOKE_TEST_RUNBOOK.md`.
+
+---
+
 ### 2026-05-04 — Bandejas captación son solo lectura, no hay operativa
 
 - **Quién**: Juan (revisión pre-onboarding)
