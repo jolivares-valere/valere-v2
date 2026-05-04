@@ -149,15 +149,18 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                 </section>
               )}
 
-              {/* Contactos */}
-              {detalle.contactos.length > 0 && (
+              {/* Contactos — guard null por si el embed de Supabase no devuelve el array */}
+              {(() => {
+                const contactos = detalle.contactos ?? []
+                if (contactos.length === 0) return null
+                return (
                 <section>
                   <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
                     Contactos
                   </h3>
                   <div className="space-y-2">
-                    {detalle.contactos.map(c => (
+                    {contactos.map(c => (
                       <div key={c.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
                         <div className="flex items-center justify-between">
                           <p className="font-medium text-slate-900">{c.nombre ?? '(sin nombre)'}</p>
@@ -176,7 +179,8 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                     ))}
                   </div>
                 </section>
-              )}
+                )
+              })()}
 
               {/* Datos clave de la fase actual */}
               <section>
