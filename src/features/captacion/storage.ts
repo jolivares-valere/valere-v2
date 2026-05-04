@@ -28,8 +28,18 @@ export type UploadDocumentoInput = {
   oportunidadId: string
   empresaId: string
   categoria: CategoriaDocumento
-  /** tipo en tabla documentos: 'factura' o 'oferta' (oferta = propuesta) */
-  tipoDocumento: 'factura' | 'oferta'
+  /**
+   * Valor del campo `tipo` en tabla `documentos`. Debe estar en el CHECK
+   * constraint `documentos_tipo_check`:
+   *   contrato | factura | documentacion | otro | autorizacion |
+   *   autorizacion_firmada | licencia | informe | estudio_ahorro | email_enviado
+   *
+   * Para captación usamos:
+   *   - 'factura' para la factura del cliente
+   *   - 'estudio_ahorro' para la propuesta comercial (estudio de ahorro
+   *     energético) — semánticamente correcto y dentro del enum BD
+   */
+  tipoDocumento: 'factura' | 'estudio_ahorro'
   descripcion?: string
 }
 

@@ -1213,7 +1213,7 @@ function FormSubirPropuesta({ oportunidadId, empresaId, onCancel, onDone }: {
       // 1) Upload
       const result = await subirDocumentoOportunidad({
         file, oportunidadId, empresaId,
-        categoria: 'propuestas', tipoDocumento: 'oferta',
+        categoria: 'propuestas', tipoDocumento: 'estudio_ahorro',
       })
 
       // 2) Buscar el creador original (Carolina A) para handoff de vuelta
