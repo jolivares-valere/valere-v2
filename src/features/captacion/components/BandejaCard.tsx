@@ -4,6 +4,7 @@ import { ETAPA_LABELS, ETAPA_COLORS, type VMisOportunidadesRow } from '../api'
 
 interface Props {
   op: VMisOportunidadesRow
+  onClick?: (id: string) => void
 }
 
 // Mapeo etapa_operativa → siguiente acción concreta para el responsable
@@ -21,7 +22,7 @@ const SIGUIENTE_ACCION: Record<string, string> = {
   cerrado: 'Sin acción pendiente',
 }
 
-export default function BandejaCard({ op }: Props) {
+export default function BandejaCard({ op, onClick }: Props) {
   const etapa = op.etapa_operativa ?? 'sin_etapa'
   const etapaLabel = ETAPA_LABELS[etapa] ?? etapa
   const etapaColor = ETAPA_COLORS[etapa] ?? 'bg-slate-50 border-slate-200 text-slate-700'
@@ -29,8 +30,16 @@ export default function BandejaCard({ op }: Props) {
 
   return (
     <div
-      onClick={() => console.log('clicked', op.id)}
-      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+      onClick={() => onClick?.(op.id)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick?.(op.id)
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-valere-blue-dark"
     >
       {/* Nombre empresa */}
       <p className="font-semibold text-slate-900 mb-1">

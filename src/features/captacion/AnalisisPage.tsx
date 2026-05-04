@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { useMisOportunidades, type VMisOportunidadesRow } from './api'
 import BandejaCard from './components/BandejaCard'
+import OportunidadDrawer from './components/OportunidadDrawer'
 
 export default function AnalisisPage() {
   const { data: oportunidades = [], isLoading } = useMisOportunidades()
+  const [drawerId, setDrawerId] = useState<string | null>(null)
 
   const filterByEtapas = (etapas: string[]): VMisOportunidadesRow[] => {
     return oportunidades.filter(op => etapas.includes(op.etapa_operativa ?? ''))
@@ -63,7 +66,7 @@ export default function AnalisisPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {facturasPendientes.map(op => (
-                <BandejaCard key={op.id} op={op} />
+                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
               ))}
             </div>
           )}
@@ -78,7 +81,7 @@ export default function AnalisisPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {enAnalisis.map(op => (
-                <BandejaCard key={op.id} op={op} />
+                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
               ))}
             </div>
           )}
@@ -93,12 +96,14 @@ export default function AnalisisPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {propuestasPreparacion.map(op => (
-                <BandejaCard key={op.id} op={op} />
+                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
               ))}
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      <OportunidadDrawer oportunidadId={drawerId} onClose={() => setDrawerId(null)} />
     </div>
   )
 }

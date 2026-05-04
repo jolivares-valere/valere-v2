@@ -1,6 +1,83 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización (más reciente): 2026-05-01 noche por Cowork — Schema CONGELADO. Próximo: saneamiento.**
+> **Última actualización (más reciente): 2026-05-04 por Cowork — Smoke test 4 perfiles + onboarding + feedback ready. Listo para arrancar uso real.**
+>
+> ## ✅ DÍA 1 USO REAL — TODO PREPARADO (2026-05-04)
+>
+> Sesión enfocada en validación pre-uso, sin código nuevo (directriz ChatGPT).
+>
+> ### 1. Smoke test BD + código (objetivo)
+>
+> Verificación SQL de `v_mis_oportunidades` por usuario + auditoría Sidebar.tsx + App.tsx + deploy Cloudflare.
+>
+> | Usuario | Bandeja real (BD) |
+> |---|---|
+> | Carolina Aroca [telemarketing] | Industria Textil ABC [esperando_factura] |
+> | Carolina Maciñeiras [analista] | Hostal del Pino [factura_recibida] |
+> | Antonio Rodriguez [asesor_senior] | Frigorífica Norte [asignada_a_senior] |
+> | Juan Olivares [admin+asesor_senior] | Bodega Mediterránea SL [asignada_a_senior] (€18.500 / €9.200/año) |
+>
+> **Nota:** se añadió Bodega Mediterránea SL a Juan el 2026-05-04 para que su bandeja Cartera Senior tenga al menos 1 caso visible al validar UI. `external_id='DEMO_MVP'` para borrado fácil cuando lleguen datos reales.
+>
+> Filtrado correcto. Deploy `valere-v2.pages.dev` HTTP 200 servido por Cloudflare.
+>
+> ### 2. Fugas conocidas (deuda no bloqueante para uso real)
+>
+> - Sidebar "CRM Comercial" (13 items) y "Gestión de Potencias" (9 items) visibles a todos sin filtro por funciones.
+> - Solo `/admin` tiene guard de rol; resto de rutas accesibles tecleando URL directa.
+> - RLS permisivo (cualquier authenticated puede CRUD cualquier tabla).
+>
+> Aceptado como deuda. Si el equipo reporta fricción real durante uso, se desbloquea capa A del backlog de permisos.
+>
+> Doc: `docs/SMOKE_TEST_4_USERS_2026-05-04.md`.
+>
+> ### 3. Onboarding equipo listo
+>
+> 3 borradores de mensaje (Antonio, Carolina M, Carolina A) en `docs/ONBOARDING_4_USERS_2026-05-04.md`. Tono coloquial profesional, en castellano. Carolina Aroca con password temporal `Valere2026Temporal!` y reset en primer login.
+>
+> ### 4. Mecanismo feedback activado
+>
+> `docs/FEEDBACK_USO_REAL.md` con plantilla copiable + 6 categorías (`fuga`, `hueco`, `ux`, `bug`, `mejora`, `confianza`). Trigger: 3+ entradas o ≥7 días → Cowork procesa y propone sprint correctivo.
+>
+> ### Próximo paso (NO es código, es operativo de Juan)
+>
+> 1. Enviar los 3 mensajes a Antonio, Carolina M y Carolina A.
+> 2. Asignarse a sí mismo una oportunidad demo si quiere validar UI desde perfil senior (su bandeja sale vacía hoy).
+> 3. Llenar `docs/FEEDBACK_USO_REAL.md` a medida que aparezcan fricciones.
+> 4. Esperar ≥1 semana antes de pedir nuevas features.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-03 por Cowork — 4 usuarios reales operativos + 3 demos reasignados. Próximo: uso real ≥1 semana.**
+>
+> ## ✅ USUARIOS REALES OPERATIVOS (2026-05-03)
+>
+> 4 usuarios reales con funciones asignadas. Las 3 oportunidades demo han sido reasignadas a sus responsables reales según el flujo:
+>
+> | Usuario | Email | Funciones | Demo asignada (etapa) |
+> |---|---|---|---|
+> | Juan Olivares | jolivares@ | `['admin','asesor_senior']` | (sin demo asignada — supervisión) |
+> | Antonio Rodriguez | arodriguez@ | `['asesor_senior']` | DEMO MVP — Frigorífica Norte SL (asignada_a_senior) |
+> | Carolina Maciñeiras | administracion@ | `['analista']` | DEMO MVP — Hostal del Pino SL (factura_recibida) |
+> | Carolina Aroca | info@ | `['telemarketing']` | DEMO MVP — Industria Textil ABC SL (esperando_factura) |
+>
+> ### Carolina Aroca — credencial inicial
+>
+> Usuario creado vía SQL en auth.users (no había registro previo). Password temporal: `Valere2026Temporal!`. Juan le facilita el acceso y le pide reset de password en primer login.
+>
+> ### Petición permisos granulares — diferida
+>
+> Juan pidió plantear permisos editables por usuario. **Documentado como BACKLOG en `docs/BACKLOG_PERMISOS_GRANULARES_2026-05-03.md`** (4 capas: menú → entidad → campo → RPC).
+> Razón del aplazamiento: directriz validada por ChatGPT — *"El modelo de datos ya soporta el flujo real. Lo siguiente no es más código, es uso real con el equipo."*
+> Pre-requisito: ≥1 semana uso real con los 4 usuarios para identificar fugas concretas y diseñar permisos basados en evidencia, no en hipótesis.
+>
+> ### Próximo paso (sin desviación)
+>
+> Uso real con los 4 usuarios. Recoger feedback en `.cowork/inbox/` o `docs/SESIONES/`. Cuando haya ≥3 fricciones reales documentadas, desbloquear sprint de permisos granulares.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-01 noche por Cowork — Schema CONGELADO. Próximo: saneamiento.**
 >
 > ## 🛑 SCHEMA CONGELADO (decisión final aceptada por ChatGPT)
 >

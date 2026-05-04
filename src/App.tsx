@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './core/hooks/useAuth'
+import { puedeAccederRuta, rutaDefaultSegunFunciones } from './core/auth/permissions'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
 import SignupPage from './features/auth/SignupPage'
@@ -64,6 +65,20 @@ function AuthGuard({ children, roles }: { children: React.ReactNode; roles?: str
   if (roles && (!user.role || !roles.includes(user.role))) {
     return <Navigate to="/dashboard" replace />
   }
+
+  // Capa A — guard por funciones (whitelist de rutas)
+  // Master/admin pasa todo. Si no, redirige a su default si la ruta actual no está permitida.
+  if (profileLoaded) {
+    const ok = puedeAccederRuta(location.pathname, user.funciones, user.role)
+    if (!ok) {
+      const destino = rutaDefaultSegunFunciones(user.funciones, user.role)
+      // evita loop si el destino tampoco es accesible (caso edge)
+      if (destino !== location.pathname) {
+        return <Navigate to={destino} replace />
+      }
+    }
+  }
+
   return (
     <AppShell>
       <ErrorBoundary moduleName="esta seccion">

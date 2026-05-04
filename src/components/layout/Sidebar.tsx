@@ -77,11 +77,17 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
   const isMasterOrManager = user?.role === 'master' || user?.role === 'manager'
 
   const userFunciones = user?.funciones ?? []
+  const isAdmin = userFunciones.includes('admin') || user?.role === 'master'
   const hasCaptacionAccess =
     userFunciones.includes('telemarketing') ||
     userFunciones.includes('analista') ||
     userFunciones.includes('asesor_senior') ||
-    userFunciones.includes('admin')
+    isAdmin
+
+  // Capa A — bloques completos visibles solo a admin/asesor_senior.
+  // Telemarketing y analista NO ven CRM Comercial ni Potencias en sidebar.
+  const showCrmComercial = isAdmin || userFunciones.includes('asesor_senior')
+  const showPotencias    = isAdmin // Potencias es módulo aparte; por ahora solo admin
 
   const isPotenciasActive =
     location.pathname === '/potencias' ||
@@ -139,17 +145,22 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
 
       {/* Navegacion */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {!collapsed && (
-          <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            CRM Comercial
-          </p>
+        {/* Bloque CRM Comercial — solo admin/asesor_senior (Capa A permisos) */}
+        {showCrmComercial && (
+          <>
+            {!collapsed && (
+              <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                CRM Comercial
+              </p>
+            )}
+            {collapsed && <div className="mb-1 mx-auto h-px w-8 bg-slate-200" />}
+            <div className="space-y-0.5">
+              {crmItems.map(item => (
+                <NavItem key={item.to} {...item} onClose={onClose} collapsed={collapsed} />
+              ))}
+            </div>
+          </>
         )}
-        {collapsed && <div className="mb-1 mx-auto h-px w-8 bg-slate-200" />}
-        <div className="space-y-0.5">
-          {crmItems.map(item => (
-            <NavItem key={item.to} {...item} onClose={onClose} collapsed={collapsed} />
-          ))}
-        </div>
 
         {/* Seccion Captacion */}
         {hasCaptacionAccess && (
@@ -171,50 +182,52 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
           </div>
         )}
 
-        {/* Seccion Potencias */}
-        <div className="mt-2 border-t border-slate-100 pt-2">
-          {collapsed ? (
-            <NavLink
-              to="/potencias"
-              onClick={onClose}
-              title="Gestion de Potencias"
-              className={({ isActive }) =>
-                `flex items-center justify-center rounded-xl px-2 py-2 transition-colors ${
-                  isActive || isPotenciasActive
-                    ? 'bg-amber-50 text-amber-700'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`
-              }
-            >
-              <Zap className="h-4 w-4 text-amber-500" />
-            </NavLink>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setPotenciasOpen(o => !o)}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                  isPotenciasActive ? 'bg-amber-50 text-amber-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
+        {/* Seccion Potencias — solo admin (Capa A permisos) */}
+        {showPotencias && (
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            {collapsed ? (
+              <NavLink
+                to="/potencias"
+                onClick={onClose}
+                title="Gestion de Potencias"
+                className={({ isActive }) =>
+                  `flex items-center justify-center rounded-xl px-2 py-2 transition-colors ${
+                    isActive || isPotenciasActive
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`
+                }
               >
-                <Zap className="h-4 w-4 shrink-0 text-amber-500" />
-                <span className="flex-1 text-left">Gestion de Potencias</span>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
-                    potenciasOpen ? 'rotate-180' : ''
+                <Zap className="h-4 w-4 text-amber-500" />
+              </NavLink>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setPotenciasOpen(o => !o)}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                    isPotenciasActive ? 'bg-amber-50 text-amber-700' : 'text-slate-600 hover:bg-slate-100'
                   }`}
-                />
-              </button>
-              {potenciasOpen && (
-                <div className="mt-1 space-y-0.5 pl-2">
-                  {potenciasItems.map(item => (
-                    <NavItem key={item.to + item.label} {...item} onClose={onClose} collapsed={false} />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                >
+                  <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+                  <span className="flex-1 text-left">Gestion de Potencias</span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+                      potenciasOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {potenciasOpen && (
+                  <div className="mt-1 space-y-0.5 pl-2">
+                    {potenciasItems.map(item => (
+                      <NavItem key={item.to + item.label} {...item} onClose={onClose} collapsed={false} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Admin */}
         {isMasterOrManager && (

@@ -13,6 +13,7 @@ export type VMisOportunidadesRow = {
   etapa_operativa: string | null
   decisor_identificado: boolean | null
   responsable_actual_id: string | null
+  factura_fecha_prevista?: string | null
   factura_recibida_at: string | null
   factura_documento_id: string | null
   propuesta_documento_id: string | null
@@ -22,6 +23,62 @@ export type VMisOportunidadesRow = {
   ahorro_anual_estimado: number | null
   created_at: string
   updated_at: string
+}
+
+/** Tipo de fila de la vista v_captacion_todos_mis_casos (incluye casos donde fui parte alguna vez) */
+export type VTodosMisCasosRow = VMisOportunidadesRow & {
+  responsable_actual_nombre: string | null
+  responsable_actual_funciones: string[] | null
+}
+
+/** Datos detallados para el drawer */
+export type OportunidadDetalle = {
+  id: string
+  nombre: string | null
+  tipo: string | null
+  etapa: string | null
+  etapa_operativa: string | null
+  decisor_identificado: boolean | null
+  valor_estimado_eur: number | null
+  ahorro_anual_estimado: number | null
+  factura_fecha_prevista: string | null
+  factura_recibida_at: string | null
+  factura_documento_id: string | null
+  propuesta_documento_id: string | null
+  propuesta_enviada_at: string | null
+  notas: string | null
+  responsable_actual_id: string | null
+  created_at: string
+  updated_at: string
+  empresa: {
+    id: string
+    nombre: string | null
+    nif: string | null
+    telefono_principal: string | null
+    email_principal: string | null
+    ciudad: string | null
+    segmento: string | null
+  } | null
+  contactos: Array<{
+    id: string
+    nombre: string | null
+    cargo: string | null
+    telefono: string | null
+    email: string | null
+    es_decisor: boolean
+  }>
+}
+
+export type ActividadRow = {
+  id: string
+  tipo: string
+  titulo: string
+  descripcion: string | null
+  fecha_actividad: string
+  resultado: string | null
+  usuario_id: string | null
+  adjunto_url: string | null
+  adjunto_nombre: string | null
 }
 
 export function useMisOportunidades() {
@@ -41,6 +98,97 @@ export function useMisOportunidades() {
       // generados (limitación de Postgres views), pero en BD nunca es null porque
       // viene de oportunidades.id (PK). Cast seguro.
       return (data ?? []) as unknown as VMisOportunidadesRow[]
+    },
+  })
+}
+
+/**
+ * Vista cross-bandeja: todos los casos donde el user actual fue parte alguna vez
+ * (responsable actual, creador o aparece en handoffs).
+ *
+ * Pensada para Carolina Aroca: aunque haya hecho handoff a analista, sigue viendo
+ * el caso en estado read-only para responder al cliente si llama.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabaseAny = supabase as any
+
+export function useTodosMisCasosCaptacion() {
+  return useQuery({
+    queryKey: ['captacion_todos_mis_casos'],
+    queryFn: async (): Promise<VTodosMisCasosRow[]> => {
+      // Cast: vista nueva del sprint Día 1, aún no presente en los tipos
+      // generados de Supabase. Cuando se regeneren con
+      // `npx supabase gen types typescript --project-id <ref> > src/core/types/database.ts`
+      // se podrá usar `supabase.from(...)` directo.
+      const { data, error } = await supabaseAny
+        .from('v_captacion_todos_mis_casos')
+        .select('*')
+        .order('updated_at', { ascending: false })
+
+      if (error) {
+        logError(error, 'useTodosMisCasosCaptacion')
+        throw error
+      }
+      return (data ?? []) as VTodosMisCasosRow[]
+    },
+  })
+}
+
+/** Detalle de una oportunidad para el drawer (incluye empresa + contactos) */
+export function useOportunidadDetalle(id: string | null) {
+  return useQuery({
+    queryKey: ['oportunidad_detalle', id],
+    enabled: !!id,
+    queryFn: async (): Promise<OportunidadDetalle | null> => {
+      if (!id) return null
+      const { data, error } = await supabase
+        .from('oportunidades')
+        .select(`
+          id, nombre, tipo, etapa, etapa_operativa,
+          decisor_identificado, valor_estimado_eur, ahorro_anual_estimado,
+          factura_fecha_prevista, factura_recibida_at, factura_documento_id,
+          propuesta_documento_id, propuesta_enviada_at, notas,
+          responsable_actual_id, created_at, updated_at,
+          empresa:empresas (
+            id, nombre, nif, telefono_principal, email_principal, ciudad, segmento
+          ),
+          contactos:contactos (
+            id, nombre, cargo, telefono, email, es_decisor
+          )
+        `)
+        .eq('id', id)
+        .is('deleted_at', null)
+        .maybeSingle()
+
+      if (error) {
+        logError(error, 'useOportunidadDetalle')
+        throw error
+      }
+      return (data ?? null) as unknown as OportunidadDetalle | null
+    },
+  })
+}
+
+/** Timeline de actividades de una oportunidad (orden DESC por fecha) */
+export function useActividadesOportunidad(oportunidadId: string | null) {
+  return useQuery({
+    queryKey: ['actividades_oportunidad', oportunidadId],
+    enabled: !!oportunidadId,
+    queryFn: async (): Promise<ActividadRow[]> => {
+      if (!oportunidadId) return []
+      const { data, error } = await supabase
+        .from('actividades')
+        .select('id, tipo, titulo, descripcion, fecha_actividad, resultado, usuario_id, adjunto_url, adjunto_nombre')
+        .eq('entidad_tipo', 'oportunidad')
+        .eq('entidad_id', oportunidadId)
+        .is('deleted_at', null)
+        .order('fecha_actividad', { ascending: false })
+
+      if (error) {
+        logError(error, 'useActividadesOportunidad')
+        throw error
+      }
+      return (data ?? []) as ActividadRow[]
     },
   })
 }
