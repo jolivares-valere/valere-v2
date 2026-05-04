@@ -42,6 +42,31 @@
 
 <!-- Añadir entradas debajo de esta línea -->
 
+### 2026-05-04 — Smoke test E2E completo (7/7 tests verde)
+
+- **Quién**: Juan + ChatGPT auditor + Cowork
+- **Pantalla / ruta**: flujo completo multi-rol Captación → Análisis → Senior
+- **Qué intentaba hacer**: validar todos los flujos del runbook con users reales antes de onboarding
+- **Resultado**: 7/7 tests OK. 6 P0 detectados y resueltos durante el smoke. 1 P1 + 4 P2 anotados al cierre.
+- **Severidad**: validación
+- **Tags**: `[validacion]` `[smoke-completo]`
+
+**P1 anotado**: selector analista/senior muestra UUID en vez de nombre (FormPasarAAnalisis, FormPedirVisita). No operativo para users reales — fix antes de onboarding.
+
+**P2 anotados**:
+- Label "Descargar propuesta" en botón de factura (DescargarPropuestaInline reusable sin distinción)
+- Formato tamaño "0.00 MB" para archivos <1KB (cambiar a B/KB/MB según escala)
+- Timeline cuenta menos entradas de las esperables (cambios simples de etapa no generan actividad propia)
+- `documentos.tipo='estudio_ahorro'` para propuestas (interno BD, no visible)
+
+**Deuda confirmada (no cambia)**: policies Storage permisivas — cualquier authenticated puede SELECT cualquier doc del bucket. Aceptado MVP interno; tighten antes de ampliar equipo.
+
+**Archivo huérfano en Storage**: 1 PDF de 312 bytes en `oportunidades/6a4e92f1.../propuestas/` por intento pre-hotfix #5. Limpieza manual pendiente desde Supabase Dashboard.
+
+Detalle completo: `docs/SMOKE_TEST_RESULTADO_2026-05-04.md`.
+
+---
+
 ### 2026-05-04 (post-sprint) — Auditoría ChatGPT detecta bug bloqueante en handoffs
 
 - **Quién**: ChatGPT (auditoría externa post-sprint Días 2-5)
