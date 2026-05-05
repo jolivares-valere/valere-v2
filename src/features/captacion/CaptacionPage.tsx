@@ -6,8 +6,10 @@ import { useMisOportunidades, useTodosMisCasosCaptacion, type VMisOportunidadesR
 import BandejaCard from './components/BandejaCard'
 import OportunidadDrawer from './components/OportunidadDrawer'
 import NuevoLeadModal from './components/NuevoLeadModal'
+import { useAuth } from '../../core/hooks/useAuth'
 
 export default function CaptacionPage() {
+  const { user } = useAuth()
   const { data: oportunidades = [], isLoading } = useMisOportunidades()
   const { data: todosMisCasos = [] } = useTodosMisCasosCaptacion()
   const [drawerId, setDrawerId] = useState<string | null>(null)
@@ -149,7 +151,12 @@ export default function CaptacionPage() {
               </p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {todosMisCasos.map(op => (
-                  <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
+                  <BandejaCard
+                    key={op.id}
+                    op={op}
+                    onClick={setDrawerId}
+                    currentUserId={user?.id ?? null}
+                  />
                 ))}
               </div>
             </>

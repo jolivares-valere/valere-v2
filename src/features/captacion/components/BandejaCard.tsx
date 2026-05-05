@@ -1,3 +1,4 @@
+import { Eye } from 'lucide-react'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
 import { ETAPA_LABELS, ETAPA_COLORS, type VMisOportunidadesRow } from '../api'
@@ -5,6 +6,13 @@ import { ETAPA_LABELS, ETAPA_COLORS, type VMisOportunidadesRow } from '../api'
 interface Props {
   op: VMisOportunidadesRow
   onClick?: (id: string) => void
+  /**
+   * Sprint C 2026-05-05: id del usuario actual.
+   * Si se pasa y `op.responsable_actual_id !== currentUserId`, la card
+   * muestra badge "Solo seguimiento" para que la creadora entienda que ya
+   * no es responsable y solo puede leer/comentar.
+   */
+  currentUserId?: string | null
 }
 
 // Mapeo etapa_operativa → siguiente acción concreta para el responsable
@@ -22,11 +30,17 @@ const SIGUIENTE_ACCION: Record<string, string> = {
   cerrado: 'Sin acción pendiente',
 }
 
-export default function BandejaCard({ op, onClick }: Props) {
+export default function BandejaCard({ op, onClick, currentUserId }: Props) {
   const etapa = op.etapa_operativa ?? 'sin_etapa'
   const etapaLabel = ETAPA_LABELS[etapa] ?? etapa
   const etapaColor = ETAPA_COLORS[etapa] ?? 'bg-slate-50 border-slate-200 text-slate-700'
   const siguienteAccion = SIGUIENTE_ACCION[etapa]
+
+  // Sprint C: la card aparece en "Todos mis casos" (currentUserId pasado).
+  // Si no soy responsable, muestro badge "Solo seguimiento" para que la
+  // creadora distinga sus casos activos de los que ya gestiona otra persona.
+  const esSoloSeguimiento = !!currentUserId && !!op.responsable_actual_id
+    && op.responsable_actual_id !== currentUserId
 
   return (
     <div
@@ -41,10 +55,21 @@ export default function BandejaCard({ op, onClick }: Props) {
       tabIndex={0}
       className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-valere-blue-dark"
     >
-      {/* Nombre empresa */}
-      <p className="font-semibold text-slate-900 mb-1">
-        {op.empresa_nombre ?? 'Sin empresa'}
-      </p>
+      {/* Nombre empresa + badge solo seguimiento */}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <p className="font-semibold text-slate-900 truncate">
+          {op.empresa_nombre ?? 'Sin empresa'}
+        </p>
+        {esSoloSeguimiento && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border border-blue-200 bg-blue-50 text-blue-700 shrink-0"
+            title="No eres responsable; solo lectura/comentarios"
+          >
+            <Eye className="h-2.5 w-2.5" />
+            Solo seguimiento
+          </span>
+        )}
+      </div>
 
       {/* NIF empresa */}
       {op.empresa_nif && (

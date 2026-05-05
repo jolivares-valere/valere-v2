@@ -29,6 +29,12 @@ export type VMisOportunidadesRow = {
 export type VTodosMisCasosRow = VMisOportunidadesRow & {
   responsable_actual_nombre: string | null
   responsable_actual_funciones: string[] | null
+  /** Sprint C 2026-05-05: campos del creador para distinguir "soy responsable" vs "solo seguimiento" */
+  created_by: string | null
+  creador_nombre: string | null
+  creador_funciones: string[] | null
+  fecha_vencimiento_contrato_prospecto?: string | null
+  fuente_vencimiento_contrato_prospecto?: string | null
 }
 
 /** Datos detallados para el drawer */
@@ -52,6 +58,8 @@ export type OportunidadDetalle = {
   notas_vencimiento_contrato_prospecto?: string | null
   notas: string | null
   responsable_actual_id: string | null
+  /** Sprint C 2026-05-05: campos del creador para badge "Solo seguimiento" y permisos comentar */
+  created_by?: string | null
   created_at: string
   updated_at: string
   empresa: {
@@ -73,6 +81,17 @@ export type OportunidadDetalle = {
     es_decisor: boolean
     es_principal?: boolean
   }>
+  /** Info de personas (nombre + rol). Pueden ser null si el user fue borrado. */
+  responsable?: {
+    id: string
+    full_name: string | null
+    funciones: string[] | null
+  } | null
+  creador?: {
+    id: string
+    full_name: string | null
+    funciones: string[] | null
+  } | null
 }
 
 export type ActividadRow = {
@@ -282,12 +301,18 @@ export function useOportunidadDetalle(id: string | null) {
           fecha_vencimiento_contrato_prospecto,
           fuente_vencimiento_contrato_prospecto,
           notas_vencimiento_contrato_prospecto,
-          responsable_actual_id, created_at, updated_at,
+          responsable_actual_id, created_by, created_at, updated_at,
           empresa:empresas (
             id, nombre, nif, telefono_principal, email_principal, ciudad, segmento, estado_relacion
           ),
           contactos:contactos (
             id, nombre, cargo, telefono, email, es_decisor, es_principal
+          ),
+          responsable:user_profiles!oportunidades_responsable_actual_id_fkey (
+            id, full_name, funciones
+          ),
+          creador:user_profiles!oportunidades_created_by_fkey (
+            id, full_name, funciones
           )
         `)
         .eq('id', id)
@@ -395,6 +420,39 @@ export function useConvertirCliente() {
       queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
       queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', input.oportunidadId] })
       queryClient.invalidateQueries({ queryKey: ['empresas'] })
+    },
+  })
+}
+
+/**
+ * Hook para añadir comentario interno a una oportunidad sin cambiar etapa.
+ * Permitido a: responsable actual, creador, admin/senior, o quien aparezca en handoffs.
+ *
+ * Origen: Sprint C 2026-05-05. Carolina A pierde control al hacer handoff a
+ * analista. El comentario le permite seguir aportando contexto sin tener
+ * que reabrir el caso.
+ */
+export function useAgregarComentario(oportunidadId: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (texto: string): Promise<string> => {
+      if (!oportunidadId) throw new Error('Oportunidad no especificada')
+      const { data, error } = await supabaseAny.rpc('agregar_comentario_oportunidad', {
+        p_oportunidad_id: oportunidadId,
+        p_texto: texto,
+      })
+      if (error) {
+        logError(error, 'useAgregarComentario')
+        throw error
+      }
+      return String(data)
+    },
+    onSuccess: () => {
+      // Invalida timeline + listas (updated_at cambia)
+      queryClient.invalidateQueries({ queryKey: ['actividades_oportunidad', oportunidadId] })
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+      queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', oportunidadId] })
     },
   })
 }

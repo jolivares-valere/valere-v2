@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star, Briefcase, AlertCircle } from 'lucide-react'
+import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star, Briefcase, AlertCircle, MessageSquare, Eye } from 'lucide-react'
 import { toast } from 'sonner'
-import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, calcularSemaforoVencimiento, ETAPA_LABELS, ETAPA_COLORS } from '../api'
+import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, useAgregarComentario, calcularSemaforoVencimiento, ETAPA_LABELS, ETAPA_COLORS } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Button } from '../../../components/ui/button'
+import { Textarea } from '../../../components/ui/textarea'
 import OportunidadAcciones, { DescargarPropuestaInline } from './OportunidadAcciones'
 import EditarLeadModal from './EditarLeadModal'
 
@@ -29,6 +30,9 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
   const { data: actividades = [], isLoading: loadingActividades } = useActividadesOportunidad(oportunidadId)
   const [editarOpen, setEditarOpen] = useState(false)
   const convertirCliente = useConvertirCliente()
+  const agregarComentario = useAgregarComentario(oportunidadId)
+  const [comentarioOpen, setComentarioOpen] = useState(false)
+  const [comentarioTexto, setComentarioTexto] = useState('')
 
   // Puede editar: responsable actual, creador, o admin
   const puedeEditar = !!detalle && !!user && (
@@ -36,6 +40,21 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
     || (user.funciones ?? []).includes('admin')
     || user.role === 'master'
   )
+
+  // Sprint C 2026-05-05: visibilidad post-handoff
+  const userFuncionesLower = user?.funciones ?? []
+  const esResponsable = !!detalle && !!user && detalle.responsable_actual_id === user.id
+  const esCreador    = !!detalle && !!user && detalle.created_by === user.id
+  const esAdminSenior = !!user && (
+    userFuncionesLower.includes('admin') ||
+    userFuncionesLower.includes('asesor_senior') ||
+    user.role === 'master'
+  )
+  // Solo seguimiento: soy creador pero ya no soy el responsable actual.
+  // En este modo, banner azul + botón comentar; sin botones de cambio de etapa.
+  const esSoloSeguimiento = !!detalle && !!user && esCreador && !esResponsable && !esAdminSenior
+  // Puede añadir comentario: cualquier "parte" legítima del caso (RPC valida igual).
+  const puedeComentar = !!detalle && !!user && (esResponsable || esCreador || esAdminSenior)
 
   // Es prospecto: empresa no es cliente (ej. captación o ya marcada)
   const esProspecto = detalle?.empresa?.estado_relacion === 'prospecto'
@@ -51,6 +70,27 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
     detalle.etapa === 'contrato_firmado' ||
     detalle.etapa === 'activo'
   )
+
+  const handleEnviarComentario = async () => {
+    const texto = comentarioTexto.trim()
+    if (!texto) {
+      toast.error('El comentario está vacío')
+      return
+    }
+    try {
+      await agregarComentario.mutateAsync(texto)
+      toast.success('Comentario añadido')
+      setComentarioTexto('')
+      setComentarioOpen(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message
+        : (typeof err === 'object' && err !== null && 'message' in err
+          && typeof (err as { message: unknown }).message === 'string')
+          ? (err as { message: string }).message
+          : 'Error desconocido'
+      toast.error('No se pudo añadir el comentario', { description: msg })
+    }
+  }
 
   const handleConvertir = async () => {
     if (!detalle?.empresa?.id) return
@@ -174,6 +214,49 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
 
           {detalle && (
             <>
+              {/* Sprint C 2026-05-05: Responsable / Creador (visibilidad post-handoff) */}
+              {(detalle.responsable || detalle.creador) && (
+                <section className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 space-y-1 text-xs">
+                  {detalle.responsable && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-500">Responsable actual</span>
+                      <span className="font-medium text-slate-900 truncate">
+                        {detalle.responsable.full_name ?? '—'}
+                        {detalle.responsable.funciones && detalle.responsable.funciones.length > 0 && (
+                          <span className="text-slate-400 font-normal ml-1">
+                            ({detalle.responsable.funciones[0]})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {detalle.creador && detalle.creador.id !== detalle.responsable?.id && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-500">Creado por</span>
+                      <span className="font-medium text-slate-900 truncate">
+                        {detalle.creador.full_name ?? '—'}
+                        {detalle.creador.funciones && detalle.creador.funciones.length > 0 && (
+                          <span className="text-slate-400 font-normal ml-1">
+                            ({detalle.creador.funciones[0]})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* Banner "Solo seguimiento" para creadora cuando ya hizo handoff */}
+              {esSoloSeguimiento && (
+                <section className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 flex items-start gap-2">
+                  <Eye className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-900">
+                    Este caso está siendo gestionado por <strong>{detalle.responsable?.full_name ?? 'otra persona'}</strong>.
+                    Puedes hacer seguimiento y añadir comentarios, pero las acciones de cambio de etapa las hace quien lo lleva.
+                  </div>
+                </section>
+              )}
+
               {/* Resumen económico */}
               {(detalle.valor_estimado_eur || detalle.ahorro_anual_estimado) && (
                 <section>
@@ -405,6 +488,61 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                 </section>
               )}
 
+              {/* Sprint C: Añadir comentario interno (visible para responsable, creador, admin/senior) */}
+              {puedeComentar && (
+                <section>
+                  {!comentarioOpen ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setComentarioOpen(true)}
+                      className="w-full"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                      Añadir comentario
+                    </Button>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        Comentario interno
+                      </h3>
+                      <Textarea
+                        autoFocus
+                        rows={3}
+                        value={comentarioTexto}
+                        onChange={e => setComentarioTexto(e.target.value)}
+                        placeholder="Contexto, observación, recordatorio…"
+                        maxLength={4000}
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setComentarioOpen(false)
+                            setComentarioTexto('')
+                          }}
+                          disabled={agregarComentario.isPending}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleEnviarComentario}
+                          disabled={agregarComentario.isPending || comentarioTexto.trim().length === 0}
+                        >
+                          {agregarComentario.isPending ? 'Añadiendo…' : 'Añadir comentario'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
+
               {/* Timeline actividades */}
               <section>
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
@@ -446,8 +584,11 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
         {/* Footer — acciones contextuales por etapa.
             max-h + overflow-y-auto: si un form interno (subir factura, cerrar
             perdida, etc.) crece, scrollea dentro del propio footer en vez de
-            empujar los botones fuera de pantalla. */}
-        {detalle && (
+            empujar los botones fuera de pantalla.
+            Sprint C: solo visible para responsable o admin/senior. La creadora
+            que ya hizo handoff (esSoloSeguimiento) no ve botones de cambio de
+            etapa para evitar pisar el flujo del que ahora gestiona el caso. */}
+        {detalle && (esResponsable || esAdminSenior) && (
           <div className="border-t border-slate-200 px-5 py-3 bg-slate-50 max-h-[60vh] overflow-y-auto shrink-0">
             <OportunidadAcciones detalle={detalle} onClose={onClose} />
           </div>
