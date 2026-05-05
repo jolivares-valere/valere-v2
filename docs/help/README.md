@@ -7,23 +7,90 @@ Esta carpeta es la **fuente única de verdad** de la documentación que consumen
 ```
 docs/help/
 ├── README.md                            # este índice
+├── AUTH-SIGNUP-Y-APROBACION.md          # alta de usuarios y aprobación admin
+│
 ├── empezando/
 │   └── primer-acceso.md                 # cómo entrar al CRM por primera vez
+│
+├── permisos/
+│   └── que-ve-cada-funcion.md           # qué módulos ve cada rol/función
+│
+├── captacion/                           # Carolina Aroca (telemarketing)
+│   ├── crear-lead.md                    # alta rápida de lead
+│   ├── pedir-factura.md                 # llamar y registrar resultado
+│   ├── subir-factura.md                 # cliente envía factura → upload
+│   ├── pasar-a-analisis.md              # handoff a Carolina M
+│   ├── enviar-propuesta.md              # marcar propuesta enviada al cliente
+│   └── cerrar-caso.md                   # ganada / perdida / visita / programar
+│
+├── analisis-captacion/                  # Carolina Maciñeiras (analista)
+│   ├── recibir-caso.md                  # qué hacer al recibir factura
+│   ├── empezar-analisis.md              # estándar vs senior — cómo decidir
+│   └── subir-propuesta.md               # subir propuesta + handoff vuelta
+│
+├── cartera-senior/                      # Antonio / Juan (asesor senior)
+│   └── preparar-y-subir-propuesta-senior.md
+│
 ├── empresas/
-│   ├── crear-empresa.md                 # alta de empresa
-│   └── importar-csv.md                  # alta masiva desde CSV
-├── oportunidades/
-│   └── pipeline-kanban.md               # uso del kanban de oportunidades
-├── actividades/
-│   └── registrar-actividad.md           # crear llamadas/reuniones/tareas
+│   ├── crear-empresa.md
+│   ├── importar-csv.md
+│   └── anadir-contacto-a-empresa.md
+│
 ├── contactos/
-├── contratos/
+│   └── crear-contacto.md
+│
+├── oportunidades/
+│   ├── pipeline-kanban.md               # NOTA: legacy /oportunidades; el flujo
+│   ├── estados-y-etapas.md              # nuevo es Captación + bandejas multi-rol
+│   └── crear-oportunidad.md
+│
+├── actividades/
+│   ├── registrar-actividad.md
+│   └── configurar-recordatorio.md
+│
 ├── calendario/
-├── incidencias-y-renovaciones/
+│   └── ver-agenda.md
+│
+├── contratos/
+│   ├── crear-contrato.md
+│   └── gestionar-contratos.md
+│
+├── cups/
+│   └── crear-cups.md
+│
+├── dashboard/
+│   └── interpretar-dashboard.md
+│
+├── datos/
+│   └── captura-facturas.md              # módulo Calculadora (energía)
+│
+├── analisis/
+│   └── comparativo-ofertas.md           # módulo Calculadora
+│
+├── propuestas-energia/
+│   └── generar-propuesta.md             # módulo Calculadora
+│
 ├── documentos/
-├── notificaciones/
+│   └── subir-documento.md
+│
+├── incidencias/
+│   └── registrar-incidencia.md
+│
+├── renovaciones/
+│   └── gestionar-renovaciones.md
+│
 ├── informes/
-└── faqs/
+│   └── generar-informes.md
+│
+├── notificaciones/
+│   └── gestionar-notificaciones.md
+│
+├── admin/
+│   ├── custom-fields.md
+│   └── gestionar-usuarios.md
+│
+└── potencias/
+    └── README.md                        # módulo Potencias (otra app interna)
 ```
 
 ## Convenciones de cada `.md`
@@ -89,10 +156,26 @@ Igual que el punto anterior. El pipeline detecta cambios en cualquier archivo ba
 - **NO asumir conocimiento técnico** del usuario. Son compañeros de Valere (consultores energéticos), no desarrolladores. Evitar jerga técnica (React, Supabase, RLS, etc.) salvo que sea imprescindible.
 - **NO usar capturas de pantalla pesadas** — los embeddings solo procesan texto. Si es imprescindible mostrar la UI, usar descripción textual + link a imagen en Drive.
 
-## Estado actual
+## Estado actual (2026-05-04)
 
-- **Docs escritos**: 5 piloto (primer-acceso, crear-empresa, importar-csv, pipeline-kanban, registrar-actividad).
-- **Pipeline embeddings**: pendiente de implementar (Fase 2 del plan).
-- **Widget RAG**: pendiente de implementar (Fase 4 del plan).
+- **Docs escritos**: 38 documentos organizados por módulo + Sprint Operativo Captación completo (10 docs nuevos: 6 captación + 3 análisis + 1 senior + permisos).
+- **Pipeline embeddings**: implementado (`.github/workflows/regenerate-help-embeddings.yml`). Se dispara con cualquier cambio bajo `docs/help/**`.
+- **Widget RAG**: implementado en `src/features/asistente-crm/AsistentePanel.tsx`, accesible desde todas las páginas del CRM.
 
-Ver `docs/PLAN_ASISTENTE_RAG_CRM.md` para el plan completo de implementación.
+## Convención de formato (validada con ChatGPT 2026-05-04)
+
+Cada doc operativo del flujo nuevo (Sprint Captación) sigue este formato:
+
+```
+CUÁNDO USAR    — escenario concreto
+QUÉ HACE       — qué consigue la acción
+PASOS          — 3 a 5 pasos numerados
+QUÉ DEBE PASAR — resultado esperado en pantalla
+SI FALLA       — errores típicos y cómo resolverlos
+```
+
+Cortos (15-25 líneas), accionables, sin teoría. La ayuda no es manual: es respuesta inmediata a la pregunta "estoy aquí, qué hago".
+
+Los docs antiguos (módulos legacy CRM Comercial / Calculadora) usan el formato anterior (Resumen rápido / Paso a paso / Errores frecuentes / Preguntas relacionadas) — están bien, no los reescribimos.
+
+Ver `docs/PLAN_ASISTENTE_RAG_CRM.md` para arquitectura completa del asistente.

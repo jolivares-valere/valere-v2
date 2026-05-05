@@ -11,7 +11,14 @@ related:
 
 # Estados y etapas de una oportunidad
 
-> En el CRM **estado = etapa = fase** de una oportunidad. Son sinónimos. La columna del kanban en la que está la tarjeta indica su estado actual.
+> ⚠️ **Importante (2026-05-04)**: el CRM ahora tiene **dos vistas** de oportunidades.
+>
+> - **Captación + Análisis + Cartera senior** (flujo nuevo multi-rol con bandejas) usa la columna `etapa_operativa` con 11 estados granulares: `nuevo, contactado, esperando_factura, factura_recibida, en_analisis, asignada_a_senior, propuesta_en_preparacion, propuesta_lista, propuesta_enviada, seguimiento, cerrado`.
+> - **/oportunidades** (kanban legacy comercial) usa la columna `etapa` con los 8 estados que se describen abajo.
+>
+> Ambas conviven. Para el flujo de captación nuevo (Carolina A / Carolina M / asesores), usa los docs de `captacion/`, `analisis-captacion/` y `cartera-senior/` — son los que aplican al día a día actual.
+
+> En el kanban legacy `/oportunidades`, **estado = etapa = fase** de una oportunidad. La columna del kanban indica su estado actual.
 
 ## Resumen rápido
 Una oportunidad puede estar en uno de **8 estados**: Prospecto, Auditoría consumo, Oferta presentada, Negociación, Contrato firmado, Activo, Ganada o Perdida. Cada estado lleva asociada una probabilidad y un significado comercial.

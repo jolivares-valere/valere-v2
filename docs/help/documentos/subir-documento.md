@@ -11,6 +11,8 @@ related:
 
 # Subir documentos
 
+> 💡 **Para captación**: si lo que quieres es subir una **factura recibida** (Carolina Aroca) o una **propuesta lista** (analista / senior), no uses esta vía genérica. Hazlo desde el drawer del caso en `/captacion`, `/analisis-captacion` o `/cartera-senior`. Ver `captacion/subir-factura.md` y `analisis-captacion/subir-propuesta.md`.
+
 ## Resumen rápido
 Desde la ficha de cualquier entidad (empresa, contrato, CUPS, oportunidad, incidencia) → pestaña **Documentos** → **+ Subir documento**. Soporta PDF, imágenes, Excel, Word.
 
