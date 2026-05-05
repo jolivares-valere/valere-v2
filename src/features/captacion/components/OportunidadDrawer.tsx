@@ -416,9 +416,14 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                 )}
               </section>
 
-              {/* Vencimiento contrato actual del prospecto (semáforo 90/60/30) */}
-              {detalle.fecha_vencimiento_contrato_prospecto && (() => {
-                const sem = calcularSemaforoVencimiento(detalle.fecha_vencimiento_contrato_prospecto)
+              {/* Vencimiento contrato actual del prospecto (semáforo 90/60/30).
+                  Hotfix Sprint C 2026-05-05: la sección se muestra SIEMPRE en
+                  contexto captación (aunque la fecha sea null) para que Carolina
+                  vea si está registrada o no. Antes solo aparecía cuando existía
+                  fecha, lo que confundía: "¿lo guardé bien o no?". */}
+              {esProspecto && (() => {
+                const fecha = detalle.fecha_vencimiento_contrato_prospecto
+                const sem = calcularSemaforoVencimiento(fecha)
                 const colorClasses: Record<typeof sem.color, string> = {
                   verde:    'bg-green-50 border-green-200 text-green-800',
                   amarillo: 'bg-yellow-50 border-yellow-200 text-yellow-800',
@@ -433,22 +438,31 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                       <Calendar className="h-3.5 w-3.5" />
                       Vencimiento contrato actual del prospecto
                     </h3>
-                    <div className={`rounded-lg border px-3 py-2 ${colorClasses[sem.color]}`}>
-                      <div className="text-sm font-semibold">
-                        {formatDate(detalle.fecha_vencimiento_contrato_prospecto, 'short')}
+                    {fecha ? (
+                      <div className={`rounded-lg border px-3 py-2 ${colorClasses[sem.color]}`}>
+                        <div className="text-sm font-semibold">
+                          {formatDate(fecha, 'short')}
+                        </div>
+                        <div className="text-xs mt-0.5">{sem.label}</div>
+                        {detalle.fuente_vencimiento_contrato_prospecto && (
+                          <div className="text-[11px] mt-1 opacity-80">
+                            Fuente: {detalle.fuente_vencimiento_contrato_prospecto}
+                          </div>
+                        )}
+                        {detalle.notas_vencimiento_contrato_prospecto && (
+                          <div className="text-xs mt-1 italic opacity-90">
+                            {detalle.notas_vencimiento_contrato_prospecto}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs mt-0.5">{sem.label}</div>
-                      {detalle.fuente_vencimiento_contrato_prospecto && (
-                        <div className="text-[11px] mt-1 opacity-80">
-                          Fuente: {detalle.fuente_vencimiento_contrato_prospecto}
-                        </div>
-                      )}
-                      {detalle.notas_vencimiento_contrato_prospecto && (
-                        <div className="text-xs mt-1 italic opacity-90">
-                          {detalle.notas_vencimiento_contrato_prospecto}
-                        </div>
-                      )}
-                    </div>
+                    ) : (
+                      // Hotfix Sprint C: si no hay fecha, mostrar placeholder en
+                      // lugar de ocultar la sección. Carolina necesita saber si
+                      // el dato está registrado o no.
+                      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                        Sin fecha registrada. Edita el lead para añadir la fecha de vencimiento del contrato actual y activar el semáforo 90/60/30 días.
+                      </div>
+                    )}
                   </section>
                 )
               })()}

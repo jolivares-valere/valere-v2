@@ -69,11 +69,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
 
+      {/* Hotfix Sprint C 2026-05-05: toast a bottom-right + 5s para no
+          tapar el botón "+ Nuevo lead" ni el botón cerrar del drawer.
+          Duración 5s queda dentro del rango 4-6s pedido por feedback Carolina. */}
       <Toaster
-        position="top-right"
+        position="bottom-right"
         richColors
         closeButton
-        toastOptions={{ duration: 3500 }}
+        toastOptions={{ duration: 5000 }}
       />
     </div>
   )
