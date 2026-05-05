@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star } from 'lucide-react'
-import { useOportunidadDetalle, useActividadesOportunidad, ETAPA_LABELS, ETAPA_COLORS } from '../api'
+import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star, Briefcase, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, calcularSemaforoVencimiento, ETAPA_LABELS, ETAPA_COLORS } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { Button } from '../../../components/ui/button'
 import OportunidadAcciones, { DescargarPropuestaInline } from './OportunidadAcciones'
 import EditarLeadModal from './EditarLeadModal'
 
@@ -26,14 +28,56 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
   const { data: detalle, isLoading: loadingDetalle } = useOportunidadDetalle(oportunidadId)
   const { data: actividades = [], isLoading: loadingActividades } = useActividadesOportunidad(oportunidadId)
   const [editarOpen, setEditarOpen] = useState(false)
+  const convertirCliente = useConvertirCliente()
 
   // Puede editar: responsable actual, creador, o admin
   const puedeEditar = !!detalle && !!user && (
     detalle.responsable_actual_id === user.id
     || (user.funciones ?? []).includes('admin')
     || user.role === 'master'
-    // creador: si la BD nos lo expone en detalle (no lo expone hoy en este tipo)
   )
+
+  // Es prospecto: empresa no es cliente (ej. captación o ya marcada)
+  const esProspecto = detalle?.empresa?.estado_relacion === 'prospecto'
+
+  // Puede convertir a cliente CRM: solo admin/asesor_senior + es prospecto + etapa indica cierre real
+  const userFunciones = user?.funciones ?? []
+  const puedeConvertir = !!detalle && !!user && esProspecto && (
+    userFunciones.includes('admin') ||
+    userFunciones.includes('asesor_senior') ||
+    user.role === 'master'
+  ) && (
+    detalle.etapa === 'cerrada_ganada' ||
+    detalle.etapa === 'contrato_firmado' ||
+    detalle.etapa === 'activo'
+  )
+
+  const handleConvertir = async () => {
+    if (!detalle?.empresa?.id) return
+    const empresaNombre = detalle.empresa.nombre ?? 'esta empresa'
+    const ok = window.confirm(
+      `Esto moverá "${empresaNombre}" al CRM de clientes.\n\n` +
+      `A partir de ahora aparecerá en Empresas, Contactos, Contratos y gestión operativa del CRM.\n\n` +
+      `Esta acción es difícil de revertir. ¿Confirmar?`
+    )
+    if (!ok) return
+    try {
+      await convertirCliente.mutateAsync({
+        empresaId: detalle.empresa.id,
+        oportunidadId: detalle.id,
+      })
+      toast.success('Empresa promocionada a cliente CRM', {
+        description: 'Ya aparece en /empresas, /contactos y resto del CRM.',
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message
+        : (typeof err === 'object' && err !== null && 'message' in err
+          && typeof (err as { message: unknown }).message === 'string')
+          ? (err as { message: string }).message
+          : 'Error desconocido'
+      toast.error('No se pudo convertir', { description: msg })
+    }
+  }
 
   // Cierre con ESC
   useEffect(() => {
@@ -77,11 +121,22 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
             {detalle?.empresa?.nif && (
               <p className="text-xs text-slate-500 mt-0.5">{detalle.empresa.nif}</p>
             )}
-            <span
-              className={`inline-flex mt-2 items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${etapaColor}`}
-            >
-              {etapaLabel}
-            </span>
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${etapaColor}`}
+              >
+                {etapaLabel}
+              </span>
+              {esProspecto && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border border-amber-300 bg-amber-50 text-amber-800"
+                  title="Prospecto: aún no es cliente del CRM"
+                >
+                  <AlertCircle className="h-3 w-3" />
+                  PROSPECTO
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {puedeEditar && (
@@ -277,6 +332,65 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                   </div>
                 )}
               </section>
+
+              {/* Vencimiento contrato actual del prospecto (semáforo 90/60/30) */}
+              {detalle.fecha_vencimiento_contrato_prospecto && (() => {
+                const sem = calcularSemaforoVencimiento(detalle.fecha_vencimiento_contrato_prospecto)
+                const colorClasses: Record<typeof sem.color, string> = {
+                  verde:    'bg-green-50 border-green-200 text-green-800',
+                  amarillo: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+                  naranja:  'bg-orange-50 border-orange-300 text-orange-800',
+                  rojo:     'bg-red-50 border-red-300 text-red-800',
+                  vencido:  'bg-slate-100 border-slate-300 text-slate-700',
+                  sin_dato: 'bg-slate-50 border-slate-200 text-slate-500',
+                }
+                return (
+                  <section>
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      Vencimiento contrato actual del prospecto
+                    </h3>
+                    <div className={`rounded-lg border px-3 py-2 ${colorClasses[sem.color]}`}>
+                      <div className="text-sm font-semibold">
+                        {formatDate(detalle.fecha_vencimiento_contrato_prospecto, 'short')}
+                      </div>
+                      <div className="text-xs mt-0.5">{sem.label}</div>
+                      {detalle.fuente_vencimiento_contrato_prospecto && (
+                        <div className="text-[11px] mt-1 opacity-80">
+                          Fuente: {detalle.fuente_vencimiento_contrato_prospecto}
+                        </div>
+                      )}
+                      {detalle.notas_vencimiento_contrato_prospecto && (
+                        <div className="text-xs mt-1 italic opacity-90">
+                          {detalle.notas_vencimiento_contrato_prospecto}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )
+              })()}
+
+              {/* Convertir prospecto a cliente CRM */}
+              {puedeConvertir && (
+                <section className="rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-emerald-800 mb-2 flex items-center gap-1.5">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    Convertir a cliente CRM
+                  </h3>
+                  <p className="text-xs text-emerald-900 mb-2">
+                    Esta oportunidad parece cerrada. Si el contrato está firmado de verdad, promociona la empresa a cliente del CRM. Aparecerá en /empresas, /contactos, /contratos y resto del CRM.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={handleConvertir}
+                    disabled={convertirCliente.isPending}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                    size="sm"
+                  >
+                    {convertirCliente.isPending ? 'Convirtiendo…' : 'Convertir a cliente CRM'}
+                  </Button>
+                </section>
+              )}
 
               {/* Notas */}
               {detalle.notas && (

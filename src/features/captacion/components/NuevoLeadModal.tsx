@@ -13,8 +13,9 @@ import { Textarea } from '../../../components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../../components/ui/select'
-import { useCrearLead, type CrearLeadInput, type ContactoInput } from '../api'
+import { useCrearLead, type CrearLeadInput, type ContactoInput, type FuenteVencimiento } from '../api'
 import ContactosForm from './ContactosForm'
+import VencimientoContratoForm from './VencimientoContratoForm'
 
 /**
  * Modal "+ Nuevo lead" para Carolina Aroca.
@@ -50,6 +51,9 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
   const [contactos, setContactos] = useState<ContactoInput[]>([
     { nombre: '', cargo: '', telefono: '', email: '', es_principal: true },
   ])
+  const [vencFecha, setVencFecha] = useState<string>('')
+  const [vencFuente, setVencFuente] = useState<FuenteVencimiento | ''>('')
+  const [vencNotas, setVencNotas] = useState<string>('')
   const crearLead = useCrearLead()
 
   const form = useForm<Form>({
@@ -85,6 +89,9 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
         })),
       origen: values.origen,
       notas: values.notas?.trim() || undefined,
+      fecha_vencimiento_contrato: vencFecha || undefined,
+      fuente_vencimiento: vencFuente || undefined,
+      notas_vencimiento: vencNotas?.trim() || undefined,
     }
     try {
       const oportunidadId = await crearLead.mutateAsync(input)
@@ -93,6 +100,9 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
       })
       form.reset()
       setContactos([{ nombre: '', cargo: '', telefono: '', email: '', es_principal: true }])
+      setVencFecha('')
+      setVencFuente('')
+      setVencNotas('')
       setExtraOpen(false)
       onOpenChange(false)
       onCreated?.(oportunidadId)
@@ -224,6 +234,26 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
                   rows={3}
                   placeholder="Contexto, referencia, etc."
                   {...form.register('notas')}
+                />
+              </div>
+
+              <div className="border-t border-slate-200 pt-3">
+                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
+                  Vencimiento contrato actual del prospecto
+                </h4>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Si el cliente ya te ha dicho cuándo le vence el contrato actual, anótalo. Activa los semáforos de seguimiento (90/60/30 días).
+                </p>
+                <VencimientoContratoForm
+                  fecha={vencFecha}
+                  fuente={vencFuente}
+                  notas={vencNotas}
+                  onChange={({ fecha, fuente, notas }) => {
+                    setVencFecha(fecha)
+                    setVencFuente(fuente)
+                    setVencNotas(notas)
+                  }}
+                  idPrefix="nl_venc"
                 />
               </div>
             </section>

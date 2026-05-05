@@ -19,11 +19,16 @@ interface SearchResults {
 
 async function runSearch(q: string): Promise<SearchResults> {
   const like = `%${q}%`
+  // Búsqueda global del CRM excluye prospectos de captación (separación CRM/Captación).
+  // Cast: estado_relacion / contexto son columnas nuevas (FASE 1 separación,
+  // 2026-05-05) aún no reflejadas en los tipos generados de Supabase.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
   const [emp, con, ctr, opo] = await Promise.all([
-    supabase.from('empresas').select('id, nombre, nif').or(`nombre.ilike.${like},nif.ilike.${like}`).is('deleted_at', null).limit(5),
-    supabase.from('contactos').select('id, nombre, apellidos, email, empresa:empresas(nombre)').or(`nombre.ilike.${like},apellidos.ilike.${like},email.ilike.${like}`).is('deleted_at', null).limit(5),
+    sb.from('empresas').select('id, nombre, nif').or(`nombre.ilike.${like},nif.ilike.${like}`).is('deleted_at', null).eq('estado_relacion', 'cliente').limit(5),
+    sb.from('contactos').select('id, nombre, apellidos, email, empresa:empresas!inner(nombre, estado_relacion)').or(`nombre.ilike.${like},apellidos.ilike.${like},email.ilike.${like}`).is('deleted_at', null).eq('empresa.estado_relacion', 'cliente').limit(5),
     supabase.from('contratos').select('id, cups, empresa:empresas(nombre)').ilike('cups', like).is('deleted_at', null).limit(5),
-    supabase.from('oportunidades').select('id, nombre, empresa:empresas(nombre)').ilike('nombre', like).is('deleted_at', null).limit(5),
+    sb.from('oportunidades').select('id, nombre, empresa:empresas(nombre)').ilike('nombre', like).is('deleted_at', null).eq('contexto', 'crm').limit(5),
   ])
   return {
     empresas: (emp.data ?? []) as EmpresaHit[],

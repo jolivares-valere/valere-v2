@@ -13,8 +13,9 @@ import { Textarea } from '../../../components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../../components/ui/select'
-import { useActualizarLead, type ActualizarLeadInput, type OportunidadDetalle, type ContactoInput } from '../api'
+import { useActualizarLead, type ActualizarLeadInput, type OportunidadDetalle, type ContactoInput, type FuenteVencimiento } from '../api'
 import ContactosForm from './ContactosForm'
+import VencimientoContratoForm from './VencimientoContratoForm'
 
 /**
  * Modal "Editar datos del lead" — corrección de errores tras crear.
@@ -47,6 +48,9 @@ interface Props {
 export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) {
   const actualizar = useActualizarLead()
   const [contactos, setContactos] = useState<ContactoInput[]>([])
+  const [vencFecha, setVencFecha] = useState<string>('')
+  const [vencFuente, setVencFuente] = useState<FuenteVencimiento | ''>('')
+  const [vencNotas, setVencNotas] = useState<string>('')
 
   const form = useForm<Form>({
     resolver: zodResolver(schema),
@@ -82,11 +86,15 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
         email: c.email ?? '',
         es_principal: c.es_principal ?? false,
       }))
-      // Asegurar que al menos uno sea principal
       if (initial.length > 0 && !initial.some(c => c.es_principal)) {
         initial[0]!.es_principal = true
       }
       setContactos(initial.length > 0 ? initial : [{ nombre: '', cargo: '', telefono: '', email: '', es_principal: true }])
+
+      // Pre-rellenar vencimiento contrato del prospecto
+      setVencFecha(detalle.fecha_vencimiento_contrato_prospecto ?? '')
+      setVencFuente((detalle.fuente_vencimiento_contrato_prospecto as FuenteVencimiento | null) ?? '')
+      setVencNotas(detalle.notas_vencimiento_contrato_prospecto ?? '')
     }
   }, [open, detalle, form])
 
@@ -109,6 +117,12 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
         _eliminar: c._eliminar,
       })),
       notas: values.notas?.trim() || undefined,
+      // Vencimiento: lo enviamos siempre (con flag) para que el usuario pueda
+      // crear, editar o borrar (poniendo fecha vacía).
+      actualizar_vencimiento: true,
+      fecha_vencimiento_contrato: vencFecha || null,
+      fuente_vencimiento: (vencFuente || null) as FuenteVencimiento | null,
+      notas_vencimiento: vencNotas?.trim() || null,
     }
     try {
       await actualizar.mutateAsync(input)
@@ -192,6 +206,24 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
               Añade, edita o elimina contactos. Marca uno como principal (estrella).
             </p>
             <ContactosForm contactos={contactos} onChange={setContactos} idPrefix="ed" />
+          </section>
+
+          <section className="space-y-2 pt-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Vencimiento contrato actual</h3>
+            <p className="text-[11px] text-slate-500">
+              Si conoces o estimas cuándo vence el contrato actual del prospecto, anótalo. Activa los semáforos 90/60/30 días.
+            </p>
+            <VencimientoContratoForm
+              fecha={vencFecha}
+              fuente={vencFuente}
+              notas={vencNotas}
+              onChange={({ fecha, fuente, notas }) => {
+                setVencFecha(fecha)
+                setVencFuente(fuente)
+                setVencNotas(notas)
+              }}
+              idPrefix="ed_venc"
+            />
           </section>
 
           <section className="space-y-2 pt-2">

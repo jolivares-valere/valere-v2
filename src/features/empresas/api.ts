@@ -21,10 +21,19 @@ export function useEmpresas(options?: QueryOptions) {
       const from = (page - 1) * pageSize
       const to = from + pageSize - 1
 
-      let q = supabase
+      // Separación CRM/Captación: por defecto solo empresas cliente.
+      // Si se pasa filter.estado_relacion explícito, usar ese.
+      const estadoFilter = (options?.filter?.estado_relacion as string | undefined) ?? 'cliente'
+
+      // Cast: estado_relacion es columna nueva (FASE 1 separación CRM/Captación,
+      // 2026-05-05) que aún no está en los tipos generados de Supabase.
+      // Quitar este cast cuando se regeneren los tipos.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any)
         .from('empresas')
         .select('*, comercial:user_profiles!empresas_comercial_id_fkey(id, full_name)', { count: 'exact' })
         .is('deleted_at', null)
+        .eq('estado_relacion', estadoFilter)
 
       const search = options?.filter?.search as string | undefined
       if (search && search.trim()) {

@@ -23,10 +23,17 @@ export function useOportunidades(options?: QueryOptions) {
   return useQuery({
     queryKey: buildQueryKey(RESOURCE, options),
     queryFn: async (): Promise<OportunidadConEmpresa[]> => {
-      let q = supabase
+      // Cast: contexto es columna nueva (FASE 1 separación CRM/Captación,
+      // 2026-05-05). Aún no está en los tipos generados de Supabase.
+      // Quitar este cast cuando se regeneren los tipos.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any)
         .from('oportunidades')
+        // Separación CRM/Captación: kanban legacy /oportunidades muestra solo
+        // contexto='crm'. Las de captación viven en /captacion (bandejas).
         .select('*, empresa:empresas(id, nombre), contrato_origen:contratos!oportunidades_contrato_origen_id_fkey(id, fecha_fin, numero_contrato), contacto:contactos(id, nombre, apellidos, cargo)')
         .is('deleted_at', null)
+        .eq('contexto', 'crm')
         .order('created_at', { ascending: false })
 
       const f = options?.filter ?? {}

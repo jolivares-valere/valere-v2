@@ -44,7 +44,11 @@ export function useDashboardKPIs(comercialId?: string) {
       const in60 = new Date(hoy.getTime() + 60 * 86_400_000).toISOString().slice(0, 10)
       const hoyISO = hoy.toISOString().slice(0, 10)
 
-      let empresasQ = supabase.from('empresas').select('id', { count: 'exact', head: true }).is('deleted_at', null)
+      // Dashboard CRM excluye prospectos de captación (separación CRM/Captación).
+      // Cast: estado_relacion es columna nueva (FASE 1, 2026-05-05) aún no
+      // reflejada en los tipos generados de Supabase.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let empresasQ = (supabase as any).from('empresas').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('estado_relacion', 'cliente')
       if (comercialId) empresasQ = empresasQ.eq('comercial_id', comercialId)
 
       let contratosQ = supabase.from('contratos').select('id', { count: 'exact', head: true }).eq('estado', 'activo').is('deleted_at', null)

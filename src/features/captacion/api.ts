@@ -38,6 +38,7 @@ export type OportunidadDetalle = {
   tipo: string | null
   etapa: string | null
   etapa_operativa: string | null
+  contexto?: 'captacion' | 'crm' | null
   decisor_identificado: boolean | null
   valor_estimado_eur: number | null
   ahorro_anual_estimado: number | null
@@ -46,6 +47,9 @@ export type OportunidadDetalle = {
   factura_documento_id: string | null
   propuesta_documento_id: string | null
   propuesta_enviada_at: string | null
+  fecha_vencimiento_contrato_prospecto?: string | null
+  fuente_vencimiento_contrato_prospecto?: string | null
+  notas_vencimiento_contrato_prospecto?: string | null
   notas: string | null
   responsable_actual_id: string | null
   created_at: string
@@ -58,6 +62,7 @@ export type OportunidadDetalle = {
     email_principal: string | null
     ciudad: string | null
     segmento: string | null
+    estado_relacion?: 'prospecto' | 'cliente' | 'ex_cliente' | 'descartado' | null
   } | null
   contactos: Array<{
     id: string
@@ -130,6 +135,8 @@ export type ContactoInput = {
   _eliminar?: boolean
 }
 
+export type FuenteVencimiento = 'cliente_llamada' | 'factura' | 'email' | 'estimado' | 'desconocido'
+
 export type CrearLeadInput = {
   empresa_nombre: string
   empresa_nif?: string
@@ -140,6 +147,9 @@ export type CrearLeadInput = {
   contactos: ContactoInput[]
   origen?: 'cold' | 'web' | 'recomendacion' | 'contacto_previo' | 'otro'
   notas?: string
+  fecha_vencimiento_contrato?: string  // ISO date YYYY-MM-DD
+  fuente_vencimiento?: FuenteVencimiento
+  notas_vencimiento?: string
 }
 
 export type ActualizarLeadInput = {
@@ -152,6 +162,32 @@ export type ActualizarLeadInput = {
   empresa_segmento?: 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
   contactos: ContactoInput[]
   notas?: string
+  /** Si actualizar_vencimiento=true, los 3 campos abajo se persisten (incluso a null). Si false, no se tocan. */
+  actualizar_vencimiento?: boolean
+  fecha_vencimiento_contrato?: string | null
+  fuente_vencimiento?: FuenteVencimiento | null
+  notas_vencimiento?: string | null
+}
+
+/** Semáforo de vencimiento para captación. Validado con ChatGPT 2026-05-05. */
+export type Semaforo = {
+  color: 'verde' | 'amarillo' | 'naranja' | 'rojo' | 'vencido' | 'sin_dato'
+  label: string
+  dias: number | null
+}
+
+export function calcularSemaforoVencimiento(fechaISO: string | null | undefined): Semaforo {
+  if (!fechaISO) return { color: 'sin_dato', label: 'Sin fecha', dias: null }
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const venc = new Date(fechaISO + 'T00:00:00')
+  const diffMs = venc.getTime() - hoy.getTime()
+  const dias = Math.round(diffMs / 86_400_000)
+  if (dias < 0) return { color: 'vencido', label: `Vencido hace ${Math.abs(dias)} días`, dias }
+  if (dias <= 30) return { color: 'rojo', label: `Vence en ${dias} días — urgente`, dias }
+  if (dias <= 60) return { color: 'naranja', label: `Vence en ${dias} días — prioridad alta`, dias }
+  if (dias <= 90) return { color: 'amarillo', label: `Vence en ${dias} días — iniciar contacto`, dias }
+  return { color: 'verde', label: `Vence en ${dias} días`, dias }
 }
 
 /** Cargos sugeridos para B2B energético (input libre con sugerencias) */
@@ -190,6 +226,9 @@ export function useCrearLead() {
         p_contactos:        input.contactos ?? [],
         p_origen: input.origen ?? 'cold',
         p_notas:  input.notas ?? null,
+        p_fecha_vencimiento_contrato: input.fecha_vencimiento_contrato ?? null,
+        p_fuente_vencimiento: input.fuente_vencimiento ?? null,
+        p_notas_vencimiento: input.notas_vencimiento ?? null,
       })
       if (error) {
         logError(error, 'useCrearLead')
@@ -236,13 +275,16 @@ export function useOportunidadDetalle(id: string | null) {
       const { data, error } = await supabase
         .from('oportunidades')
         .select(`
-          id, nombre, tipo, etapa, etapa_operativa,
+          id, nombre, tipo, etapa, etapa_operativa, contexto,
           decisor_identificado, valor_estimado_eur, ahorro_anual_estimado,
           factura_fecha_prevista, factura_recibida_at, factura_documento_id,
           propuesta_documento_id, propuesta_enviada_at, notas,
+          fecha_vencimiento_contrato_prospecto,
+          fuente_vencimiento_contrato_prospecto,
+          notas_vencimiento_contrato_prospecto,
           responsable_actual_id, created_at, updated_at,
           empresa:empresas (
-            id, nombre, nif, telefono_principal, email_principal, ciudad, segmento
+            id, nombre, nif, telefono_principal, email_principal, ciudad, segmento, estado_relacion
           ),
           contactos:contactos (
             id, nombre, cargo, telefono, email, es_decisor, es_principal
@@ -307,6 +349,10 @@ export function useActualizarLead() {
         p_empresa_segmento:  input.empresa_segmento ?? null,
         p_contactos:         input.contactos ?? [],
         p_notas:             input.notas ?? null,
+        p_fecha_vencimiento_contrato: input.fecha_vencimiento_contrato ?? null,
+        p_fuente_vencimiento: input.fuente_vencimiento ?? null,
+        p_notas_vencimiento: input.notas_vencimiento ?? null,
+        p_actualizar_vencimiento: input.actualizar_vencimiento ?? false,
       })
       if (error) {
         logError(error, 'useActualizarLead')
@@ -317,6 +363,38 @@ export function useActualizarLead() {
       queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
       queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
       queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', input.oportunidadId] })
+    },
+  })
+}
+
+/**
+ * Hook para convertir empresa prospecto a cliente CRM.
+ * Solo asesor_senior o admin (validado en RPC).
+ * Atómico: cambia estado_relacion, migra oportunidades captacion→crm,
+ * marca etapa contrato_firmado si se especifica oportunidad concreta,
+ * registra actividad.
+ *
+ * Origen: feedback Juan/ChatGPT 2026-05-05 separación CRM/Captación.
+ */
+export function useConvertirCliente() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { empresaId: string; oportunidadId?: string; notas?: string }): Promise<void> => {
+      const { error } = await supabaseAny.rpc('convertir_prospecto_a_cliente', {
+        p_empresa_id: input.empresaId,
+        p_oportunidad_id: input.oportunidadId ?? null,
+        p_notas: input.notas ?? null,
+      })
+      if (error) {
+        logError(error, 'useConvertirCliente')
+        throw error
+      }
+    },
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+      queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', input.oportunidadId] })
+      queryClient.invalidateQueries({ queryKey: ['empresas'] })
     },
   })
 }

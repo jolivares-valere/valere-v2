@@ -23,8 +23,11 @@ export function useContactos(options?: QueryOptions) {
 
       let q = supabase
         .from('contactos')
-        .select('*, empresa:empresas!contactos_empresa_id_fkey(id, nombre)', { count: 'exact' })
+        // Separación CRM/Captación: solo contactos de empresas cliente.
+        // Filtra por inner-join: empresa con estado_relacion='cliente'
+        .select('*, empresa:empresas!contactos_empresa_id_fkey!inner(id, nombre, estado_relacion)', { count: 'exact' })
         .is('deleted_at', null)
+        .eq('empresa.estado_relacion', 'cliente')
 
       const f = options?.filter ?? {}
       const search = f.search as string | undefined
