@@ -800,7 +800,13 @@ function FormPasarAAnalisis({ oportunidadId, analistas, onCancel, onDone }: {
         <div>
           <Label htmlFor="pa_to">Analista</Label>
           <Select value={toUser} onValueChange={v => setToUser(v ?? '')}>
-            <SelectTrigger id="pa_to"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="pa_to">
+              <SelectValue>
+                {analistas.find(a => a.id === toUser)?.full_name
+                  ?? analistas.find(a => a.id === toUser)?.email
+                  ?? 'Selecciona analista'}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {analistas.map(a => (
                 <SelectItem key={a.id} value={a.id}>{a.full_name ?? a.email}</SelectItem>
@@ -1072,7 +1078,13 @@ function FormPedirVisita({ oportunidadId, senior, onCancel, onDone }: {
         <div>
           <Label htmlFor="pv_to">Asesor senior</Label>
           <Select value={toUser} onValueChange={v => setToUser(v ?? '')}>
-            <SelectTrigger id="pv_to"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="pv_to">
+              <SelectValue>
+                {senior.find(s => s.id === toUser)?.full_name
+                  ?? senior.find(s => s.id === toUser)?.email
+                  ?? 'Selecciona asesor'}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {senior.map(s => (
                 <SelectItem key={s.id} value={s.id}>{s.full_name ?? s.email}</SelectItem>
