@@ -13,7 +13,8 @@ import { Textarea } from '../../../components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../../components/ui/select'
-import { useCrearLead, type CrearLeadInput } from '../api'
+import { useCrearLead, type CrearLeadInput, type ContactoInput } from '../api'
+import ContactosForm from './ContactosForm'
 
 /**
  * Modal "+ Nuevo lead" para Carolina Aroca.
@@ -31,10 +32,6 @@ const schema = z.object({
   empresa_email: z.string().email('Email inválido').optional().or(z.literal('')),
   empresa_ciudad: z.string().optional(),
   empresa_segmento: z.enum(['industrial', 'comercial', 'servicios', 'agricola', 'residencial_colectivo']).optional(),
-  contacto_nombre: z.string().optional(),
-  contacto_cargo: z.string().optional(),
-  contacto_telefono: z.string().optional(),
-  contacto_email: z.string().email('Email inválido').optional().or(z.literal('')),
   origen: z.enum(['cold', 'web', 'recomendacion', 'contacto_previo', 'otro']).optional(),
   notas: z.string().optional(),
 })
@@ -50,6 +47,9 @@ interface Props {
 
 export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props) {
   const [extraOpen, setExtraOpen] = useState(false)
+  const [contactos, setContactos] = useState<ContactoInput[]>([
+    { nombre: '', cargo: '', telefono: '', email: '', es_principal: true },
+  ])
   const crearLead = useCrearLead()
 
   const form = useForm<Form>({
@@ -61,10 +61,6 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
       empresa_email: '',
       empresa_ciudad: '',
       empresa_segmento: 'comercial',
-      contacto_nombre: '',
-      contacto_cargo: '',
-      contacto_telefono: '',
-      contacto_email: '',
       origen: 'cold',
       notas: '',
     },
@@ -78,10 +74,15 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
       empresa_email: values.empresa_email?.trim() || undefined,
       empresa_ciudad: values.empresa_ciudad?.trim() || undefined,
       empresa_segmento: values.empresa_segmento,
-      contacto_nombre: values.contacto_nombre?.trim() || undefined,
-      contacto_cargo: values.contacto_cargo?.trim() || undefined,
-      contacto_telefono: values.contacto_telefono?.trim() || undefined,
-      contacto_email: values.contacto_email?.trim() || undefined,
+      contactos: contactos
+        .filter(c => !c._eliminar)
+        .map(c => ({
+          nombre: c.nombre?.trim() || undefined,
+          cargo: c.cargo?.trim() || undefined,
+          telefono: c.telefono?.trim() || undefined,
+          email: c.email?.trim() || undefined,
+          es_principal: c.es_principal ?? false,
+        })),
       origen: values.origen,
       notas: values.notas?.trim() || undefined,
     }
@@ -91,6 +92,7 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
         description: `${input.empresa_nombre} aparecerá en "Por llamar".`,
       })
       form.reset()
+      setContactos([{ nombre: '', cargo: '', telefono: '', email: '', es_principal: true }])
       setExtraOpen(false)
       onOpenChange(false)
       onCreated?.(oportunidadId)
@@ -146,15 +148,15 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
                 <Input id="empresa_nif" placeholder="B12345678" {...form.register('empresa_nif')} />
               </div>
             </div>
+          </section>
 
-            <div>
-              <Label htmlFor="contacto_nombre">Contacto</Label>
-              <Input
-                id="contacto_nombre"
-                placeholder="Persona con la que hablas"
-                {...form.register('contacto_nombre')}
-              />
-            </div>
+          {/* Contactos (lista dinámica con rol y principal) */}
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900">Contactos</h3>
+            <p className="text-xs text-slate-500">
+              Añade todos los interlocutores que conozcas (Compras, Mantenimiento, Gerencia…). Marca uno como principal con la estrella.
+            </p>
+            <ContactosForm contactos={contactos} onChange={setContactos} idPrefix="nl" />
           </section>
 
           {/* Bloque expandible */}
@@ -213,23 +215,6 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="contacto_cargo">Cargo del contacto</Label>
-                  <Input id="contacto_cargo" placeholder="Director, Gerente..." {...form.register('contacto_cargo')} />
-                </div>
-                <div>
-                  <Label htmlFor="contacto_telefono">Teléfono contacto</Label>
-                  <Input id="contacto_telefono" {...form.register('contacto_telefono')} />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="contacto_email">Email contacto</Label>
-                <Input id="contacto_email" type="email" {...form.register('contacto_email')} />
-                {errors.contacto_email && <p className="text-xs text-red-600 mt-0.5">{errors.contacto_email.message}</p>}
               </div>
 
               <div>

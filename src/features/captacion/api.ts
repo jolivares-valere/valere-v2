@@ -66,6 +66,7 @@ export type OportunidadDetalle = {
     telefono: string | null
     email: string | null
     es_decisor: boolean
+    es_principal?: boolean
   }>
 }
 
@@ -116,6 +117,19 @@ const supabaseAny = supabase as any
  * Inputs y helpers de mutación (Día 2 sprint operativo)
  * ============================================================ */
 
+/** Contacto individual para crear/editar lead */
+export type ContactoInput = {
+  /** id existente — solo en update; si no, se crea nuevo */
+  id?: string
+  nombre?: string
+  cargo?: string
+  telefono?: string
+  email?: string
+  es_principal?: boolean
+  /** marca para soft-delete en update */
+  _eliminar?: boolean
+}
+
 export type CrearLeadInput = {
   empresa_nombre: string
   empresa_nif?: string
@@ -123,10 +137,7 @@ export type CrearLeadInput = {
   empresa_email?: string
   empresa_ciudad?: string
   empresa_segmento?: 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
-  contacto_nombre?: string
-  contacto_cargo?: string
-  contacto_telefono?: string
-  contacto_email?: string
+  contactos: ContactoInput[]
   origen?: 'cold' | 'web' | 'recomendacion' | 'contacto_previo' | 'otro'
   notas?: string
 }
@@ -139,12 +150,23 @@ export type ActualizarLeadInput = {
   empresa_email?: string
   empresa_ciudad?: string
   empresa_segmento?: 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
-  contacto_nombre?: string
-  contacto_cargo?: string
-  contacto_telefono?: string
-  contacto_email?: string
+  contactos: ContactoInput[]
   notas?: string
 }
+
+/** Cargos sugeridos para B2B energético (input libre con sugerencias) */
+export const CARGOS_SUGERIDOS = [
+  'Compras',
+  'Compras indirectas',
+  'Operaciones',
+  'Mantenimiento',
+  'Director industrial',
+  'Energía / Sostenibilidad',
+  'Director financiero',
+  'Gerencia',
+  'Dirección general',
+  'Otro',
+] as const
 
 /**
  * Hook para crear un lead nuevo desde Captación.
@@ -165,10 +187,7 @@ export function useCrearLead() {
         p_empresa_email:    input.empresa_email ?? null,
         p_empresa_ciudad:   input.empresa_ciudad ?? null,
         p_empresa_segmento: input.empresa_segmento ?? 'comercial',
-        p_contacto_nombre:   input.contacto_nombre ?? null,
-        p_contacto_cargo:    input.contacto_cargo ?? null,
-        p_contacto_telefono: input.contacto_telefono ?? null,
-        p_contacto_email:    input.contacto_email ?? null,
+        p_contactos:        input.contactos ?? [],
         p_origen: input.origen ?? 'cold',
         p_notas:  input.notas ?? null,
       })
@@ -226,7 +245,7 @@ export function useOportunidadDetalle(id: string | null) {
             id, nombre, nif, telefono_principal, email_principal, ciudad, segmento
           ),
           contactos:contactos (
-            id, nombre, cargo, telefono, email, es_decisor
+            id, nombre, cargo, telefono, email, es_decisor, es_principal
           )
         `)
         .eq('id', id)
@@ -286,10 +305,7 @@ export function useActualizarLead() {
         p_empresa_email:     input.empresa_email ?? null,
         p_empresa_ciudad:    input.empresa_ciudad ?? null,
         p_empresa_segmento:  input.empresa_segmento ?? null,
-        p_contacto_nombre:   input.contacto_nombre ?? null,
-        p_contacto_cargo:    input.contacto_cargo ?? null,
-        p_contacto_telefono: input.contacto_telefono ?? null,
-        p_contacto_email:    input.contacto_email ?? null,
+        p_contactos:         input.contactos ?? [],
         p_notas:             input.notas ?? null,
       })
       if (error) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil } from 'lucide-react'
+import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star } from 'lucide-react'
 import { useOportunidadDetalle, useActividadesOportunidad, ETAPA_LABELS, ETAPA_COLORS } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
@@ -175,26 +175,52 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                 </section>
               )}
 
-              {/* Contactos — guard null por si el embed de Supabase no devuelve el array */}
+              {/* Contactos — guard null + ordenado por es_principal primero */}
               {(() => {
-                const contactos = detalle.contactos ?? []
+                const contactos = (detalle.contactos ?? []).slice().sort((a, b) => {
+                  // Principal arriba; luego decisor; luego por id (orden de creación aproximado)
+                  if (a.es_principal && !b.es_principal) return -1
+                  if (!a.es_principal && b.es_principal) return 1
+                  if (a.es_decisor && !b.es_decisor) return -1
+                  if (!a.es_decisor && b.es_decisor) return 1
+                  return 0
+                })
                 if (contactos.length === 0) return null
                 return (
                 <section>
                   <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
-                    Contactos
+                    Contactos ({contactos.length})
                   </h3>
                   <div className="space-y-2">
                     {contactos.map(c => (
-                      <div key={c.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-slate-900">{c.nombre ?? '(sin nombre)'}</p>
-                          {c.es_decisor && (
-                            <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 text-[10px] font-semibold">
-                              Decisor
-                            </span>
-                          )}
+                      <div
+                        key={c.id}
+                        className={`rounded-lg border px-3 py-2 text-sm ${
+                          c.es_principal
+                            ? 'border-amber-300 bg-amber-50/40'
+                            : 'border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-slate-900 flex items-center gap-1.5">
+                            {c.es_principal && (
+                              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-600 shrink-0" aria-label="Contacto principal" />
+                            )}
+                            {c.nombre ?? '(sin nombre)'}
+                          </p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {c.es_principal && (
+                              <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-200 text-amber-700 px-2 py-0.5 text-[10px] font-semibold">
+                                Principal
+                              </span>
+                            )}
+                            {c.es_decisor && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 text-[10px] font-semibold">
+                                Decisor
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {c.cargo && <p className="text-xs text-slate-500">{c.cargo}</p>}
                         <div className="mt-1 space-y-0.5 text-xs text-slate-600">

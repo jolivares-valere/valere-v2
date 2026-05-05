@@ -42,6 +42,39 @@
 
 <!-- Añadir entradas debajo de esta línea -->
 
+### 2026-05-04 (uso real Carolina A) — Falta múltiples contactos en lead form
+
+- **Quién**: Carolina Aroca (primer uso real, 2 leads creados)
+- **Pantalla / ruta**: `/captacion` modal "+ Nuevo lead" y modal "Editar"
+- **Qué intentaba hacer**: registrar un segundo email de contacto en una empresa cliente
+- **Qué pasó**: el form solo permite 1 contacto por lead. Cada contacto tiene 1 email.
+- **Qué esperaba**: poder añadir varios contactos (un lead B2B típico tiene Compras + Operaciones + Mantenimiento)
+- **Severidad**: media (P1) — no bloquea pero genera fricción real ya en el segundo lead
+- **Notas**: la tabla `contactos` ya soporta N por empresa. Falta UI con botón "+ Añadir contacto" en los 2 modales + ajustar las RPCs para aceptar array.
+- **Tags**: `[hueco]` `[ux]`
+
+**Acción**: pendiente decisión Juan. Opciones documentadas en sesión: A) múltiples contactos (~1.5h, correcto) / B) parche segundo email (~30min, subóptimo) / C) backlog y notas internas como workaround.
+
+---
+
+### 2026-05-04 — Confirmación: fix modal scroll + editar lead funcional
+
+- **Quién**: Juan + Carolina A
+- **Pantalla / ruta**: `/captacion` modal Nuevo lead + drawer Editar
+- **Resultado**: ambos fixes (`0c0dc5f`) funcionan correctamente en producción. Carolina A ya ha creado 2 leads sin problemas.
+- **Severidad**: validación
+- **Tags**: `[validacion]` `[fix-confirmado]`
+
+---
+
+### 2026-05-04 — Backlog: agente "Investigar lead"
+
+- **Quién**: Juan (idea de producto)
+- **Resultado**: documentado en `docs/BACKLOG_INVESTIGAR_LEAD_2026-05-04.md` como visión futura. Pre-requisitos para desbloquear: ≥1 semana uso real + ≥3 entradas que mencionen "falta encontrar contactos". MVP semiautomático supervisado, NO agente autónomo.
+- **Tags**: `[backlog]` `[mejora]`
+
+---
+
 ### 2026-05-04 — Smoke test E2E completo (7/7 tests verde)
 
 - **Quién**: Juan + ChatGPT auditor + Cowork

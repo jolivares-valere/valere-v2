@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +13,8 @@ import { Textarea } from '../../../components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../../components/ui/select'
-import { useActualizarLead, type ActualizarLeadInput, type OportunidadDetalle } from '../api'
+import { useActualizarLead, type ActualizarLeadInput, type OportunidadDetalle, type ContactoInput } from '../api'
+import ContactosForm from './ContactosForm'
 
 /**
  * Modal "Editar datos del lead" — corrección de errores tras crear.
@@ -32,10 +33,6 @@ const schema = z.object({
   empresa_email: z.string().email('Email inválido').optional().or(z.literal('')),
   empresa_ciudad: z.string().optional().or(z.literal('')),
   empresa_segmento: z.enum(['industrial', 'comercial', 'servicios', 'agricola', 'residencial_colectivo']).optional(),
-  contacto_nombre: z.string().optional().or(z.literal('')),
-  contacto_cargo: z.string().optional().or(z.literal('')),
-  contacto_telefono: z.string().optional().or(z.literal('')),
-  contacto_email: z.string().email('Email inválido').optional().or(z.literal('')),
   notas: z.string().optional().or(z.literal('')),
 })
 
@@ -49,9 +46,7 @@ interface Props {
 
 export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) {
   const actualizar = useActualizarLead()
-
-  // Contacto principal: el más antiguo de la lista (mismo criterio que la RPC)
-  const contactoPrincipal = (detalle.contactos ?? [])[0]
+  const [contactos, setContactos] = useState<ContactoInput[]>([])
 
   const form = useForm<Form>({
     resolver: zodResolver(schema),
@@ -62,10 +57,6 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
       empresa_email: detalle.empresa?.email_principal ?? '',
       empresa_ciudad: detalle.empresa?.ciudad ?? '',
       empresa_segmento: (detalle.empresa?.segmento as Form['empresa_segmento']) ?? 'comercial',
-      contacto_nombre: contactoPrincipal?.nombre ?? '',
-      contacto_cargo: contactoPrincipal?.cargo ?? '',
-      contacto_telefono: contactoPrincipal?.telefono ?? '',
-      contacto_email: contactoPrincipal?.email ?? '',
       notas: detalle.notas ?? '',
     },
   })
@@ -80,14 +71,24 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
         empresa_email: detalle.empresa?.email_principal ?? '',
         empresa_ciudad: detalle.empresa?.ciudad ?? '',
         empresa_segmento: (detalle.empresa?.segmento as Form['empresa_segmento']) ?? 'comercial',
-        contacto_nombre: contactoPrincipal?.nombre ?? '',
-        contacto_cargo: contactoPrincipal?.cargo ?? '',
-        contacto_telefono: contactoPrincipal?.telefono ?? '',
-        contacto_email: contactoPrincipal?.email ?? '',
         notas: detalle.notas ?? '',
       })
+      // Pre-rellenar contactos desde el detalle (todos los existentes)
+      const initial: ContactoInput[] = (detalle.contactos ?? []).map(c => ({
+        id: c.id,
+        nombre: c.nombre ?? '',
+        cargo: c.cargo ?? '',
+        telefono: c.telefono ?? '',
+        email: c.email ?? '',
+        es_principal: c.es_principal ?? false,
+      }))
+      // Asegurar que al menos uno sea principal
+      if (initial.length > 0 && !initial.some(c => c.es_principal)) {
+        initial[0]!.es_principal = true
+      }
+      setContactos(initial.length > 0 ? initial : [{ nombre: '', cargo: '', telefono: '', email: '', es_principal: true }])
     }
-  }, [open, detalle, contactoPrincipal, form])
+  }, [open, detalle, form])
 
   const onSubmit = form.handleSubmit(async (values) => {
     const input: ActualizarLeadInput = {
@@ -98,10 +99,15 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
       empresa_email: values.empresa_email?.trim() || undefined,
       empresa_ciudad: values.empresa_ciudad?.trim() || undefined,
       empresa_segmento: values.empresa_segmento,
-      contacto_nombre: values.contacto_nombre?.trim() || undefined,
-      contacto_cargo: values.contacto_cargo?.trim() || undefined,
-      contacto_telefono: values.contacto_telefono?.trim() || undefined,
-      contacto_email: values.contacto_email?.trim() || undefined,
+      contactos: contactos.map(c => ({
+        id: c.id,
+        nombre: c.nombre?.trim() || undefined,
+        cargo: c.cargo?.trim() || undefined,
+        telefono: c.telefono?.trim() || undefined,
+        email: c.email?.trim() || undefined,
+        es_principal: c.es_principal ?? false,
+        _eliminar: c._eliminar,
+      })),
       notas: values.notas?.trim() || undefined,
     }
     try {
@@ -180,30 +186,12 @@ export default function EditarLeadModal({ open, onOpenChange, detalle }: Props) 
             </div>
           </section>
 
-          <section className="space-y-3 pt-2">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Contacto principal</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="ed_contacto_nombre">Nombre</Label>
-                <Input id="ed_contacto_nombre" {...form.register('contacto_nombre')} />
-              </div>
-              <div>
-                <Label htmlFor="ed_contacto_cargo">Cargo</Label>
-                <Input id="ed_contacto_cargo" {...form.register('contacto_cargo')} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="ed_contacto_telefono">Teléfono</Label>
-                <Input id="ed_contacto_telefono" {...form.register('contacto_telefono')} />
-              </div>
-              <div>
-                <Label htmlFor="ed_contacto_email">Email</Label>
-                <Input id="ed_contacto_email" type="email" {...form.register('contacto_email')} />
-                {errors.contacto_email && <p className="text-xs text-red-600 mt-0.5">{errors.contacto_email.message}</p>}
-              </div>
-            </div>
+          <section className="space-y-2 pt-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Contactos</h3>
+            <p className="text-xs text-slate-500">
+              Añade, edita o elimina contactos. Marca uno como principal (estrella).
+            </p>
+            <ContactosForm contactos={contactos} onChange={setContactos} idPrefix="ed" />
           </section>
 
           <section className="space-y-2 pt-2">
