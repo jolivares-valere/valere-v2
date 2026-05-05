@@ -131,6 +131,21 @@ export type CrearLeadInput = {
   notas?: string
 }
 
+export type ActualizarLeadInput = {
+  oportunidadId: string
+  empresa_nombre: string
+  empresa_nif?: string
+  empresa_telefono?: string
+  empresa_email?: string
+  empresa_ciudad?: string
+  empresa_segmento?: 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
+  contacto_nombre?: string
+  contacto_cargo?: string
+  contacto_telefono?: string
+  contacto_email?: string
+  notas?: string
+}
+
 /**
  * Hook para crear un lead nuevo desde Captación.
  * Invoca RPC `crear_lead_captacion` que en una transacción atómica inserta:
@@ -247,6 +262,45 @@ export function useActividadesOportunidad(oportunidadId: string | null) {
         throw error
       }
       return (data ?? []) as ActividadRow[]
+    },
+  })
+}
+
+/**
+ * Hook para editar lead existente desde el drawer.
+ * Invoca RPC `actualizar_lead_captacion` que actualiza atómicamente:
+ *   - empresa (nombre + datos)
+ *   - contacto principal (más antiguo de la empresa)
+ *   - notas de la oportunidad
+ * Valida funciones operativas + ownership (responsable/creador/admin).
+ */
+export function useActualizarLead() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: ActualizarLeadInput): Promise<void> => {
+      const { error } = await supabaseAny.rpc('actualizar_lead_captacion', {
+        p_oportunidad_id:    input.oportunidadId,
+        p_empresa_nombre:    input.empresa_nombre,
+        p_empresa_nif:       input.empresa_nif ?? null,
+        p_empresa_telefono:  input.empresa_telefono ?? null,
+        p_empresa_email:     input.empresa_email ?? null,
+        p_empresa_ciudad:    input.empresa_ciudad ?? null,
+        p_empresa_segmento:  input.empresa_segmento ?? null,
+        p_contacto_nombre:   input.contacto_nombre ?? null,
+        p_contacto_cargo:    input.contacto_cargo ?? null,
+        p_contacto_telefono: input.contacto_telefono ?? null,
+        p_contacto_email:    input.contacto_email ?? null,
+        p_notas:             input.notas ?? null,
+      })
+      if (error) {
+        logError(error, 'useActualizarLead')
+        throw error
+      }
+    },
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+      queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', input.oportunidadId] })
     },
   })
 }

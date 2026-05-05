@@ -104,15 +104,15 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>Nuevo lead</DialogTitle>
           <DialogDescription>
             Datos mínimos para empezar. Puedes completar el resto después desde el detalle del caso.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form id="nuevo-lead-form" onSubmit={onSubmit} className="space-y-4 overflow-y-auto px-6 pb-2 flex-1">
           {/* Bloque obligatorio */}
           <section className="space-y-3">
             <div>
@@ -243,16 +243,16 @@ export default function NuevoLeadModal({ open, onOpenChange, onCreated }: Props)
               </div>
             </section>
           )}
-
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={crearLead.isPending}>
-              {crearLead.isPending ? 'Creando...' : 'Crear lead'}
-            </Button>
-          </DialogFooter>
         </form>
+
+        <DialogFooter className="px-6 py-4 border-t border-slate-200 bg-white shrink-0">
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="nuevo-lead-form" disabled={crearLead.isPending}>
+            {crearLead.isPending ? 'Creando...' : 'Crear lead'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

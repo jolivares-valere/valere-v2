@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
-import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil } from 'lucide-react'
 import { useOportunidadDetalle, useActividadesOportunidad, ETAPA_LABELS, ETAPA_COLORS } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
+import { useAuth } from '../../../core/hooks/useAuth'
 import OportunidadAcciones, { DescargarPropuestaInline } from './OportunidadAcciones'
+import EditarLeadModal from './EditarLeadModal'
 
 interface Props {
   oportunidadId: string | null
@@ -20,8 +22,18 @@ interface Props {
  */
 export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
   const open = !!oportunidadId
+  const { user } = useAuth()
   const { data: detalle, isLoading: loadingDetalle } = useOportunidadDetalle(oportunidadId)
   const { data: actividades = [], isLoading: loadingActividades } = useActividadesOportunidad(oportunidadId)
+  const [editarOpen, setEditarOpen] = useState(false)
+
+  // Puede editar: responsable actual, creador, o admin
+  const puedeEditar = !!detalle && !!user && (
+    detalle.responsable_actual_id === user.id
+    || (user.funciones ?? []).includes('admin')
+    || user.role === 'master'
+    // creador: si la BD nos lo expone en detalle (no lo expone hoy en este tipo)
+  )
 
   // Cierre con ESC
   useEffect(() => {
@@ -71,14 +83,28 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
               {etapaLabel}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Cerrar"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {puedeEditar && (
+              <button
+                type="button"
+                onClick={() => setEditarOpen(true)}
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200"
+                aria-label="Editar datos del lead"
+                title="Editar datos del lead"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Editar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -277,13 +303,25 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
           )}
         </div>
 
-        {/* Footer — acciones contextuales por etapa */}
+        {/* Footer — acciones contextuales por etapa.
+            max-h + overflow-y-auto: si un form interno (subir factura, cerrar
+            perdida, etc.) crece, scrollea dentro del propio footer en vez de
+            empujar los botones fuera de pantalla. */}
         {detalle && (
-          <div className="border-t border-slate-200 px-5 py-3 bg-slate-50">
+          <div className="border-t border-slate-200 px-5 py-3 bg-slate-50 max-h-[60vh] overflow-y-auto shrink-0">
             <OportunidadAcciones detalle={detalle} onClose={onClose} />
           </div>
         )}
       </aside>
+
+      {/* Modal de edición del lead — solo monta cuando puedeEditar y hay detalle */}
+      {detalle && puedeEditar && (
+        <EditarLeadModal
+          open={editarOpen}
+          onOpenChange={setEditarOpen}
+          detalle={detalle}
+        />
+      )}
     </>
   )
 }
