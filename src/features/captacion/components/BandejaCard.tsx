@@ -1,7 +1,14 @@
 import { Eye } from 'lucide-react'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
-import { ETAPA_LABELS, ETAPA_COLORS, type VMisOportunidadesRow } from '../api'
+import {
+  ETAPA_LABELS,
+  ETAPA_COLORS,
+  calcularSemaforoVencimiento,
+  siguienteAccionLead,
+  ESTADO_CLASSES,
+  type VMisOportunidadesRow,
+} from '../api'
 
 interface Props {
   op: VMisOportunidadesRow
@@ -15,26 +22,21 @@ interface Props {
   currentUserId?: string | null
 }
 
-// Mapeo etapa_operativa → siguiente acción concreta para el responsable
-const SIGUIENTE_ACCION: Record<string, string> = {
-  nuevo: 'Llamar para presentar Valere',
-  contactado: 'Identificar decisor y enviar presentación',
-  esperando_factura: 'Llamar para recordar envío de factura',
-  factura_recibida: 'Analizar factura y decidir tipo de atención',
-  en_analisis: 'Terminar análisis y preparar propuesta',
-  asignada_a_senior: 'Contactar al cliente directamente',
-  propuesta_en_preparacion: 'Terminar propuesta y pasarla',
-  propuesta_lista: 'Enviar propuesta por email al cliente',
-  propuesta_enviada: 'Llamar de seguimiento al cliente',
-  seguimiento: 'Cerrar (ganada o perdida) o programar visita',
-  cerrado: 'Sin acción pendiente',
-}
-
 export default function BandejaCard({ op, onClick, currentUserId }: Props) {
   const etapa = op.etapa_operativa ?? 'sin_etapa'
   const etapaLabel = ETAPA_LABELS[etapa] ?? etapa
   const etapaColor = ETAPA_COLORS[etapa] ?? 'bg-slate-50 border-slate-200 text-slate-700'
-  const siguienteAccion = SIGUIENTE_ACCION[etapa]
+
+  // Sprint D1 2026-05-05: la siguiente acción ya no es estática del map; ahora
+  // se calcula con el helper que aplica overlay de urgencia si la fecha de
+  // vencimiento del contrato del prospecto está cerca (≤90 días).
+  const fechaVenc = op.fecha_vencimiento_contrato_prospecto ?? null
+  const siguienteAccion = siguienteAccionLead(etapa, fechaVenc)
+  const sem = calcularSemaforoVencimiento(fechaVenc)
+  // Solo mostramos badge cuando hay fecha (decisión Juan + ChatGPT 2026-05-05:
+  // "sin fecha" no debe meter ruido en la card; los casos sin fecha quedan
+  // simplemente sin badge).
+  const mostrarBadgeVenc = sem.estado !== 'sin_fecha'
 
   // Sprint C: la card aparece en "Todos mis casos" (currentUserId pasado).
   // Si no soy responsable, muestro badge "Solo seguimiento" para que la
@@ -76,6 +78,17 @@ export default function BandejaCard({ op, onClick, currentUserId }: Props) {
         <p className="text-xs text-slate-500 mb-2">
           {op.empresa_nif}
         </p>
+      )}
+
+      {/* Sprint D1 2026-05-05: badge semáforo de vencimiento.
+          Solo si hay fecha; los sin fecha no meten ruido en la card. */}
+      {mostrarBadgeVenc && (
+        <span
+          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold mb-2 ${ESTADO_CLASSES[sem.estado]}`}
+          title={fechaVenc ? `Fecha vencimiento contrato actual: ${fechaVenc}` : undefined}
+        >
+          {sem.label}
+        </span>
       )}
 
       {/* Importes */}

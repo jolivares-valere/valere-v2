@@ -4,7 +4,7 @@ import { Textarea } from '../../../components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../../components/ui/select'
-import { calcularSemaforoVencimiento, type FuenteVencimiento } from '../api'
+import { calcularSemaforoVencimiento, ESTADO_CLASSES, type FuenteVencimiento } from '../api'
 
 interface Props {
   fecha: string
@@ -31,14 +31,6 @@ export default function VencimientoContratoForm({
   fecha, fuente, notas, onChange, idPrefix = 'venc',
 }: Props) {
   const sem = calcularSemaforoVencimiento(fecha)
-  const colorClasses: Record<typeof sem.color, string> = {
-    verde:    'bg-green-50 border-green-200 text-green-800',
-    amarillo: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    naranja:  'bg-orange-50 border-orange-300 text-orange-800',
-    rojo:     'bg-red-50 border-red-300 text-red-800',
-    vencido:  'bg-slate-100 border-slate-300 text-slate-700',
-    sin_dato: 'bg-slate-50 border-slate-200 text-slate-500',
-  }
 
   return (
     <div className="space-y-2">
@@ -72,8 +64,8 @@ export default function VencimientoContratoForm({
         </div>
       </div>
 
-      {fecha && sem.color !== 'sin_dato' && (
-        <div className={`rounded-lg border px-3 py-2 text-xs ${colorClasses[sem.color]}`}>
+      {fecha && sem.estado !== 'sin_fecha' && (
+        <div className={`rounded-lg border px-3 py-2 text-xs ${ESTADO_CLASSES[sem.estado]}`}>
           {sem.label}
         </div>
       )}

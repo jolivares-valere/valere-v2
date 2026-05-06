@@ -21,6 +21,9 @@ export type VMisOportunidadesRow = {
   visita_programada_at: string | null
   valor_estimado_eur: number | null
   ahorro_anual_estimado: number | null
+  /** Sprint D1 2026-05-05: añadido a la vista para semáforo en cards */
+  fecha_vencimiento_contrato_prospecto?: string | null
+  fuente_vencimiento_contrato_prospecto?: string | null
   created_at: string
   updated_at: string
 }
@@ -188,26 +191,18 @@ export type ActualizarLeadInput = {
   notas_vencimiento?: string | null
 }
 
-/** Semáforo de vencimiento para captación. Validado con ChatGPT 2026-05-05. */
-export type Semaforo = {
-  color: 'verde' | 'amarillo' | 'naranja' | 'rojo' | 'vencido' | 'sin_dato'
-  label: string
-  dias: number | null
-}
-
-export function calcularSemaforoVencimiento(fechaISO: string | null | undefined): Semaforo {
-  if (!fechaISO) return { color: 'sin_dato', label: 'Sin fecha', dias: null }
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const venc = new Date(fechaISO + 'T00:00:00')
-  const diffMs = venc.getTime() - hoy.getTime()
-  const dias = Math.round(diffMs / 86_400_000)
-  if (dias < 0) return { color: 'vencido', label: `Vencido hace ${Math.abs(dias)} días`, dias }
-  if (dias <= 30) return { color: 'rojo', label: `Vence en ${dias} días — urgente`, dias }
-  if (dias <= 60) return { color: 'naranja', label: `Vence en ${dias} días — prioridad alta`, dias }
-  if (dias <= 90) return { color: 'amarillo', label: `Vence en ${dias} días — iniciar contacto`, dias }
-  return { color: 'verde', label: `Vence en ${dias} días`, dias }
-}
+/**
+ * Sprint D1 (2026-05-05): el helper de semáforo se ha movido a
+ * `./utils/vencimiento.ts` con tests propios y firma `estado` (más explícito
+ * que el legacy `color`). Re-exporto aquí para no romper imports existentes.
+ */
+export {
+  calcularSemaforoVencimiento,
+  siguienteAccionLead,
+  ESTADO_CLASSES,
+  type Semaforo,
+  type EstadoVencimiento,
+} from './utils/vencimiento'
 
 /** Cargos sugeridos para B2B energético (input libre con sugerencias) */
 export const CARGOS_SUGERIDOS = [

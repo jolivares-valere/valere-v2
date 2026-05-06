@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star, Briefcase, AlertCircle, MessageSquare, Eye } from 'lucide-react'
 import { toast } from 'sonner'
-import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, useAgregarComentario, calcularSemaforoVencimiento, ETAPA_LABELS, ETAPA_COLORS } from '../api'
+import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, useAgregarComentario, calcularSemaforoVencimiento, ESTADO_CLASSES, ETAPA_LABELS, ETAPA_COLORS } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
 import { useAuth } from '../../../core/hooks/useAuth'
@@ -424,14 +424,6 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
               {esProspecto && (() => {
                 const fecha = detalle.fecha_vencimiento_contrato_prospecto
                 const sem = calcularSemaforoVencimiento(fecha)
-                const colorClasses: Record<typeof sem.color, string> = {
-                  verde:    'bg-green-50 border-green-200 text-green-800',
-                  amarillo: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-                  naranja:  'bg-orange-50 border-orange-300 text-orange-800',
-                  rojo:     'bg-red-50 border-red-300 text-red-800',
-                  vencido:  'bg-slate-100 border-slate-300 text-slate-700',
-                  sin_dato: 'bg-slate-50 border-slate-200 text-slate-500',
-                }
                 return (
                   <section>
                     <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
@@ -439,7 +431,7 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                       Vencimiento contrato actual del prospecto
                     </h3>
                     {fecha ? (
-                      <div className={`rounded-lg border px-3 py-2 ${colorClasses[sem.color]}`}>
+                      <div className={`rounded-lg border px-3 py-2 ${ESTADO_CLASSES[sem.estado]}`}>
                         <div className="text-sm font-semibold">
                           {formatDate(fecha, 'short')}
                         </div>
