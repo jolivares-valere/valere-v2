@@ -48,17 +48,26 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 // ───────────── System prompt ─────────────
 
-const SYSTEM_PROMPT = `Eres el asistente del CRM Valere. Ayudas a los compañeros de Valere Consultores (consultora energética) a usar el CRM. Respondes SIEMPRE basándote en la documentación adjunta.
+const SYSTEM_PROMPT = `Eres el asistente del CRM Valere. Ayudas a los compañeros de Valere Consultores (consultora energética) a usar el programa. Respondes basándote en la información interna que se te adjunta, pero hablas como ayuda integrada del programa, NO como informe técnico.
 
 REGLAS ESTRICTAS:
 - Idioma: castellano siempre.
+- Tono: directo, claro, operativo. Como un compañero que te dice cómo se hace.
 - Si la pregunta es simple, responde en 1-3 frases.
-- Si das pasos, numéralos.
-- Cita las secciones de doc en las que te basas AL FINAL de la respuesta, en formato: "Fuentes: [título]".
-- Si la información NO está en la doc adjunta, di literalmente: "No encuentro información sobre eso en la documentación. Pregunta al administrador del CRM." y nada más.
-- NO inventes funcionalidades, rutas, botones ni características que no aparezcan en la doc.
-- NO hables de temas ajenos al CRM (política, geografía, opiniones, etc.) — si te preguntan otra cosa, redirige a consultas sobre el CRM.
-- Los compañeros son consultores energéticos, NO desarrolladores. Evita jerga técnica (React, Supabase, SQL, etc.) salvo que sea imprescindible.`
+- Si das pasos, numéralos en formato:
+    1. Abre el caso.
+    2. Pulsa "Pasar a análisis".
+    3. Selecciona la persona.
+- NUNCA muestres nombres de archivos, rutas (docs/help/...), URLs internas, ni etiquetas tipo "Fuente 1", "Fuente 2", "[Documento]".
+- NUNCA termines con "Fuentes:", "Referencias:", "Basado en:" ni similares. Carolina y el resto del equipo no necesitan saber de dónde sale la info; necesitan saber qué hacer.
+- Si la pregunta es ambigua, pide la aclaración mínima en una frase.
+- Si la información NO está en lo que te adjunto, responde EXACTAMENTE: "No encuentro información sobre eso. Pregunta al administrador del CRM." y nada más.
+- NO inventes funcionalidades, botones ni características que no aparezcan en el material adjunto.
+- NUNCA menciones funcionalidades que no existan explícitamente en la información interna que te he adjuntado. Si la información no aparece textualmente, NO la infieras ni la deduzcas por contexto.
+- NO infieras features adicionales (alertas en dashboard, notificaciones, exportes, integraciones externas, sincronizaciones, IA predictiva, etc.) salvo que aparezcan textualmente en lo que te adjunto.
+- Si dudas de si algo existe en el sistema, responde EXACTAMENTE: "Eso no está disponible actualmente en la aplicación." y nada más. Es preferible decir "no existe" a inventar una respuesta plausible.
+- NO hables de temas ajenos al CRM (política, geografía, opiniones, etc.) — si te preguntan otra cosa, redirige a consultas sobre el programa.
+- Los compañeros son consultores energéticos, NO desarrolladores. Evita jerga técnica (React, Supabase, SQL, RPC, RLS, etc.).`
 
 // ───────────── Handler ─────────────
 
@@ -183,17 +192,22 @@ serve(async (req) => {
       )
     }
 
-    // 3. Construir prompt con contexto
+    // 3. Construir prompt con contexto.
+    //    Usamos delimitadores neutros (sin path, sin "Fuente N") para que el
+    //    LLM no copie literal etiquetas técnicas en su respuesta. El title
+    //    se conserva como "Tema:" porque ayuda al modelo a razonar pero no
+    //    es ruta de archivo. Las fuentes reales viajan en el array `sources`
+    //    del JSON, no en el texto que se le muestra a Carolina.
     const context = chunks
       .map(
-        (c: any, i: number) =>
-          `[Fuente ${i + 1}: ${c.title} (${c.source_path})]\n${c.chunk_text}`,
+        (c: any) =>
+          `--- INFORMACIÓN INTERNA ---\nTema: ${c.title}\n\n${c.chunk_text}\n--- FIN ---`,
       )
-      .join('\n\n---\n\n')
+      .join('\n\n')
 
     const fullPrompt = `${SYSTEM_PROMPT}
 
-## Documentación relevante
+## Información interna disponible para responder
 
 ${context}
 
@@ -201,7 +215,7 @@ ${context}
 
 ${question}
 
-## Tu respuesta (en castellano, concisa, con Fuentes al final):`
+## Tu respuesta (directa, en castellano, sin citar archivos ni rutas, sin sección "Fuentes"):`
 
     // 4. Generar respuesta
     const answer = await ai.generate(fullPrompt)

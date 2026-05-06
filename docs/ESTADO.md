@@ -14,6 +14,7 @@
 > | Sprint D1 — helper vencimiento + cards | `b3c3d03` | OK uso real |
 > | Fix1 RAG — Edge Function v20 (sin Fuentes:) | (Edge Fn, no commit) | 3/3 OK |
 > | Fix2 RAG — docs/help al día | `d0efcf6` | 5/5 OK Carolina |
+> | Micro-fix RAG — Edge Function v21 anti-alucinación | (Edge Fn, no commit) | aplicado tras alucinación P5 |
 >
 > ## ✅ SPRINT C — VISIBILIDAD POST-HANDOFF (2026-05-05)
 >
@@ -89,13 +90,16 @@
 > - **Cache Cloudflare con bundles obsoletos** en tabs viejos. Patrón conocido. Solución: hard refresh + tab nuevo.
 > - **Alucinación menor del asistente RAG**: la respuesta P5 mencionó *"Naranja y Rojo aparecen en Dashboard como alertas"* — no implementado. Si Carolina lo busca y no lo encuentra, refinar doc o implementar alertas reales.
 >
-> ## Próxima sesión (orden firmado)
+> ## Próxima sesión (orden firmado tras dictamen ChatGPT cierre)
 >
-> 1. **D2 — vista tabla** opcional con selector Cards/Tabla, columnas con sort por prioridad, localStorage por usuario. Mensaje detallado en `.cowork/outbox/2026-05-06T-d2-vista-tabla.md`.
-> 2. Filtros CRM restantes: Datadis, Renovaciones, Incidencias, Contratos.
-> 3. Badge vencimiento en cards (DONE en D1, mantener vigilado).
-> 4. Regenerar tipos Supabase + quitar 4 casts.
-> 5. Considerar implementar "alertas en Dashboard" o ajustar doc para no prometerlo.
+> **REGLA #0:** NO arrancar nada técnico hasta tener feedback REAL de Carolina.
+>
+> 1. **Recoger feedback real Carolina** (sin código). Frases literales tipo "no veo qué hacer hoy" / "abro muchas cards" / "¿qué hago ahora?".
+> 2. Si Carolina aporta fricción → fix prioritario por su feedback.
+> 3. Si no → **D2 vista tabla**. Mensaje detallado en `.cowork/outbox/2026-05-06T-d2-vista-tabla.md`.
+> 4. **Decisión Dashboard comercial.** ChatGPT entregó scope completo (KPIs + alertas + acciones del día + pipeline + equipo + funnel). Trigger: 2 de 4 síntomas en uso real. Si no, no arrancar.
+> 5. Filtros CRM restantes: Datadis, Renovaciones, Incidencias, Contratos.
+> 6. Regenerar tipos Supabase + quitar 4 casts.
 >
 > ---
 >
