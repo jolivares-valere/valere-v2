@@ -15,13 +15,16 @@ docs/help/
 ├── permisos/
 │   └── que-ve-cada-funcion.md           # qué módulos ve cada rol/función
 │
-├── captacion/                           # Carolina Aroca (telemarketing)
-│   ├── crear-lead.md                    # alta rápida de lead
-│   ├── pedir-factura.md                 # llamar y registrar resultado
-│   ├── subir-factura.md                 # cliente envía factura → upload
-│   ├── pasar-a-analisis.md              # handoff a Carolina M
-│   ├── enviar-propuesta.md              # marcar propuesta enviada al cliente
-│   └── cerrar-caso.md                   # ganada / perdida / visita / programar
+├── captacion/                                # Carolina Aroca (telemarketing)
+│   ├── crear-lead.md                         # alta rápida de lead
+│   ├── pedir-factura.md                      # llamar y registrar resultado
+│   ├── subir-factura.md                      # cliente envía factura → upload
+│   ├── pasar-a-analisis.md                   # handoff a Carolina M
+│   ├── enviar-propuesta.md                   # marcar propuesta enviada al cliente
+│   ├── cerrar-caso.md                        # ganada / perdida / visita / programar
+│   ├── separacion-prospecto-cliente.md       # prospecto vs cliente, conversión
+│   ├── seguimiento-tras-handoff.md           # Solo seguimiento + comentarios
+│   └── vencimiento-y-semaforo.md             # fecha vencimiento + semáforo cards
 │
 ├── analisis-captacion/                  # Carolina Maciñeiras (analista)
 │   ├── recibir-caso.md                  # qué hacer al recibir factura
@@ -156,11 +159,16 @@ Igual que el punto anterior. El pipeline detecta cambios en cualquier archivo ba
 - **NO asumir conocimiento técnico** del usuario. Son compañeros de Valere (consultores energéticos), no desarrolladores. Evitar jerga técnica (React, Supabase, RLS, etc.) salvo que sea imprescindible.
 - **NO usar capturas de pantalla pesadas** — los embeddings solo procesan texto. Si es imprescindible mostrar la UI, usar descripción textual + link a imagen en Drive.
 
-## Estado actual (2026-05-04)
+## Estado actual (2026-05-05)
 
-- **Docs escritos**: 38 documentos organizados por módulo + Sprint Operativo Captación completo (10 docs nuevos: 6 captación + 3 análisis + 1 senior + permisos).
+- **Docs escritos**: 41 documentos. Última tanda (Fix2 RAG 2026-05-05):
+  - `captacion/separacion-prospecto-cliente.md`
+  - `captacion/seguimiento-tras-handoff.md`
+  - `captacion/vencimiento-y-semaforo.md`
+  - actualizado `captacion/crear-lead.md` (vencimiento + nace prospecto)
+  - actualizado `captacion/pasar-a-analisis.md` (después del handoff: visibilidad + comentarios)
 - **Pipeline embeddings**: implementado (`.github/workflows/regenerate-help-embeddings.yml`). Se dispara con cualquier cambio bajo `docs/help/**`.
-- **Widget RAG**: implementado en `src/features/asistente-crm/AsistentePanel.tsx`, accesible desde todas las páginas del CRM.
+- **Widget RAG**: implementado en `src/features/asistente-crm/AsistentePanel.tsx`, accesible desde todas las páginas del CRM. **Fix1 RAG 2026-05-05**: el asistente ya no muestra "Fuentes:" ni rutas en las respuestas.
 
 ## Convención de formato (validada con ChatGPT 2026-05-04)
 
