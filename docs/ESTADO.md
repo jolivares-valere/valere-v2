@@ -1,6 +1,169 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización (más reciente): 2026-05-04 tarde por Cowork (sesión autónoma) — Sprint Operativo Captación COMPLETO en disco (Días 1-5). Pendiente PS1 commit + push.**
+> **Última actualización (más reciente): 2026-05-05 (jornada larga) por Cowork — 5 sprints encadenados con smoke real Carolina entre cada uno. Todo desplegado.**
+>
+> ## ✅ JORNADA 2026-05-05 — RESUMEN
+>
+> Sesión arrancó con feedback real de Carolina A sobre Herba Ricemills. Encadenamos 5 sprints validados con smoke entre cada uno:
+>
+> | Sprint | Commit | Smoke |
+> |---|---|---|
+> | Sprint Fase 2-3 + vencimiento prospecto | `0260ae3` | OK Carolina |
+> | Sprint C — visibilidad post-handoff | `8c38089` | OK con Claude in Chrome |
+> | Hotfix C — toast + drawer placeholder | `ffb3bfa` | OK Carolina |
+> | Sprint D1 — helper vencimiento + cards | `b3c3d03` | OK uso real |
+> | Fix1 RAG — Edge Function v20 (sin Fuentes:) | (Edge Fn, no commit) | 3/3 OK |
+> | Fix2 RAG — docs/help al día | `d0efcf6` | 5/5 OK Carolina |
+>
+> ## ✅ SPRINT C — VISIBILIDAD POST-HANDOFF (2026-05-05)
+>
+> Origen: smoke real Carolina con Herba Ricemills. Al pasar caso a analista perdía control comercial.
+>
+> ### BD aplicada (mirror SQL: `supabase/migrations/20260505_sprint_c_visibilidad_post_handoff.sql`)
+> - Vista `v_captacion_todos_mis_casos` ampliada: incluye `created_by`, `creador_nombre`, `creador_funciones`.
+> - RPC `agregar_comentario_oportunidad(uuid, text)` — inserta actividad tipo `nota` permitido a responsable, creador, admin/senior, o usuario que aparezca en handoffs.
+>
+> ### Frontend
+> - `OportunidadDrawer`: cabecera "Responsable / Creador", banner azul "Solo seguimiento", botón "Añadir comentario" + form inline. Footer de cambio de etapa oculto cuando `esSoloSeguimiento`.
+> - `BandejaCard`: badge azul "Solo seguimiento" cuando user no es responsable (solo en pestaña "Todos mis casos").
+> - Hook `useAgregarComentario`.
+>
+> ### Hotfix C aplicado (commit `ffb3bfa`)
+> - Toaster: `top-right` 3.5s → `bottom-right` 5s. No tapa botones.
+> - Drawer vencimiento: ahora siempre visible en captación; placeholder dashed gris cuando no hay fecha. Carolina ve si guardó OK.
+>
+> ## ✅ SPRINT D1 — HELPER + CARDS MEJORADAS (2026-05-05)
+>
+> Origen: análisis Carolina + ChatGPT — la card no decía qué hacer, había que abrir cada drawer.
+>
+> ### BD (mirror SQL: `supabase/migrations/20260505_d1_v_mis_oportunidades_vencimiento.sql`)
+> - Vista `v_mis_oportunidades` ampliada: `fecha_vencimiento_contrato_prospecto`, `fuente_vencimiento_contrato_prospecto`, `factura_fecha_prevista`. Aditivo, sin breaking changes.
+>
+> ### Frontend
+> - Nuevo módulo `src/features/captacion/utils/vencimiento.ts`: helper limpio con campos `estado / diasRestantes / label`. Función `siguienteAccionLead(etapa, fecha)` con overlay de urgencia. `ESTADO_CLASSES` central.
+> - 15 tests nuevos (`vencimiento.test.ts`) con `vi.useFakeTimers`. Cubre 90 días = amarillo (caso borde validado).
+> - Migrado helper viejo en `api.ts` (re-export). `VencimientoContratoForm` y `OportunidadDrawer` usan `sem.estado`.
+> - `BandejaCard`: badge color con texto "Vence en X días" debajo del NIF (solo si hay fecha). Línea "→ siguiente acción" ahora dinámica con texto urgente cuando aplica.
+>
+> ### Resultado
+> Carolina ve en cards: "Urgente: vence en 15 días — llama ya", "Prioridad alta: vence en 50 días", etc. Sin abrir el drawer.
+>
+> ## ✅ FIX1 RAG — EDGE FUNCTION SIN "FUENTES:" (2026-05-05)
+>
+> Origen: smoke Carolina detecta que el asistente RAG mostraba `[Fuente N: docs/help/...]` en respuestas. Ruido visual + jerga técnica para usuario no técnico.
+>
+> ### Aplicado
+> - Edge Function `ask-crm-docs` versión 20 desplegada via MCP.
+> - System prompt reescrito: prohíbe explícitamente citar archivos, rutas, "Fuentes:", "Referencias:".
+> - Contexto interno usa delimitadores neutros (`--- INFORMACIÓN INTERNA ---` / `--- FIN ---`) sin path. El LLM ya no tiene de dónde copiar la sintaxis técnica.
+> - Array `sources` sigue en JSON por si futuro UI propio, pero hoy se ignora.
+>
+> ## ✅ FIX2 RAG — DOCS/HELP AL DÍA (2026-05-05)
+>
+> Origen: tras Fix1, las preguntas sobre features nuevas ("Solo seguimiento", "comentario", "prospecto vs cliente") devolvían honestamente "No encuentro información". Faltaba la documentación.
+>
+> ### Docs nuevos
+> - `docs/help/captacion/separacion-prospecto-cliente.md` (9 chunks indexados).
+> - `docs/help/captacion/seguimiento-tras-handoff.md` (12 chunks).
+> - `docs/help/captacion/vencimiento-y-semaforo.md` (12 chunks).
+>
+> ### Docs actualizados
+> - `crear-lead.md`: bloque vencimiento + nace prospecto.
+> - `pasar-a-analisis.md`: sección "Después de pasarlo" con visibilidad + comentarios.
+> - `README.md`: índice + estado.
+>
+> ### Pipeline
+> Workflow `regenerate-help-embeddings` ejecutó: DELETE + INSERT en `crm_help_embeddings`. Embeddings nuevos validados con SQL contra Supabase.
+>
+> ### Smoke 5/5 OK con Carolina
+> 1. "Solo seguimiento" → respuesta operativa.
+> 2. "Cómo añado comentario" → pasos numerados.
+> 3. "Prospecto vs cliente" → diferencias claras.
+> 4. "Cómo registro fecha vencimiento" → vías + fuentes + semáforo.
+> 5. Bonus "Cómo funciona el semáforo" → tabla colores.
+> Sin "Fuentes:", sin rutas, sin jerga técnica.
+>
+> ## Deuda técnica conocida (no bloqueante)
+>
+> - **4 casts `(supabase as any)`** por columnas nuevas no reflejadas en tipos generados. Solución: regenerar tipos. Pendiente.
+> - **Cache Cloudflare con bundles obsoletos** en tabs viejos. Patrón conocido. Solución: hard refresh + tab nuevo.
+> - **Alucinación menor del asistente RAG**: la respuesta P5 mencionó *"Naranja y Rojo aparecen en Dashboard como alertas"* — no implementado. Si Carolina lo busca y no lo encuentra, refinar doc o implementar alertas reales.
+>
+> ## Próxima sesión (orden firmado)
+>
+> 1. **D2 — vista tabla** opcional con selector Cards/Tabla, columnas con sort por prioridad, localStorage por usuario. Mensaje detallado en `.cowork/outbox/2026-05-06T-d2-vista-tabla.md`.
+> 2. Filtros CRM restantes: Datadis, Renovaciones, Incidencias, Contratos.
+> 3. Badge vencimiento en cards (DONE en D1, mantener vigilado).
+> 4. Regenerar tipos Supabase + quitar 4 casts.
+> 5. Considerar implementar "alertas en Dashboard" o ajustar doc para no prometerlo.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-05 por Cowork — Sprint Fase 2-3 separación CRM/Captación + vencimiento contrato prospecto cerrado y desplegado.**
+>
+> ## ✅ SPRINT FASE 2-3 + VENCIMIENTO PROSPECTO — DESPLEGADO (2026-05-05)
+>
+> Commit `0260ae3` en `origin/main`. TSC 0, tests 74/74, build OK, push OK. Cloudflare deploy pendiente (~2 min).
+>
+> ### Lo que entrega
+>
+> **Separación lógica CRM ↔ Captación**
+> - Empresas, contactos, oportunidades, dashboard y búsqueda global del CRM filtran por `estado_relacion='cliente'` / `contexto='crm'`.
+> - Captación opera independiente: prospectos no contaminan listas del CRM hasta promoción explícita.
+> - Drawer captación muestra badge ámbar **PROSPECTO** y botón verde "Convertir a cliente CRM" (admin/senior + etapa cerrada_ganada/contrato_firmado/activo) → invoca RPC `convertir_prospecto_a_cliente`.
+>
+> **Vencimiento contrato actual del prospecto**
+> - 3 columnas nuevas en `oportunidades`: `fecha_vencimiento_contrato_prospecto`, `fuente_vencimiento_contrato_prospecto`, `notas_vencimiento_contrato_prospecto`. Aisladas de la tabla `contratos` real (CRM).
+> - Componente `VencimientoContratoForm` reutilizable (date + select fuente + notas + semáforo en vivo).
+> - Helper puro `calcularSemaforoVencimiento`: verde >90d, amarillo ≤90d, naranja ≤60d, rojo ≤30d, vencido <0.
+> - Integrado en `NuevoLeadModal` (bloque "Datos adicionales") y `EditarLeadModal` (sección dedicada con flag `actualizar_vencimiento` para distinguir borrar vs no tocar).
+> - `OportunidadDrawer` muestra fecha + semáforo + fuente + notas en el detalle.
+>
+> ### BD prod (aplicada vía MCP, mirror SQL en disco)
+>
+> 1. `20260505_fase1_separacion_captacion_crm.sql`
+>    - ALTER `empresas` (+ `estado_relacion`, `origen_relacion`, `convertido_cliente_at/_por`)
+>    - ALTER `oportunidades` (+ `contexto`, `convertida_a_crm_at/_por`)
+>    - Backfill: 24 clientes históricos / 9 prospectos (4 DEMO + 2 TEST SMOKE + 3 leads Carolina A)
+>    - Trigger `enforce_oportunidad_contexto_coherence`
+>    - RPC `convertir_prospecto_a_cliente` SECURITY DEFINER
+>    - 4 vistas con `security_invoker = true`
+>    - `crear_lead_captacion` v3 con prospecto/captacion forzados
+> 2. `20260505_vencimiento_contrato_prospecto.sql`
+>    - 3 columnas nuevas en `oportunidades` + check constraint en `fuente_vencimiento`
+>    - `crear_lead_captacion` v4 (3 params nuevos opcionales)
+>    - `actualizar_lead_captacion` v3 (flag `p_actualizar_vencimiento` boolean)
+>
+> ### Deuda técnica conocida (no bloqueante)
+>
+> - 4 archivos con cast `(supabase as any)` por columnas nuevas no reflejadas en tipos generados:
+>   - `src/features/empresas/api.ts:32`
+>   - `src/features/oportunidades/api.ts:30`
+>   - `src/features/dashboard/api.ts:51`
+>   - `src/components/search/GlobalSearch.tsx:26`
+> - Solución: regenerar tipos con `supabase gen types typescript --project-id gtphkowfcuiqbvfkwjxb > src/core/types/database.ts` y quitar los casts.
+>
+> ### Smoke test pendiente Juan (post deploy CF)
+>
+> 1. `/empresas` debe mostrar 24 clientes, NO 33.
+> 2. `/captacion` sigue mostrando los 9 prospectos.
+> 3. Crear lead nuevo → nace con `estado_relacion=prospecto, contexto=captacion`.
+> 4. Vencimiento prospecto: 15d→rojo, 50d→naranja, 80d→amarillo, 200d→verde.
+> 5. Convertir a cliente: solo admin/senior + etapa ganado/firmado.
+>
+> ### Orden siguiente sesión (acordado con Juan/ChatGPT 2026-05-05)
+>
+> 1. Smoke corto separación/vencimientos (validar antes de tocar nada).
+> 2. Filtros módulos CRM restantes: Datadis, Renovaciones, Incidencias, Contratos.
+> 3. Badge "Vence en X días" en `BandejaCard` (P1 útil para Carolina).
+> 4. Regenerar tipos Supabase + quitar 4 casts `(supabase as any)`.
+> 5. Tests unitarios `calcularSemaforoVencimiento` (helper puro, fácil con `vi.useFakeTimers`).
+>
+> Mensaje detallado para próxima sesión en `.cowork/outbox/2026-05-05T-prioridades-post-fase23.md`.
+>
+> ---
+>
+> **Última actualización (anterior): 2026-05-04 tarde por Cowork (sesión autónoma) — Sprint Operativo Captación COMPLETO en disco (Días 1-5). Pendiente PS1 commit + push.**
 >
 > ## ✅ SPRINT OPERATIVO CAPTACIÓN — COMPLETO
 >
