@@ -113,6 +113,26 @@ export default function BandejaCard({ op, onClick, currentUserId }: Props) {
         </p>
       )}
 
+      {/* Sprint E1 2026-05-05: línea discreta "Próxima llamada".
+          Solo se muestra si existe fecha_siguiente_accion (ej: tras posponer
+          llamada). Es la base para la futura pestaña "Hoy" del backlog
+          agenda-captacion.md. */}
+      {op.fecha_siguiente_accion && (
+        <p className="text-xs text-slate-500 mb-3">
+          📅 Próxima llamada: {formatDate(op.fecha_siguiente_accion, 'short')}
+          {(() => {
+            const d = new Date(op.fecha_siguiente_accion)
+            const horas = d.getHours()
+            const mins = d.getMinutes()
+            // Mostrar hora solo si es distinta de 00:00 (evitamos "00:00" cuando solo se eligió fecha sin hora explícita)
+            if (horas !== 0 || mins !== 0) {
+              return ` ${String(horas).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+            }
+            return ''
+          })()}
+        </p>
+      )}
+
       {/* Badge etapa + updated_at */}
       <div className="flex items-center justify-between">
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${etapaColor}`}>

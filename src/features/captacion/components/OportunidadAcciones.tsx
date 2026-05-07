@@ -19,6 +19,7 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import {
   subirDocumentoOportunidad, urlFirmadaDocumento, validarFichero, ACCEPTED_EXT_LABEL, ACCEPTED_MIME,
 } from '../storage'
+import PosponerLlamadaModal from './PosponerLlamadaModal'
 
 interface Props {
   detalle: OportunidadDetalle
@@ -61,6 +62,8 @@ type Modo =
   | 'asignar_a_senior'
   | 'empezar_preparar_propuesta'
   | 'subir_propuesta'
+  /** Sprint E1 2026-05-05: posponer llamada (modal aparte) */
+  | 'posponer'
 
 /**
  * Bloque de acciones contextuales para una oportunidad, según etapa_operativa.
@@ -115,6 +118,15 @@ export default function OportunidadAcciones({ detalle, onClose }: Props) {
           oportunidadId={detalle.id}
           onCancel={() => setModo(null)}
           onDone={() => { setModo(null) }}
+        />
+      )}
+      {/* Sprint E1 2026-05-05: Posponer llamada — modal aparte (no form inline). */}
+      {modo === 'posponer' && (
+        <PosponerLlamadaModal
+          open={true}
+          onOpenChange={(open) => { if (!open) setModo(null) }}
+          oportunidadId={detalle.id}
+          empresaNombre={detalle.empresa?.nombre}
         />
       )}
       {modo === 'esperando_factura' && (
@@ -257,6 +269,8 @@ function BotonesPorEtapa({ etapa, setModo }: { etapa: string; setModo: (m: Modo)
       <div className="grid grid-cols-2 gap-2">
         <ActionButton icon={Phone} label="No contesta" onClick={() => setModo('no_contesta')} />
         <ActionButton icon={UserPlus} label="No es decisor" onClick={() => setModo('no_decisor')} />
+        {/* Sprint E1 2026-05-05: posponer llamada (caso real "está de vacaciones, llamar el lunes") */}
+        <ActionButton icon={Calendar} label="Posponer" onClick={() => setModo('posponer')} />
         <ActionButton icon={Mail} label="Esperando factura" onClick={() => setModo('esperando_factura')} variant="primary" />
         <ActionButton icon={XCircle} label="No interesa" onClick={() => setModo('cerrar_perdida')} variant="danger" />
       </div>

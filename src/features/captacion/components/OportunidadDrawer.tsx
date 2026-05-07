@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, Building2, Phone, Mail, MapPin, User, FileText, Calendar, Activity, Pencil, Star, Briefcase, AlertCircle, MessageSquare, Eye } from 'lucide-react'
 import { toast } from 'sonner'
-import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, useAgregarComentario, calcularSemaforoVencimiento, ESTADO_CLASSES, ETAPA_LABELS, ETAPA_COLORS } from '../api'
+import { useOportunidadDetalle, useActividadesOportunidad, useConvertirCliente, useAgregarComentario, calcularSemaforoVencimiento, ESTADO_CLASSES, ETAPA_LABELS, ETAPA_COLORS, formatTelefonoConExtension } from '../api'
 import { formatDate } from '../../../core/utils/dates'
 import { formatEur } from '../../../core/utils/format'
 import { useAuth } from '../../../core/hooks/useAuth'
@@ -362,7 +362,15 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                         </div>
                         {c.cargo && <p className="text-xs text-slate-500">{c.cargo}</p>}
                         <div className="mt-1 space-y-0.5 text-xs text-slate-600">
-                          {c.telefono && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" />{c.telefono}</div>}
+                          {/* Sprint E1 2026-05-05: tel · Ext. usa el helper compartido */}
+                          {(c.telefono || c.extension) && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="h-3 w-3" />
+                              <span className={c.es_principal ? 'font-semibold text-slate-800' : ''}>
+                                {formatTelefonoConExtension(c.telefono, c.extension)}
+                              </span>
+                            </div>
+                          )}
                           {c.email && <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" />{c.email}</div>}
                         </div>
                       </div>
@@ -401,6 +409,15 @@ export default function OportunidadDrawer({ oportunidadId, onClose }: Props) {
                     <dt className="text-slate-500">Decisor identificado</dt>
                     <dd className="text-slate-900 font-medium">{detalle.decisor_identificado ? 'Sí' : 'No'}</dd>
                   </div>
+                  {/* Sprint E1 2026-05-05: próxima acción registrada (ej: llamada pospuesta). */}
+                  {detalle.fecha_siguiente_accion && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-slate-500 shrink-0">📅 Próxima llamada</dt>
+                      <dd className="text-slate-900 font-medium text-right">
+                        {detalle.siguiente_accion ?? formatDate(detalle.fecha_siguiente_accion, 'short')}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
 
                 {/* Botones de descarga si hay documentos asociados */}

@@ -51,7 +51,7 @@ export default function ContactosForm({ contactos, onChange, idPrefix = 'c' }: P
     const tieneAlguno = visibles.some(c => c.es_principal)
     onChange([
       ...contactos,
-      { nombre: '', cargo: '', telefono: '', email: '', es_principal: !tieneAlguno },
+      { nombre: '', cargo: '', telefono: '', extension: '', email: '', es_principal: !tieneAlguno },
     ])
   }
 
@@ -153,24 +153,37 @@ export default function ContactosForm({ contactos, onChange, idPrefix = 'c' }: P
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div>
+          {/* Sprint E1 2026-05-05: layout teléfono+ext en grid 2/1, email aparte. */}
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <div className="col-span-2">
               <Label htmlFor={`${idPrefix}_${idx}_telefono`}>Teléfono</Label>
               <Input
                 id={`${idPrefix}_${idx}_telefono`}
                 value={c.telefono ?? ''}
                 onChange={e => update(idx, { telefono: e.target.value })}
+                placeholder="957 767 700"
               />
             </div>
             <div>
-              <Label htmlFor={`${idPrefix}_${idx}_email`}>Email</Label>
+              <Label htmlFor={`${idPrefix}_${idx}_extension`}>Ext.</Label>
               <Input
-                id={`${idPrefix}_${idx}_email`}
-                type="email"
-                value={c.email ?? ''}
-                onChange={e => update(idx, { email: e.target.value })}
+                id={`${idPrefix}_${idx}_extension`}
+                value={c.extension ?? ''}
+                onChange={e => update(idx, { extension: e.target.value })}
+                placeholder="123"
+                inputMode="numeric"
               />
             </div>
+          </div>
+
+          <div className="mt-2">
+            <Label htmlFor={`${idPrefix}_${idx}_email`}>Email</Label>
+            <Input
+              id={`${idPrefix}_${idx}_email`}
+              type="email"
+              value={c.email ?? ''}
+              onChange={e => update(idx, { email: e.target.value })}
+            />
           </div>
         </div>
       ))}

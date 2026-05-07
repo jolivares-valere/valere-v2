@@ -24,6 +24,9 @@ export type VMisOportunidadesRow = {
   /** Sprint D1 2026-05-05: añadido a la vista para semáforo en cards */
   fecha_vencimiento_contrato_prospecto?: string | null
   fuente_vencimiento_contrato_prospecto?: string | null
+  /** Sprint E1 2026-05-05: próxima acción visible en card */
+  siguiente_accion?: string | null
+  fecha_siguiente_accion?: string | null
   created_at: string
   updated_at: string
 }
@@ -38,6 +41,9 @@ export type VTodosMisCasosRow = VMisOportunidadesRow & {
   creador_funciones: string[] | null
   fecha_vencimiento_contrato_prospecto?: string | null
   fuente_vencimiento_contrato_prospecto?: string | null
+  /** Sprint E1 2026-05-05: próxima acción */
+  siguiente_accion?: string | null
+  fecha_siguiente_accion?: string | null
 }
 
 /** Datos detallados para el drawer */
@@ -63,6 +69,9 @@ export type OportunidadDetalle = {
   responsable_actual_id: string | null
   /** Sprint C 2026-05-05: campos del creador para badge "Solo seguimiento" y permisos comentar */
   created_by?: string | null
+  /** Sprint E1 2026-05-05: próxima acción (texto + fecha+hora) */
+  siguiente_accion?: string | null
+  fecha_siguiente_accion?: string | null
   created_at: string
   updated_at: string
   empresa: {
@@ -80,6 +89,8 @@ export type OportunidadDetalle = {
     nombre: string | null
     cargo: string | null
     telefono: string | null
+    /** Sprint E1 2026-05-05: extensión telefónica */
+    extension?: string | null
     email: string | null
     es_decisor: boolean
     es_principal?: boolean
@@ -151,6 +162,8 @@ export type ContactoInput = {
   nombre?: string
   cargo?: string
   telefono?: string
+  /** Sprint E1 2026-05-05: extensión telefónica (Patricia Cano · Ext. 123) */
+  extension?: string
   email?: string
   es_principal?: boolean
   /** marca para soft-delete en update */
@@ -296,12 +309,13 @@ export function useOportunidadDetalle(id: string | null) {
           fecha_vencimiento_contrato_prospecto,
           fuente_vencimiento_contrato_prospecto,
           notas_vencimiento_contrato_prospecto,
+          siguiente_accion, fecha_siguiente_accion,
           responsable_actual_id, created_by, created_at, updated_at,
           empresa:empresas (
             id, nombre, nif, telefono_principal, email_principal, ciudad, segmento, estado_relacion
           ),
           contactos:contactos (
-            id, nombre, cargo, telefono, email, es_decisor, es_principal
+            id, nombre, cargo, telefono, extension, email, es_decisor, es_principal
           ),
           responsable:user_profiles!oportunidades_responsable_actual_id_fkey (
             id, full_name, funciones
@@ -450,6 +464,64 @@ export function useAgregarComentario(oportunidadId: string | null) {
       queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', oportunidadId] })
     },
   })
+}
+
+/**
+ * Sprint E1 2026-05-05 — posponer llamada con motivo + fecha próxima.
+ * Origen: caso real Carolina "está de vacaciones, llamar el lunes 11 mayo".
+ * Crea actividad llamada/pospuesto y actualiza siguiente_accion + fecha_siguiente_accion.
+ */
+export type MotivoPosponer = 'vacaciones' | 'llamar_mas_tarde' | 'no_disponible' | 'otro'
+
+export type PosponerLlamadaInput = {
+  motivo: MotivoPosponer
+  fecha_proxima: string  // ISO timestamp
+  notas?: string
+}
+
+export function usePosponerLlamada(oportunidadId: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: PosponerLlamadaInput): Promise<string> => {
+      if (!oportunidadId) throw new Error('Oportunidad no especificada')
+      const { data, error } = await supabaseAny.rpc('posponer_llamada', {
+        p_oportunidad_id: oportunidadId,
+        p_motivo: input.motivo,
+        p_fecha_proxima: input.fecha_proxima,
+        p_notas: input.notas ?? null,
+      })
+      if (error) {
+        logError(error, 'usePosponerLlamada')
+        throw error
+      }
+      return String(data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['actividades_oportunidad', oportunidadId] })
+      queryClient.invalidateQueries({ queryKey: ['mis_oportunidades'] })
+      queryClient.invalidateQueries({ queryKey: ['captacion_todos_mis_casos'] })
+      queryClient.invalidateQueries({ queryKey: ['oportunidad_detalle', oportunidadId] })
+    },
+  })
+}
+
+/**
+ * Helper puro: formatea teléfono + extensión para mostrar en UI.
+ * "957 767 700" + "123" → "957 767 700 · Ext. 123"
+ * "957 767 700" + null   → "957 767 700"
+ * null + "123"           → "Ext. 123"
+ * null + null            → ""
+ */
+export function formatTelefonoConExtension(
+  telefono?: string | null,
+  extension?: string | null,
+): string {
+  const tel = telefono?.trim() ?? ''
+  const ext = extension?.trim() ?? ''
+  if (tel && ext) return `${tel} · Ext. ${ext}`
+  if (tel) return tel
+  if (ext) return `Ext. ${ext}`
+  return ''
 }
 
 /* ============================================================
