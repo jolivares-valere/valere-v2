@@ -103,6 +103,19 @@ D2 NO es mejora estética: es cambio de forma de trabajo. Necesita validación c
 
 ---
 
+## Backlog estratégico — Agenda captación + calendario
+
+ChatGPT entregó dictamen completo (cierre 2026-05-05) sobre estrategia de calendario operativo en captación: pestaña "Hoy", agenda interna con tabla `captacion_eventos`, integración Google Calendar en fase posterior, calendarios compartidos por rol.
+
+**No se ejecutó.** Queda como backlog dedicado en:
+`.cowork/backlog/agenda-captacion.md`
+
+Trigger para arrancar: Carolina dice *"no sé a quién llamar hoy"* o se detectan leads sin tocar varios días o >20-30 prospectos activos por persona.
+
+Si NO se da el trigger → no arrancar. La lógica base (semáforo, siguiente acción, vista cross-bandeja) ya está implementada, así que cuando llegue el momento será composición rápida, no invención.
+
+**Scope estimado cuando se arranque:** 1-2 sesiones cowork. El 60% de lógica ya en código.
+
 ## Decisión pendiente — Dashboard comercial completo
 
 ChatGPT entregó hoy una definición completa de Dashboard de dirección. **NO se ejecutó.** Queda como decisión estratégica, no como sprint listo.

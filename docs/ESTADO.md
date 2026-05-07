@@ -101,6 +101,10 @@
 > 5. Filtros CRM restantes: Datadis, Renovaciones, Incidencias, Contratos.
 > 6. Regenerar tipos Supabase + quitar 4 casts.
 >
+> ## Backlog estratégico (no arrancar sin trigger)
+>
+> - **`.cowork/backlog/agenda-captacion.md`** — agenda interna captación + estrategia calendarios compartidos. Plan completo con fases (interna primero, Google Calendar después). Trigger: Carolina dice "no sé a quién llamar hoy" o >20-30 prospectos activos por persona. Scope estimado cuando arranque: 1-2 sesiones cowork. El 60% de lógica ya en código.
+>
 > ---
 >
 > **Última actualización (anterior): 2026-05-05 por Cowork — Sprint Fase 2-3 separación CRM/Captación + vencimiento contrato prospecto cerrado y desplegado.**
