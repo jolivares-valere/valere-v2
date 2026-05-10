@@ -1,5 +1,30 @@
 # Estado actual del proyecto Valere v2
 
+> **Última actualización: 2026-05-10 por Cowork — Sesión FV Sync: diagnósticos completos, StorageStateClient robusto, commit cda9a24.**
+>
+> ## ✅ SESIÓN 2026-05-10 — FV SYNC DIAGNÓSTICOS
+>
+> | Archivo | Cambio | Commit |
+> |---|---|---|
+> | `fusionsolar_client.py` | FusionSolarAuthError/ResponseError + StorageStateClient completo (check_session, _log_storage_state_info, _fetch estructurado, login robusto con FusionSolarAuthError en redirect) | `cda9a24` |
+> | `extract_cookies.py` | Usa `context.storage_state()` (cookies + localStorage) en vez de solo `context.cookies()` | `cda9a24` |
+> | `sync_job.py` | Importa FusionSolarAuthError, catch específico con log `AUTH_REDIRECT` + `ACCIÓN REQUERIDA: ejecuta extract_cookies.py` | `cda9a24` |
+> | `test_cookie_auth.py` | Reescrito: usa StorageStateClient igual que CI, check_session() + get_station_list(), diagnósticos OK/AUTH_REDIRECT/NON_JSON/SUPABASE_ERROR | `cda9a24` |
+> | `fv-sync.yml` | Elimina step Playwright duplicado; añade step "Diagnóstico entorno" (fecha UTC, Python version, vars de entorno presentes sin mostrar valores) | `cda9a24` |
+>
+> ## ⏳ PENDIENTES FV SYNC
+>
+> - Lanzar Run #95 desde GitHub Actions UI y verificar logs
+> - Si AUTH_REDIRECT → re-ejecutar `extract_cookies.py` localmente (ya usa storage_state() completo)
+> - Si AUTH_REDIRECT persiste en CI pero funciona localmente → considerar self-hosted runner o cron local Windows Task Scheduler
+> - Investigar si FusionSolar tiene API oficial para instaladores (evitaría scraping)
+>
+> ## 📋 PENDIENTES CRM (previos, sin cambios hoy)
+>
+> - SQL fase28.6 pendiente de ejecutar en Supabase (`supabase/migrations/20260422_fase28_6_rls_policies_cleanup.sql`)
+> - Deploy Edge Function `chat-consultor`
+> - Regenerar tipos Supabase (4 casts `supabase as any` restantes)
+
 > **Última actualización (más reciente): 2026-05-05 (jornada larga) por Cowork — 5 sprints encadenados con smoke real Carolina entre cada uno. Todo desplegado.**
 >
 > ## ✅ JORNADA 2026-05-05 — RESUMEN
