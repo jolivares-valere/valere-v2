@@ -9,6 +9,7 @@ import PendingApprovalPage from './features/auth/PendingApprovalPage'
 import { ErrorBoundary } from './core/components/ErrorBoundary'
 
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage'))
+const HoyPage = lazy(() => import('./features/hoy/HoyPage'))
 const EmpresasPage = lazy(() => import('./features/empresas/EmpresasPage'))
 const EmpresaDetailPage = lazy(() => import('./features/empresas/EmpresaDetailPage'))
 const ContactosPage = lazy(() => import('./features/contactos/ContactosPage'))
@@ -130,6 +131,7 @@ export default function App() {
 
       <Route path="/" element={<AuthGuard><Navigate to="/dashboard" replace /></AuthGuard>} />
       <Route path="/dashboard" element={<AuthGuard><DashboardPage /></AuthGuard>} />
+      <Route path="/hoy" element={<AuthGuard><HoyPage /></AuthGuard>} />
 
       <Route path="/empresas" element={<AuthGuard><EmpresasPage /></AuthGuard>} />
       <Route path="/empresas/:id" element={<AuthGuard><EmpresaDetailPage /></AuthGuard>} />

@@ -14,6 +14,16 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
+    // allowedHosts: true permite que el dev server acepte cualquier Host header.
+    // Necesario para que cloudflared tunnel y similares (que reescriben Host
+    // a *.trycloudflare.com / *.ngrok-free.app) funcionen sin 403/Bad Request.
+    allowedHosts: true,
+  },
+  preview: {
+    host: '0.0.0.0',
+    // Mismo motivo que server.allowedHosts: el preview server también filtra
+    // por Host header. Sin esto, cloudflared/ngrok ven "Invalid Host header".
+    allowedHosts: true,
   },
   build: {
     rollupOptions: {
