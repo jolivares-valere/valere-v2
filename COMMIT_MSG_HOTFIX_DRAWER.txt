@@ -1,0 +1,22 @@
+fix(captacion): null guard contactos drawer + RLS funciones operativas
+
+Dos hotfixes detectados durante smoke Test 1 con Carolina Aroca:
+
+1) OportunidadDrawer crasheaba al reabrir un lead recien creado (sin
+   contactos). detalle.contactos puede llegar null. Patron seguro:
+   const contactos = detalle.contactos ?? []
+   2 ocurrencias arregladas (length + map).
+
+2) crear_lead_captacion devolvia 403 a Carolina A (role consultant).
+   La RPC era SECURITY INVOKER y las policies INSERT de
+   oportunidades/contactos/actividades solo aceptaban roles legacy
+   admin/jefe_equipo/comercial. Aplicado en BD prod via MCP, mirror
+   en supabase/migrations/20260504_hotfix_rls_funciones_captacion.sql:
+   - RPC crear_lead_captacion -> SECURITY DEFINER + search_path explicito
+   - Policies aditivas por funciones operativas (telemarketing,
+     analista, asesor_senior, admin) en oportunidades, contactos,
+     actividades, oportunidad_handoffs, empresas
+
+Origen: smoke Test 1 con Carolina Aroca real, P0 detectado.
+NO borrar lead 6a4e92f1-553f-4158-ac29-902b3c43d406 (TEST SMOKE
+INDUSTRIAL SL) - se reusa para reintentar el smoke.

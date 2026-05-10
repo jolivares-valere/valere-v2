@@ -1,0 +1,82 @@
+feat(captacion-sprint-dias2-5): operativa completa Carolina Aroca end-to-end
+
+Sprint Operativo Captacion - Dias 2-5 (2/2 al 5/5)
+
+CAMBIOS BD (migration aplicada en prod via MCP):
+- public.user_has_funcion(text): helper STABLE SECURITY DEFINER
+- Policies adicionales en bucket documentos (storage.objects):
+  insert/update permitido a funciones telemarketing/analista/asesor_senior/admin
+- Policies adicionales en tabla public.documentos: select/insert/update
+  permitido a las mismas funciones
+
+CAMBIOS FRONTEND - Dia 2 (lead form + drawer interactivo):
+- src/features/captacion/components/NuevoLeadModal.tsx:
+  modal con form minimo (empresa nombre+telefono obligatorios) + bloque
+  expandible (NIF, email, ciudad, segmento, contacto, origen, notas)
+- src/features/captacion/api.ts: hook useCrearLead que invoca RPC
+  crear_lead_captacion (transaccion atomica empresa+contacto+oportunidad)
+- src/features/captacion/CaptacionPage.tsx: boton + Nuevo lead en header
+  (visible solo a telemarketing+admin) + tab "Todos mis casos" usando
+  vista cross-bandeja v_captacion_todos_mis_casos
+
+CAMBIOS FRONTEND - Dia 3 (acciones contextuales + upload):
+- src/features/captacion/storage.ts: helpers upload Supabase Storage
+  con validacion (PDF/JPG/PNG, max 15MB), sanitizacion nombre, path
+  deterministico oportunidades/{id}/{categoria}/{YYYYMMDD}_{file}.
+  Resilient: separa upload de update oportunidad para reintento sin
+  re-uploadear.
+- src/features/captacion/components/OportunidadAcciones.tsx:
+  forms contextuales por etapa_operativa con botones primarios y
+  bloques de detalle. Cubre etapas:
+  * nuevo/contactado: No contesta, No es decisor, Esperando factura
+    (con email + fecha prevista), No interesa (con motivo simplificado)
+  * esperando_factura: Recordatorio, Factura recibida (upload),
+    Pasar a analisis (handoff manual), No envia
+  * factura_recibida (analista): Empezar analisis, Asignar a senior,
+    Pasar a analisis
+  * en_analisis (analista): Subir propuesta lista
+  * asignada_a_senior (senior): Empezar a preparar propuesta
+  * propuesta_en_preparacion (senior): Subir propuesta lista
+  * propuesta_lista (telemarketing): Marcar enviada
+  * propuesta_enviada/seguimiento: Acepta, Rechaza, Pedir visita,
+    Programar proximo contacto
+
+CAMBIOS FRONTEND - Dia 4 (cross-bandeja + acciones senior/analista):
+- Tab "Todos mis casos" en CaptacionPage muestra v_captacion_todos_mis_casos
+  (casos donde Carolina A fue parte alguna vez)
+- Subir propuesta hace handoff automatico de vuelta a creador (Carolina A)
+- Drawer en modo lectura si user no es responsable actual
+
+CAMBIOS COMUNES:
+- src/features/captacion/api.ts: nuevos hooks useCambiarEtapa,
+  useRegistrarActividad, useHacerHandoff, useAnalistas, useAsesoresSenior
+- Drawer: bloques descarga factura/propuesta cuando hay documento_id
+- motivos.ts: catalogo MOTIVOS_TELEMARKETING (7+otro) y MOTIVOS_AVANZADO
+  (16+otro), helper motivosParaUsuario(funciones) — enum BD intacto
+
+TESTS NUEVOS (35 tests):
+- src/features/captacion/motivos.test.ts (10 tests)
+- src/features/captacion/storage.test.ts (9 tests, validarFichero)
+- src/core/auth/permissions.test.ts (16 tests, puedeAccederRuta y default)
+
+DOCS:
+- SPRINT_OPERATIVO_CAPTACION_2026-05-04.md actualizado con cierre
+
+ROBUSTEZ:
+- Upload con validaciones cliente
+- Errores claros (toast.error con descripcion)
+- Resilient: si upload OK pero update falla, archivo queda y se puede
+  reintentar transicion sin volver a subir
+- Si transicion OK pero handoff falla, propuesta lista queda y se puede
+  reintentar handoff
+- Cleanup best-effort del blob si INSERT documentos falla
+
+OUT OF SCOPE (futuros sprints):
+- Plantillas/generacion PDF
+- Google Calendar
+- Permisos capa B/C/D (RLS por entidad/campo/RPC)
+- Notificaciones push/email
+- OCR
+
+Origen: feedback Juan 2026-05-04 - bandejas captacion son solo lectura.
+Plan: docs/SPRINT_OPERATIVO_CAPTACION_2026-05-04.md

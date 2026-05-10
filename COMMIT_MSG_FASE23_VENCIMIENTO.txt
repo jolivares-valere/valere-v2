@@ -1,0 +1,58 @@
+feat(captacion): Fase 2-3 separación CRM/captación + vencimiento contrato prospecto
+
+Sprint 2026-05-05 (continuación Fase 1 BD aplicada).
+
+== Fase 2: Frontend filtros estado_relacion / contexto ==
+- src/features/empresas/api.ts: filter por estado_relacion (default 'cliente').
+  El CRM solo lista clientes reales; prospectos quedan ocultos.
+- src/features/contactos/api.ts: inner join empresas + filter
+  empresa.estado_relacion='cliente'.
+- src/features/oportunidades/api.ts: filter contexto='crm' en listados CRM.
+- src/features/dashboard/api.ts: KPI "empresas" cuenta solo clientes.
+- src/components/search/GlobalSearch.tsx: búsqueda global excluye prospectos
+  para no contaminar resultados con leads de captación.
+
+== Fase 3: UI captación con badge PROSPECTO + convertir a cliente ==
+- OportunidadDrawer:
+  * Badge ámbar "PROSPECTO" en cabecera cuando empresa.estado_relacion!=cliente.
+  * Sección verde "Convertir a cliente CRM" visible solo a admin/asesor_senior
+    en etapas cerrada_ganada/contrato_firmado/activo.
+  * window.confirm + RPC convertir_prospecto_a_cliente + toast + invalidate.
+- captacion/api.ts: nuevo hook useConvertirCliente.
+- OportunidadDetalle ahora incluye empresa.estado_relacion + contexto.
+
+== Vencimiento contrato actual del prospecto (semáforo 90/60/30) ==
+BD (mirror SQL en supabase/migrations/20260505_vencimiento_contrato_prospecto.sql):
+- ALTER oportunidades ADD fecha_vencimiento_contrato_prospecto date.
+- ALTER oportunidades ADD fuente_vencimiento_contrato_prospecto text CHECK.
+- ALTER oportunidades ADD notas_vencimiento_contrato_prospecto text.
+- crear_lead_captacion v4: 3 nuevos params opcionales para vencimiento.
+- actualizar_lead_captacion v3: flag p_actualizar_vencimiento boolean
+  para distinguir "limpiar fecha" de "no enviar el campo".
+
+Frontend:
+- captacion/api.ts:
+  * type FuenteVencimiento ('cliente_llamada'|'factura'|'email'|'estimado'|'desconocido').
+  * type Semaforo + helper puro calcularSemaforoVencimiento(fechaISO).
+    verde >90d, amarillo ≤90d, naranja ≤60d, rojo ≤30d, vencido <0, sin_dato.
+  * Extender CrearLeadInput / ActualizarLeadInput.
+  * Pasar params al RPC en useCrearLead / useActualizarLead.
+  * SELECT de useOportunidadDetalle incluye los 3 nuevos campos.
+- captacion/components/VencimientoContratoForm.tsx (nuevo):
+  componente reutilizable date+select+textarea con semáforo en vivo.
+- NuevoLeadModal: integrado en bloque expandible "Datos adicionales".
+- EditarLeadModal: nueva sección "Vencimiento contrato actual" pre-rellena
+  desde detalle, envía actualizar_vencimiento=true (permite borrar).
+- OportunidadDrawer: muestra fecha + semáforo + fuente + notas en el detalle.
+
+== Origen ==
+- Decisión arquitectónica Juan + ChatGPT (2026-05-05): no contaminar
+  contratos CRM con info comercial de captación; aislar en oportunidades.
+- Backfill Fase 1 verificado: 24 clientes / 9 prospectos / 0 inconsistencias.
+
+Tests: helper calcularSemaforoVencimiento es puro (sin red), apto para unit
+test con date mock. Pendiente añadir tests cuando se haga sprint de QA.
+
+Refs:
+  Fase 1 BD: supabase/migrations/20260505_fase1_separacion_captacion_crm.sql
+  Vencimiento BD: supabase/migrations/20260505_vencimiento_contrato_prospecto.sql

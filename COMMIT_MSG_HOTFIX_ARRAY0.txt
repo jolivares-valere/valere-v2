@@ -1,0 +1,26 @@
+fix(captacion): null guard contactos[0] en OportunidadAcciones
+
+P0 detectado en smoke Test 2 con Carolina Aroca:
+
+Click "Esperando factura" crasheaba con
+TypeError: Cannot read properties of null (reading '0')
+
+Causa: 2 accesos detalle.contactos[0]?.email donde detalle.contactos
+puede ser null cuando la oportunidad recien creada no tiene contactos
+asociados. El optional chaining ?.email NO protege contra null en el
+array padre.
+
+Fix: detalle.contactos?.[0]?.email
+Aplicado en 2 lineas: FormEsperandoFactura y FormMarcarPropuestaEnviada.
+
+Resto de [0] del archivo verificados:
+- motivos[0]?.codigo: motivos siempre es array (motivosParaUsuario)
+- analistas[0]?.id: data ?? [] en hook useAnalistas
+- senior[0]?.id: data ?? [] en hook useAsesoresSenior
+- e.target.files?.[0]: guard correcto
+
+NO toca schema.
+NO cambia flujo.
+NO añade features.
+NO borra el lead 6a4e92f1-553f-4158-ac29-902b3c43d406 (TEST SMOKE
+INDUSTRIAL SL) - se sigue reusando en el smoke.

@@ -58,6 +58,9 @@ La fuente te ayuda a saber cómo de fiable es la fecha:
 
 ## Dónde ves el semáforo
 
+### Dónde NO se muestra
+El semáforo del prospecto vive **solo en captación** (cards y drawer de `/captacion`). NO aparece en el Dashboard, NO genera notificaciones, NO se exporta a calendario, NO manda emails. Si quieres saber qué prospectos urgen, abre `/captacion` y mira las bandejas. (Las alertas que sí muestra el Dashboard son de **contratos firmados de clientes**, no de prospectos.)
+
 ### En la card de la bandeja
 Debajo del NIF de la empresa aparece un badge pequeño con el color y el texto **"Vence en X días"**. Si no hay fecha, no aparece nada — la card no se llena de ruido.
 

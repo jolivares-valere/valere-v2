@@ -1,0 +1,90 @@
+feat(captacion): D1 — helper vencimiento + cards con semáforo y siguiente acción
+
+Sprint D1 2026-05-05.
+
+== Origen ==
+Análisis profesional Juan + ChatGPT detecta fricción real en /captacion para
+perfil no técnico: "veo info pero no me dice qué hacer". Carolina abre cada
+card para entender contexto. Para captación de volumen, la card debe gritar
+acción y prioridad sin abrir el drawer.
+
+== Decisión arquitectónica ==
+D1 (este sprint) = mejora de cards (helper + tests + badges + acción dinámica).
+D2 (próximo) = vista tabla con selector. Separar para validar incremental.
+
+== BD (mirror SQL en supabase/migrations/20260505_d1_v_mis_oportunidades_vencimiento.sql) ==
+- DROP + CREATE de v_mis_oportunidades para añadir 3 columnas:
+  factura_fecha_prevista (estaba en TS pero faltaba en vista),
+  fecha_vencimiento_contrato_prospecto (necesario para semáforo en card),
+  fuente_vencimiento_contrato_prospecto (contexto futuro).
+- security_invoker=true mantenido.
+- v_captacion_todos_mis_casos ya exponía estos campos desde Sprint C.
+
+== Frontend ==
+
+A) Helper migrado a fichero propio + tests
+- src/features/captacion/utils/vencimiento.ts (NUEVO):
+  * type EstadoVencimiento ('sin_fecha' | 'vencido' | 'rojo' | 'naranja' | 'amarillo' | 'verde').
+  * type Semaforo { estado, diasRestantes, label }.
+    Cambio de naming respecto al helper viejo (color → estado, dias → diasRestantes)
+    para que sea más explícito. Reglas idénticas:
+      <0 vencido / <=30 rojo / <=60 naranja / <=90 amarillo / >90 verde.
+    90 días entra en amarillo (caso borde acordado).
+  * function siguienteAccionLead(etapa, fechaVencimiento):
+    Mapeo base por etapa_operativa, con OVERLAY de urgencia si la fecha
+    está cerca:
+      vencido → "Urgente: contrato vencido — llama ya"
+      rojo    → "Urgente: vence en X días — llama ya"
+      naranja → "Prioridad alta: vence en X días"
+      amarillo→ "Contactar ya: vence en X días"
+      verde   → texto base de etapa (sin overlay)
+      sin_fecha → texto base de etapa
+    Etapa "cerrado" nunca aplica overlay.
+  * const ESTADO_CLASSES: mapeo central de clases Tailwind por estado,
+    para que ningún consumidor las redefina y diverjan.
+
+- src/features/captacion/utils/vencimiento.test.ts (NUEVO):
+  * 7 tests calcularSemaforoVencimiento (null, vencido, 15d, 50d, 80d, 90d=amarillo, 200d).
+  * 8 tests siguienteAccionLead (etapas + overlay urgencia + cerrado sin overlay).
+  * Usa vi.useFakeTimers() con fecha fija 2026-05-05.
+
+B) api.ts (legacy compat)
+- Helper viejo borrado. Re-exporta el nuevo desde utils/vencimiento.ts.
+- VMisOportunidadesRow añade fecha_vencimiento_contrato_prospecto +
+  fuente_vencimiento_contrato_prospecto opcionales (corresponde con la vista).
+
+C) Consumidores migrados (sin cambio de comportamiento visual)
+- VencimientoContratoForm.tsx: sem.color → sem.estado, ESTADO_CLASSES
+  centralizado. Mapa local borrado.
+- OportunidadDrawer.tsx: igual. Mapa colorClasses local borrado.
+
+D) BandejaCard.tsx (los 2 cambios visuales nuevos)
+1) Badge semáforo de vencimiento debajo del NIF, antes de los importes.
+   Solo se muestra si HAY fecha (sem.estado !== 'sin_fecha').
+   Decisión Juan + ChatGPT: sin fecha = sin ruido en card.
+2) Línea "→ siguiente acción" ahora viene de siguienteAccionLead(etapa, fecha),
+   no del map estático. Carolina ve directamente "Urgente: vence en 15 días"
+   en la card, sin abrir el drawer.
+
+== NO incluido (D2) ==
+- Selector Cards/Tabla
+- Vista tabla con columnas
+- localStorage de preferencia
+- Ordenación por prioridad de semáforo
+
+== Smoke esperado ==
+1. /captacion bandeja "Por llamar":
+   - Cards con fecha vencimiento muestran badge color (rojo/naranja/amarillo/verde)
+     debajo del NIF.
+   - Cards sin fecha NO muestran badge — ningún ruido visual extra.
+2. Línea "→" muestra texto urgente cuando aplica:
+   "Urgente: vence en 15 días — llama ya" en lugar de "Llamar para presentar Valere".
+3. Drawer sigue funcionando idéntico (sección vencimiento + bloque coloreado).
+4. Sin regresión Sprint C: badge azul "Solo seguimiento" sigue saliendo en
+   "Todos mis casos".
+5. Tests 81/81 (74 antes + 7 nuevos del helper + 8 de siguienteAccion = 89... espera).
+
+Refs:
+  Migration: supabase/migrations/20260505_d1_v_mis_oportunidades_vencimiento.sql
+  Sprint C base: ffb3bfa
+  Plan firmado por Juan en sesión cowork.

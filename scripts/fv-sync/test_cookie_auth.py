@@ -88,4 +88,70 @@ def main():
         )
         storage_state = {"cookies": storage_state, "origins": []}
 
-    n_cookies = len(storage_state.get("cookies",
+    n_cookies = len(storage_state.get("cookies", []))
+    n_origins = len(storage_state.get("origins", []))
+    expires_at = cred.get("cookies_expires_at", "N/A")
+    logger.info(
+        "Storage state cargado: %d cookies, %d origenes localStorage (expiran %s)",
+        n_cookies, n_origins, str(expires_at)[:10],
+    )
+
+    # ── Crear cliente y verificar sesión ─────────────────────────
+    base_url = cred.get("region_url") or "https://uni003eu5.fusionsolar.huawei.com"
+    username = cred.get("username", "?")
+    logger.info("Probando StorageStateClient → %s (%s)", base_url, username)
+
+    client = StorageStateClient(base_url, storage_state)
+
+    try:
+        client.login()
+    except FusionSolarAuthError as e:
+        logger.error(
+            "AUTH_REDIRECT — FusionSolar rechaza la sesion: %s\n"
+            "ACCION: ejecuta extract_cookies.py para renovar el storage state.",
+            e,
+        )
+        sys.exit(1)
+    except Exception as e:
+        logger.error("UNEXPECTED_ERROR en login: %s: %s", type(e).__name__, e, exc_info=True)
+        sys.exit(1)
+
+    # ── check_session() rápido antes de intentar datos reales ─────
+    status = client.check_session()
+    logger.info("check_session() → %s", status)
+    if status != "OK":
+        logger.error(
+            "AUTH_REDIRECT / NON_JSON_RESPONSE — check_session devolvio '%s'. "
+            "La sesion no esta autenticada. Ejecuta extract_cookies.py.",
+            status,
+        )
+        client.close()
+        sys.exit(1)
+
+    # ── Llamada real: listar plantas ──────────────────────────────
+    try:
+        stations = client.get_station_list()
+        logger.info("OK — %d plantas encontradas", len(stations))
+        for s in stations:
+            name = s.get("stationName") or s.get("plantName") or "(sin nombre)"
+            code = s.get("stationCode") or s.get("stationDn") or "?"
+            logger.info("  %s — %s", name, code)
+    except FusionSolarAuthError as e:
+        logger.error(
+            "AUTH_REDIRECT — sesion expiro al pedir plantas: %s\n"
+            "Ejecuta extract_cookies.py para renovar.",
+            e,
+        )
+        sys.exit(1)
+    except FusionSolarResponseError as e:
+        logger.error("NON_JSON_RESPONSE / HTTP_ERROR al pedir plantas: %s", e)
+        sys.exit(1)
+    except Exception as e:
+        logger.error("UNEXPECTED_ERROR al pedir plantas: %s: %s", type(e).__name__, e, exc_info=True)
+        sys.exit(1)
+    finally:
+        client.close()
+
+
+if __name__ == "__main__":
+    main()

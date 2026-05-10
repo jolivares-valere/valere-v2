@@ -1,0 +1,49 @@
+fix(captacion): modal scrollable + editar lead (feedback Carolina A)
+
+Primer feedback de uso real de Carolina Aroca: 2 P0 detectados.
+
+P0 #1 — Modal "+ Nuevo lead" no scrollable
+Cuando se desplegaba "Datos adicionales", el modal crecia mas que el
+viewport y los botones Cancelar/Crear lead quedaban invisibles.
+Carolina tenia que minimizar para aceptar.
+
+Fix layout estandar SaaS:
+- DialogContent: max-h[90vh] + flex flex-col + p-0
+- Header: shrink-0 con padding propio
+- Form: overflow-y-auto + flex-1 (cuerpo scrollable)
+- DialogFooter: sacado del form, sticky bottom con border-top
+- Botón submit conectado al form via atributo form="..."
+
+Resultado: header fijo arriba, contenido scrollable, footer con
+botones SIEMPRE visible.
+
+P0 #2 — No se podia editar lead tras crearlo
+Si Carolina se equivocaba en nombre/teléfono, no había forma de
+corregir. Bloqueante de uso real.
+
+Fix:
+- BD: RPC actualizar_lead_captacion (SECURITY DEFINER + check
+  funcion + check ownership: responsable/creador/admin) que actualiza
+  empresa + contacto principal + notas atomicamente.
+  Mirror SQL: supabase/migrations/20260504_rpc_actualizar_lead_captacion.sql
+- Frontend:
+  - Hook useActualizarLead invoca la RPC.
+  - EditarLeadModal con misma estructura SaaS scrollable que NuevoLead:
+    secciones Empresa / Contacto principal / Notas, todas editables.
+  - Boton "Editar" en cabecera del drawer (visible solo si user es
+    responsable/creador/admin/master).
+
+OportunidadDrawer mejorado:
+- Footer de acciones contextuales con max-h[60vh] + overflow-y-auto:
+  cuando un form interno (subir factura, cerrar perdida, pedir visita)
+  crece, scrollea dentro del propio footer en vez de empujar botones
+  fuera de pantalla.
+
+Patron compartido NuevoLead/EditarLead:
+- DialogContent flex flex-col max-h-90vh p-0
+- Form overflow-y-auto flex-1
+- DialogFooter sticky bottom con border-top, button submit con
+  form="<id>"
+
+NO cambia flujo. NO añade features que no estuvieran. Solo arregla
+errores bloqueantes detectados en el primer login real.

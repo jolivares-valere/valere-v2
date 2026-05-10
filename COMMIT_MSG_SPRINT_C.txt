@@ -1,0 +1,69 @@
+feat(captacion): Sprint C — visibilidad post-handoff + comentarios internos
+
+Sprint 2026-05-05 (continuación tras smoke real Carolina A con caso Herba).
+
+== Problema detectado en uso real ==
+Carolina A creó el lead Herba Ricemills, lo trabajó, y al pasarlo a analista
+(Carolina M) perdió la opción de hacer seguimiento. Eso rompe la venta:
+quien creó el lead conoce el contexto comercial y debe poder seguir
+aportando aunque ya no sea responsable.
+
+== Decisión arquitectónica ==
+El handoff cambia RESPONSABILIDAD pero NO VISIBILIDAD ni capacidad de
+comentar. Modelo profesional de cualquier CRM serio: responsable actual,
+creador, observadores. Validado con ChatGPT.
+
+== BD (mirror SQL en supabase/migrations/20260505_sprint_c_visibilidad_post_handoff.sql) ==
+- Recrear v_captacion_todos_mis_casos con info del creador
+  (created_by, creador_nombre, creador_funciones).
+  La vista ya filtraba correctamente; solo faltaba exponer al creador
+  para que la UI distinga "soy responsable" vs "solo seguimiento".
+- RPC agregar_comentario_oportunidad(p_oportunidad_id, p_texto):
+  inserta actividad tipo 'nota' (ya en CHECK constraint) sin cambiar
+  etapa. Permite a responsable, creador, admin/senior, o quien aparezca
+  en handoffs. SECURITY DEFINER + validación de pertenencia + límite
+  de 4000 caracteres.
+
+== Frontend ==
+- captacion/api.ts:
+  * VTodosMisCasosRow ahora incluye created_by, creador_nombre, creador_funciones.
+  * OportunidadDetalle incluye created_by + relaciones responsable y creador.
+  * useOportunidadDetalle SELECT con join a user_profiles vía
+    oportunidades_responsable_actual_id_fkey y oportunidades_created_by_fkey.
+  * Hook nuevo useAgregarComentario(oportunidadId).
+- OportunidadDrawer:
+  * Bloque "Responsable actual / Creado por" debajo del badge.
+  * Banner azul "Este caso está siendo gestionado por X" cuando user es
+    creador pero ya no es responsable (esSoloSeguimiento).
+  * Botón "Añadir comentario" + form inline (textarea + cancelar/añadir)
+    visible para responsable, creador, admin/senior.
+  * Footer OportunidadAcciones (cambio de etapa, subir factura, etc.)
+    se oculta cuando esSoloSeguimiento. Carolina A no puede pisar el
+    flujo del que ahora gestiona el caso.
+- BandejaCard:
+  * Acepta prop currentUserId opcional.
+  * Si currentUserId !== op.responsable_actual_id muestra badge
+    "Solo seguimiento" (eye icon, azul) junto al nombre de la empresa.
+- CaptacionPage:
+  * Pasa currentUserId solo a las cards de la pestaña "Todos mis casos"
+    (en bandejas operativas siempre eres responsable, no aplica).
+
+== NO incluido (sprint aparte) ==
+- Notificaciones cuando se añade comentario (responsable no se entera
+  hasta que abre el caso). Decisión consciente: notificaciones es scope
+  propio que arrastra backend + UI + edge cases.
+
+== Smoke esperado tras deploy ==
+- Carolina A entra en /captacion → pestaña "Todos mis casos".
+- Ve Herba con badge "Solo seguimiento" (porque responsable es Carolina M).
+- Click → drawer muestra:
+  * Cabecera: "Responsable actual: Carolina M (analista) / Creado por: Carolina A (telemarketing)"
+  * Banner azul: "Este caso está siendo gestionado por Carolina M..."
+  * Botón "Añadir comentario" disponible.
+  * NO hay botones de cambio de etapa (footer oculto).
+- Comentario aparece en timeline como tipo 'nota'.
+- Carolina M (cuando reabre el caso) ve el comentario en timeline.
+
+Refs:
+  Migration: supabase/migrations/20260505_sprint_c_visibilidad_post_handoff.sql
+  Tipo de actividad: 'nota' (ya existente, no requiere ALTER enum/CHECK)

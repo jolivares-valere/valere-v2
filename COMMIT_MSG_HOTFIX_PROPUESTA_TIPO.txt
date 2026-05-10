@@ -1,0 +1,45 @@
+fix(captacion): tipo documento propuesta = estudio_ahorro (enum BD)
+
+P0 detectado en TEST 5.2 con Carolina Maciñeiras subiendo propuesta:
+
+Storage upload OK (HTTP 200) pero INSERT en public.documentos fallaba:
+  new row for relation "documentos" violates check constraint
+  "documentos_tipo_check"
+
+Causa: tipoDocumento enviaba 'oferta' que NO esta en el CHECK.
+
+Valores validos del CHECK (verificado):
+  contrato | factura | documentacion | otro | autorizacion |
+  autorizacion_firmada | licencia | informe | estudio_ahorro |
+  email_enviado
+
+Fix: cambiar 'oferta' -> 'estudio_ahorro' (semanticamente correcto:
+Valere vende propuestas de ahorro energetico).
+
+Cambios:
+- src/features/captacion/storage.ts: tipoDocumento type
+  'factura' | 'oferta' -> 'factura' | 'estudio_ahorro'
+  + JSDoc con lista completa de valores permitidos
+- src/features/captacion/components/OportunidadAcciones.tsx:
+  FormSubirPropuesta: tipoDocumento 'oferta' -> 'estudio_ahorro'
+
+NO toca schema.
+
+NOTA SOBRE HUERFANO:
+El intento fallido dejo un blob en Storage sin fila en documentos:
+  oportunidades/6a4e92f1-553f-4158-ac29-902b3c43d406/propuestas/
+  20260504_1777904593724_propuesta_dummy.pdf (312 bytes)
+
+Limpieza manual requerida desde Supabase Dashboard -> Storage ->
+bucket documentos. No rompe nada (no esta vinculado, no se descarga
+desde la UI, no se reclama por nadie). DELETE directo sobre
+storage.objects esta protegido por funcion protect_delete().
+
+El cleanup best-effort en storage.ts (supabase.storage.remove en
+catch del INSERT fallido) es void/fire-and-forget y no garantiza
+limpieza si la sesion se cierra antes. Mejora futura: await + log.
+
+Tras este fix, FormSubirFactura sigue usando 'factura' (sin cambio,
+no roto) y FormSubirPropuesta usa 'estudio_ahorro' (corregido).
+
+Origen: smoke TEST 5.2 con Carolina Maciñeiras real. P0.

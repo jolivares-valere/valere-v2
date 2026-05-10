@@ -1,0 +1,41 @@
+fix(captacion): motivos handoff alineados con CHECK constraint BD
+
+Auditoria ChatGPT post-sprint detecto que useHacerHandoff enviaba 3 valores
+de motivo NO permitidos por el CHECK constraint de oportunidad_handoffs.
+Sin este fix, cualquier handoff habria fallado en produccion (BD rechazaria
+el INSERT con check_violation).
+
+Mapeo corregido en OportunidadAcciones.tsx:
+
+- FormPasarAAnalisis:    'pasar_a_analisis'             -> 'factura_recibida'
+- FormPedirVisita:       'pedir_visita'                 -> 'asignacion_a_senior'
+- FormSubirPropuesta:    'propuesta_lista_para_enviar'  -> 'propuesta_lista'
+
+Valores validos del CHECK constraint:
+factura_recibida, asignacion_a_senior, propuesta_lista,
+devuelta_para_revision, reasignacion_manual, otro
+
+DOCS de auditoria:
+- docs/AUDITORIA_SPRINT_CAPTACION_2026-05-04.md (5 puntos auditados,
+  riesgos identificados, deuda anotada, regla "1 bloque por sesion
+  autonoma" registrada para futuro)
+- docs/SMOKE_TEST_RUNBOOK.md (7 tests E2E con verificaciones BD)
+- docs/FEEDBACK_USO_REAL.md (entrada del bug bloqueante registrada)
+
+Otros puntos auditados (NO requieren fix de codigo):
+- Storage policies son permisivas (cualquier authenticated puede
+  SELECT del bucket). Aceptado para MVP interno; deuda futura para
+  cuando se amplie equipo.
+- Upload + handoff es resilient (separa fases, no pierde archivo).
+- motivo_perdida_codigo es nullable en BD pero la UI siempre lo
+  rellena. Sin constraint nuevo (regla "no mas schema" mantenida).
+- No hay UNIQUE en oportunidad_handoffs; doble click bloqueado por
+  isPending en cada FormFooter.
+
+Cambios en proceso a partir de aqui (regla validada con ChatGPT):
+- Maximo autonomo: 1 bloque funcional, despues checkpoint humano.
+- Cada sprint entrega 4 salidas: tecnica + operativa + smoke +
+  decision producto.
+- Cambios sensibles (RLS, Storage, auth, handoffs) -> PR no a main.
+
+Origen: dictamen ChatGPT 2026-05-04 post-sprint.

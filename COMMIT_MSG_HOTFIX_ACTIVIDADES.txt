@@ -1,0 +1,51 @@
+fix(captacion): mapear actividades.tipo y resultado a enum BD valido
+
+P0 detectado en smoke Test 2 con Carolina Aroca:
+
+Click "Mover a Esperando factura":
+- etapa cambia OK
+- pero registrar actividad falla silenciosa
+- form no cierra
+- toast "Error desconocido"
+- Network: solo OPTIONS /actividades, no POST
+
+Causa raiz: actividades tiene 3 CHECK constraints en BD que el codigo
+violaba sistematicamente:
+  tipo IN (llamada, email, reunion, tarea, nota, cambio_estado,
+           documento, whatsapp, visita)
+  resultado IN (positivo, neutral, negativo, sin_respuesta)
+  estado_tarea IN (pendiente, completada, cancelada)
+
+El codigo enviaba valores inventados como tipo=cambio_etapa,
+tipo=factura_subida, tipo=propuesta_subida, resultado=compromiso_factura,
+resultado=cerrado_perdida, resultado=handoff_a_analista, etc.
+
+PostgreSQL rechazaba el INSERT con check_violation. El catch del form
+mostraba "desconocido" porque PostgrestError no es Error instance —
+el ?: err.message : 'desconocido' caia siempre al else.
+
+Fix doble:
+
+1) Helper errMsg(err) que extrae .message + .details + .hint de
+   PostgrestError (objetos planos). Reemplaza todos los catches.
+   Ahora errores reales son visibles en toast.
+
+2) Mapeo de todos los tipo/resultado a valores del enum:
+   - tipo cierre/handoff -> cambio_estado
+   - tipo factura_subida/propuesta_subida -> documento
+   - tipo callback_programado -> tarea
+   - tipo cambio_etapa -> cambio_estado
+   - resultado no_contesta -> sin_respuesta
+   - resultado no_es_decisor/recordatorio/handoff_*/callback_pendiente
+     -> neutral
+   - resultado compromiso_factura/factura_recibida/cerrado_ganada/
+     propuesta_enviada/propuesta_lista -> positivo
+   - resultado cerrado_perdida -> negativo
+   - resultado factura_recibida_pendiente_estado -> sin_respuesta
+
+El subtipo informativo se preserva en el titulo (ej. "Factura recibida
+- factura_dummy.pdf"). La trazabilidad fina queda en titulo+descripcion.
+
+Validado: INSERT manual con valores corregidos retorna fila OK.
+
+NO toca schema. NO cambia flujo. NO añade features. NO borra leads.

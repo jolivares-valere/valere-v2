@@ -1,0 +1,44 @@
+feat(captacion-sprint-dia1): permisos por funciones + drawer base + RPC lead
+
+Sprint Operativo Captacion - Dia 1 (1/5)
+
+CAMBIOS BD (migration aplicada en prod via MCP):
+- oportunidades.factura_fecha_prevista: nueva columna timestamptz
+- v_captacion_todos_mis_casos: vista cross-bandeja con security_invoker=true
+  (Carolina A ve casos donde fue parte alguna vez, no solo los actuales)
+- RPC crear_lead_captacion(...): empresa+contacto+oportunidad en 1 tx
+  (valida funcion telemarketing/admin del caller, search_path explicito)
+
+CAMBIOS FRONTEND:
+- src/core/auth/permissions.ts: whitelist de rutas por funcion
+  - telemarketing -> /captacion
+  - analista -> /analisis-captacion
+  - asesor_senior -> /cartera-senior + comercial
+  - admin/master -> todo
+- AuthGuard: redirige al default de la funcion si la ruta no esta permitida
+- Sidebar: bloques CRM Comercial y Potencias se ocultan a
+  telemarketing/analista (Capa A backlog permisos granulares)
+- BandejaCard: click handler conectado (era console.log placeholder)
+- OportunidadDrawer: nuevo, slide-over derecho con detalle empresa +
+  contactos + timeline actividades + estado fase actual
+- api.ts: types VTodosMisCasosRow, OportunidadDetalle, ActividadRow
+  + hooks useOportunidadDetalle, useActividadesOportunidad,
+  useTodosMisCasosCaptacion
+- motivos.ts: catalogo UI filtrado por funcion (telemarketing 7+otro,
+  avanzado 16+otro). Enum BD intacto (21 valores).
+- 3 pages (Captacion, Analisis, CarteraSenior) conectadas al drawer
+
+DOCS (incluye cierre sesion ayer no commiteado):
+- SPRINT_OPERATIVO_CAPTACION_2026-05-04.md: plan 5 dias completo
+- ESTADO.md: snapshot 2026-05-04
+- SMOKE_TEST_4_USERS_2026-05-04.md
+- ONBOARDING_4_USERS_2026-05-04.md
+- FEEDBACK_USO_REAL.md (incluye entrada que origino este sprint)
+- BACKLOG_PERMISOS_GRANULARES_2026-05-03.md
+- SESIONES/2026-05-04-resumen.md
+- 2 notas outbox
+
+Origen: feedback Juan 2026-05-04 - bandejas captacion son solo lectura.
+Plan: docs/SPRINT_OPERATIVO_CAPTACION_2026-05-04.md
+Pendiente Dias 2-5: lead form, acciones contextuales, upload factura,
+cross-bandeja, QA + smoke.

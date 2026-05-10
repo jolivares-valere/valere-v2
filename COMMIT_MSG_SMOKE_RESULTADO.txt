@@ -1,0 +1,38 @@
+docs(smoke): resultado smoke completo 7/7 + entrada FEEDBACK
+
+Smoke test E2E del Sprint Operativo Captacion completado con 4 users
+reales en BD prod. Validados los 7 tests del runbook + verificacion
+cruzada de permisos.
+
+Resultado: APTO para onboarding interno.
+
+Detalle:
+- 6 P0 detectados durante el smoke, todos resueltos vía hotfixes:
+  * RLS funciones (commit 8e9ee33)
+  * null guard contactos[0] (51912c1)
+  * mapeo enums actividades + helper errMsg (b087486)
+  * tipo documento estudio_ahorro (04d3245)
+  * (pre-smoke) motivos handoff (71e880a)
+  * setup auth.users via SQL (no commit, BD directa)
+
+- 1 P1 al cierre: selector analista/senior muestra UUID en vez de
+  nombre. Bloquea onboarding para Carolina A/M. Fix estimado 30 min.
+
+- 4 P2 al cierre: label descarga indistinguible, formato MB pequeno,
+  timeline menos entradas, tipo BD estudio_ahorro.
+
+- Deuda conocida confirmada: policies Storage permisivas. Aceptado
+  para MVP 4 users; tighten antes de ampliar.
+
+- 1 huerfano Storage pendiente limpieza manual desde dashboard.
+
+Documentos:
+- docs/SMOKE_TEST_RESULTADO_2026-05-04.md (informe completo)
+- docs/FEEDBACK_USO_REAL.md (entrada de validacion)
+
+Proximo paso: hotfix P1 selector UUID -> onboarding equipo ->
+1 semana de uso real -> decidir siguiente sprint.
+
+Frase guia: "El CRM ya puede ejecutar el flujo. Ahora hay que
+demostrar que el equipo lo puede usar sin volver a WhatsApp, Excel
+o email suelto." -- ChatGPT, dictamen 2026-05-04.

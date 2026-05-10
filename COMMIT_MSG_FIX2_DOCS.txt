@@ -1,0 +1,69 @@
+docs(help): Fix2 RAG — docs/help al día con Sprint Fase 1-3 + C + D1
+
+Origen: smoke real Carolina 2026-05-05. El asistente del CRM (Fix1 ya
+desplegado, versión 20 de Edge Function) devuelve correctamente "No
+encuentro información sobre eso" para preguntas como "qué es Solo
+seguimiento" o "cómo añado un comentario", porque la documentación de
+esas features no estaba escrita.
+
+Este commit añade los docs faltantes y actualiza los relacionados.
+Al hacer push a main, el workflow regenerate-help-embeddings detecta
+cambios en docs/help/** y regenera embeddings automáticamente.
+
+== Docs nuevos (3) ==
+
+1. docs/help/captacion/separacion-prospecto-cliente.md
+   - Qué es prospecto vs cliente y dónde aparece cada uno.
+   - Cuándo se promociona (etapas cerrada_ganada/contrato_firmado/activo).
+   - Quién puede (admin/asesor_senior).
+   - Cómo se promociona (botón verde en drawer + confirmación).
+   - Por qué la separación.
+
+2. docs/help/captacion/seguimiento-tras-handoff.md
+   - Pestaña "Todos mis casos".
+   - Badge azul "Solo seguimiento" en cards.
+   - Drawer con cabecera Responsable/Creador + banner azul.
+   - Qué puedes hacer (leer + comentar) vs qué no.
+   - Cómo añadir comentario paso a paso.
+   - Quién puede comentar.
+
+3. docs/help/captacion/vencimiento-y-semaforo.md
+   - Qué es la fecha de vencimiento del contrato actual del prospecto
+     (no es contrato CRM, es info comercial).
+   - Cómo registrarla (al crear y al editar lead).
+   - Fuentes del dato (cliente_llamada / factura / email / estimado / desconocido).
+   - Tabla del semáforo: <=30 rojo / <=60 naranja / <=90 amarillo / >90 verde.
+   - Texto urgente en card según semáforo.
+   - Bloque del drawer con placeholder "sin fecha" cuando no hay.
+
+== Docs actualizados (3) ==
+
+1. docs/help/captacion/crear-lead.md
+   - Mención a "nace como prospecto" (separación CRM).
+   - Sección detallada de "+ Datos adicionales" incluyendo bloque
+     vencimiento contrato actual.
+   - Referencias cruzadas a vencimiento-y-semaforo y separacion-prospecto-cliente.
+
+2. docs/help/captacion/pasar-a-analisis.md
+   - Sección nueva "Después de pasarlo" explicando que conservas
+     visibilidad + capacidad de comentar.
+   - Referencia cruzada a seguimiento-tras-handoff.
+
+3. docs/help/README.md
+   - Añadidas las 3 entradas nuevas en la sección Captación del índice.
+   - Estado actual actualizado a 2026-05-05 con resumen de Fix1 + Fix2.
+
+== Smoke esperado (después de que GH Actions regenere embeddings ~3-5 min) ==
+1. Asistente del CRM → "¿Qué significa Solo seguimiento?" → respuesta
+   operativa con explicación del badge + cómo comentar.
+2. → "¿Cómo añado un comentario en una oportunidad?" → pasos numerados.
+3. → "¿Qué es un prospecto vs un cliente?" → respuesta clara con
+   diferencias y cuándo se convierte.
+4. → "¿Cómo registro la fecha de vencimiento del contrato?" → pasos
+   con detalle del semáforo.
+5. NINGUNA respuesta debe terminar con "Fuentes:" ni mostrar rutas
+   docs/help/... (ya validado en Fix1, sigue funcionando).
+
+Refs:
+- Fix1 (Edge Function v20): aplicada via MCP 2026-05-05
+- Workflow embeddings: .github/workflows/regenerate-help-embeddings.yml

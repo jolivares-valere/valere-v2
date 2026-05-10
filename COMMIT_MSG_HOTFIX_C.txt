@@ -1,0 +1,44 @@
+fix(captacion): hotfix Sprint C — toast + drawer vencimiento siempre visible
+
+Origen: smoke real Carolina A 2026-05-05 detecta 2 P1 (sin P0).
+
+== P1.1 — Toast tapa botones críticos ==
+Toaster estaba en top-right con duration 3500ms. El toast "+Comentario añadido"
+o "+Lead creado" tapaba momentáneamente el botón "+ Nuevo lead" y el botón
+cerrar del drawer.
+
+Fix:
+- src/components/layout/AppShell.tsx
+- position="bottom-right" (lejos de los CTAs principales)
+- duration 5000ms (5s, dentro del rango 4-6s pedido)
+- closeButton sigue activo para descarte manual
+
+== P1.2 — Sección vencimiento desaparece sin fecha ==
+La sección "Vencimiento contrato actual del prospecto" en el drawer solo
+aparecía si existía fecha. Carolina no podía verificar si guardó el dato
+correctamente al editar un lead — al no aparecer la sección, no sabía si
+el sistema lo recibió o no.
+
+Fix:
+- src/features/captacion/components/OportunidadDrawer.tsx
+- La sección se muestra SIEMPRE en contexto captación (esProspecto=true).
+- Si hay fecha → render normal con semáforo + fuente + notas.
+- Si NO hay fecha → placeholder con borde dashed gris:
+  "Sin fecha registrada. Edita el lead para añadir la fecha de vencimiento
+   del contrato actual y activar el semáforo 90/60/30 días."
+
+== NO incluido ==
+- P2 detectado (autor en timeline poco visible). Decisión: dejar para
+  feedback futuro de Carolina si lo echa de menos.
+
+== Smoke esperado ==
+- Toast aparece bottom-right, no tapa botones.
+- Toast desaparece a los 5s.
+- Drawer Herba (con fecha) muestra sección con bloque coloreado.
+- Drawer caso sin fecha muestra placeholder dashed.
+- Editar lead → guardar fecha → reabrir drawer → sección aparece con bloque
+  coloreado en lugar del placeholder. (Validación crítica de "se guardó OK".)
+
+Refs:
+- Sprint C base: commit 8c38089
+- Smoke con captura validado por Juan + ChatGPT 2026-05-05

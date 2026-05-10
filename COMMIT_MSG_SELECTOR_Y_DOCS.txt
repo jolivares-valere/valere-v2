@@ -1,0 +1,61 @@
+fix(captacion): selector UUID + docs operativos help/ Sprint Captacion
+
+Dos cosas en un commit (cohesivo: cierre del smoke + soporte onboarding):
+
+1) FIX P1 SELECTOR UUID
+SelectValue de Base UI mostraba el value crudo (UUID) en lugar del
+nombre del user en FormPasarAAnalisis y FormPedirVisita. Carolina A/M
+no podian seleccionar persona real en producción.
+
+Fix: pasar children explicito al SelectValue con map manual:
+  <SelectValue>
+    {analistas.find(a => a.id === toUser)?.full_name ?? '...'}
+  </SelectValue>
+
+Aplicado en 2 ocurrencias. Otros selects no afectados (usan strings
+legibles como value).
+
+2) DOCS OPERATIVOS HELP/ — Sprint Operativo Captacion
+11 docs nuevos en docs/help/ con formato accionable validado por
+ChatGPT (CUANDO USAR / QUE HACE / PASOS / QUE DEBE PASAR / SI FALLA).
+Cortos (15-25 lineas), sin teoria, accionables.
+
+Creados:
+- captacion/crear-lead.md
+- captacion/pedir-factura.md
+- captacion/subir-factura.md
+- captacion/pasar-a-analisis.md
+- captacion/enviar-propuesta.md
+- captacion/cerrar-caso.md
+- analisis-captacion/recibir-caso.md
+- analisis-captacion/empezar-analisis.md
+- analisis-captacion/subir-propuesta.md
+- cartera-senior/preparar-y-subir-propuesta-senior.md
+- permisos/que-ve-cada-funcion.md
+
+Actualizados:
+- docs/help/README.md: arbol completo, estado real (38 docs no 5),
+  convencion del nuevo formato accionable
+- docs/help/oportunidades/estados-y-etapas.md: nota arriba avisando de
+  los 2 modos (kanban legacy /oportunidades vs flujo nuevo bandejas)
+- docs/help/documentos/subir-documento.md: nota arriba redirigiendo
+  a docs especificos de captacion para factura/propuesta
+
+P0 docs cubierto. P1 cubierto (permisos por funcion). P2 docs (FAQs,
+glosario amplio, transcripciones) diferido — se hara solo si surgen
+preguntas reales del equipo durante 1a semana de uso.
+
+PIPELINE EMBEDDINGS:
+El workflow .github/workflows/regenerate-help-embeddings.yml se
+disparara con este commit (toca docs/help/**) y regenerara los
+vectores que el asistente RAG del CRM consulta.
+
+Tras este commit:
+- Carolina A pregunta al asistente "como subo una factura" -> doc
+  encontrado.
+- Carolina M pregunta "cuando paso a senior" -> empezar-analisis.md.
+- Antonio pregunta "como recibir un caso" -> preparar-y-subir-...
+- Cualquiera "que veo yo" -> que-ve-cada-funcion.md.
+
+NO se ha tocado schema, RLS, ni features. Solo frontend (selector
+UUID) y docs (formato accionable + arbol).

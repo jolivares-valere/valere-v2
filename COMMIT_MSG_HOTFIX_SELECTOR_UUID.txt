@@ -1,0 +1,29 @@
+fix(captacion): selector analista/senior muestra nombre en vez de UUID
+
+P1 detectado en TEST 4 del smoke: SelectValue mostraba el UUID crudo
+del user seleccionado en lugar del nombre legible.
+
+Causa: SelectValue de Base UI muestra el value tal cual cuando el
+children del SelectItem activo no se propaga al trigger automaticamente
+en esta version. El value es UUID, el children es nombre, pero el
+trigger renderizaba UUID.
+
+Fix: pasar children explicito al SelectValue con map manual del value
+seleccionado al label deseado:
+
+  <SelectValue>
+    {analistas.find(a => a.id === toUser)?.full_name ?? '...'}
+  </SelectValue>
+
+Aplicado en 2 ocurrencias:
+- FormPasarAAnalisis (Carolina A escoge analista)
+- FormPedirVisita (Carolina A o M escoge senior)
+
+Otros selects no afectados porque usan strings legibles como value
+(motivos, tipo recordatorio, segmento, origen).
+
+Bloquea onboarding sin esto: Carolina A/M no podrian escoger persona
+real en producción. Tras este fix, el selector muestra nombres
+("Carolina Maciñeiras", "Antonio Rodriguez") como esperado.
+
+NO toca schema. NO cambia flujo. NO añade features.

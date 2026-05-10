@@ -1,0 +1,52 @@
+feat(captacion): multi-contacto con rol y principal
+
+Feedback uso real Carolina A 2026-05-04: "echo de menos un segundo email
+de contacto". Decisión validada con ChatGPT: opción A multi-contacto
+(no parche).
+
+Por qué multi-contacto y no parche:
+B2B energético siempre tiene varios interlocutores por empresa
+(Compras / Mantenimiento / Operaciones / Energía / Gerencia). 1 contacto
+es insuficiente desde el segundo lead. Hacer parche con "email2" generaba
+deuda estructural — datos sucios desde el día 1, pérdida de trazabilidad.
+
+CAMBIOS BD (aplicados via MCP):
+- ALTER contactos ADD COLUMN es_principal boolean DEFAULT false
+- Backfill: contacto más antiguo de cada empresa marcado como principal
+- UNIQUE INDEX parcial: máximo 1 contacto principal por empresa
+- RPC crear_lead_captacion v2: acepta p_contactos jsonb (array)
+- RPC actualizar_lead_captacion v2: acepta p_contactos jsonb con soporte
+  - id (UPDATE existente)
+  - sin id (INSERT nuevo)
+  - _eliminar:true (soft-delete)
+- Si tras update ningún contacto queda como principal, marca el primero
+
+CAMBIOS FRONTEND:
+- ContactoInput type con id, nombre, cargo, telefono, email, es_principal,
+  _eliminar
+- CARGOS_SUGERIDOS const con valores comunes B2B (Compras, Operaciones,
+  Energía/Sostenibilidad, Director financiero, Gerencia, etc.)
+- Component nuevo ContactosForm:
+  - Lista dinámica con botón "+ Añadir contacto"
+  - Cada contacto: nombre, cargo (con datalist sugerencias), tel, email
+  - Botón estrella para marcar/desmarcar principal
+  - Botón "Eliminar" (soft-delete si tiene id, splice si nuevo)
+  - Resalta visualmente el principal con borde ámbar
+- NuevoLeadModal: usa ContactosForm en sección dedicada (fuera del bloque
+  expandible — los contactos son críticos en B2B). Inicializa con un
+  contacto vacío marcado como principal.
+- EditarLeadModal: pre-rellena con todos los contactos del detalle, asegura
+  que al menos uno es principal. Sincroniza array al guardar.
+- OportunidadDrawer: ordena contactos con principal arriba, badge "Principal"
+  ámbar + estrella, mantiene badge "Decisor" verde (concepto distinto).
+  Muestra contador "Contactos (N)".
+
+Coherencia conceptual:
+- es_principal: punto de contacto preferente para llamar/escribir
+- es_decisor: quien firma el contrato (puede no coincidir con principal)
+- Ambos son distintos. UI los muestra como badges separados.
+
+NO toca otras tablas. Compatible con datos existentes (backfill marca
+todos los contactos actuales con es_principal correcto).
+
+Mirror SQL: supabase/migrations/20260504_multi_contacto_rol_principal.sql

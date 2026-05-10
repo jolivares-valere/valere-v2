@@ -27,7 +27,9 @@ El listado muestra todas las columnas principales: compañía, empresa, tipo ene
 | 🟠 Naranja | Entre 30 y 60 días |
 | 🔴 Rojo | Menos de 30 días o ya vencido |
 
-Los contratos en 🔴 y 🟠 aparecen también en el **Dashboard** como alertas y generan **notificaciones**.
+Los **contratos firmados de clientes** en 🔴 y 🟠 aparecen también en el **Dashboard** como alertas y generan **notificaciones**.
+
+Esto aplica únicamente a contratos del CRM cliente (empresas con relación firmada con Valere). Los vencimientos del contrato actual del prospecto (campo de captación) NO se muestran en el Dashboard ni generan notificaciones — solo se ven en las cards y el drawer de `/captacion`.
 
 ### Filtros del listado
 

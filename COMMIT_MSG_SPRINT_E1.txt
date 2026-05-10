@@ -1,0 +1,92 @@
+feat(captacion): E1 — posponer llamada + contacto extensión + próxima llamada visible
+
+Sprint E1 2026-05-05/06. Origen: feedback real Carolina + casos concretos.
+
+== Casos reales que se resuelven ==
+- "Está de vacaciones, llamar el lunes 11 de mayo" → ahora hay flujo formal.
+- "Patricia Cano con extensión" → ahora se guarda y se muestra.
+
+== BD (mirror SQL en supabase/migrations/20260506_sprint_e1_posponer_extension.sql) ==
+
+3 ALTER aditivos:
+- actividades_resultado_check añade 'pospuesto' (sin breaking).
+- contactos.extension text (nullable).
+- oportunidades.siguiente_accion + fecha_siguiente_accion.
+
+2 vistas recreadas para exponer siguiente_accion + fecha_siguiente_accion:
+- v_mis_oportunidades.
+- v_captacion_todos_mis_casos.
+
+RPC nuevo: posponer_llamada(uuid, motivo, fecha_proxima, notas):
+- SECURITY DEFINER + valida pertenencia (responsable / creador / admin/senior / handoff).
+- Inserta actividad llamada/pospuesto.
+- Actualiza siguiente_accion + fecha_siguiente_accion atómicamente.
+- Validación de motivos ('vacaciones','llamar_mas_tarde','no_disponible','otro').
+- Validación de fecha (no puede ser pasado).
+
+RPCs crear_lead_captacion + actualizar_lead_captacion ahora persisten 'extension'
+del jsonb de contactos. Compatible: si no viene, NULLIF lo deja NULL.
+
+== Frontend ==
+
+Nuevo:
+- src/features/captacion/components/PosponerLlamadaModal.tsx
+  Modal con select motivo + datepicker + hora opcional + notas.
+- src/features/captacion/formatTelefono.test.ts (5 tests del helper).
+
+Tipos extendidos en api.ts:
+- VMisOportunidadesRow + VTodosMisCasosRow: siguiente_accion + fecha_siguiente_accion.
+- ContactoInput: extension.
+- OportunidadDetalle: siguiente_accion + fecha_siguiente_accion + contactos[].extension.
+- type MotivoPosponer + PosponerLlamadaInput.
+- Hook usePosponerLlamada(oportunidadId).
+- Helper puro formatTelefonoConExtension(tel, ext) — "957 767 700 · Ext. 123".
+
+Componentes modificados:
+- ContactosForm: nuevo input "Ext." en grid 2/3 + 1/3 (no rompe layout).
+- OportunidadAcciones: botón "📅 Posponer" en grid de etapa nuevo/contactado.
+  Modo nuevo 'posponer' que monta PosponerLlamadaModal.
+- OportunidadDrawer:
+  * Sección Contactos usa formatTelefonoConExtension (principal en negrita).
+  * Sección "Estado del caso" muestra "📅 Próxima llamada: <texto>" si existe
+    fecha_siguiente_accion.
+  * SELECT amplía 'contactos.extension' + 'siguiente_accion' + 'fecha_siguiente_accion'.
+- BandejaCard: línea discreta "📅 Próxima llamada: dd/mm/yyyy hh:mm" si existe
+  fecha_siguiente_accion. Solo si hay hora distinta de 00:00 se imprime.
+
+== Lo que NO se incluye en E1 (firmado con Juan) ==
+- Pestaña "Hoy" en /captacion (parte del backlog agenda-captacion.md).
+- "Sección Llamadas de hoy / Próximas llamadas" en top de /captacion.
+- Aviso destacado en cards "tiene llamada programada".
+- Multipunto CUPS / parser Excel (decisión arquitectónica pendiente: Carolina A vs Carolina M).
+- Google Calendar.
+- Notificaciones push/email.
+- Dashboard alertas.
+- Vista tabla.
+
+== Smoke esperado tras deploy ==
+1. Login Carolina A → /captacion → bandeja "Por llamar".
+2. Abrir un caso → ver 5 botones (No contesta / No es decisor / 📅 Posponer / Esperando factura / No interesa).
+3. Click "📅 Posponer" → modal con motivo + fecha + hora opcional + notas.
+4. Motivo "Vacaciones" + fecha 11/05/2026 + hora 10:00 + nota "Volver tras vacaciones" → guardar.
+5. Toast verde "Llamada pospuesta. <empresa> · próxima llamada 11/05/2026 10:00".
+6. Drawer se cierra. Card de la empresa muestra:
+   - Línea discreta "📅 Próxima llamada: 11/05/2026 10:00".
+   - El texto "→ siguiente acción" puede actualizar al reabrir.
+7. Reabrir drawer → sección "Estado del caso" muestra
+   "📅 Próxima llamada: Llamar el 11/05/2026 10:00".
+8. Timeline muestra entrada nueva: "Llamada pospuesta · llamada · resultado: pospuesto"
+   con descripción "cliente de vacaciones · Volver a llamar: 11/05/2026 10:00 · Volver tras vacaciones".
+9. Editar lead → contacto Patricia Cano → poner extensión "123" → guardar.
+   Drawer reabre y muestra "957 767 700 · Ext. 123" en sección Contactos.
+
+== Sin regresión esperada ==
+- Sprint C: badge "Solo seguimiento" en "Todos mis casos" sigue funcionando.
+- D1: badge semáforo de vencimiento + texto urgente en "→".
+- Edición de lead con vencimiento + multi-contacto sigue funcionando.
+
+Refs:
+- Migration: supabase/migrations/20260506_sprint_e1_posponer_extension.sql
+- Edge Function ask-crm-docs v21 (anti-alucinación) sigue activa.
+- Backlog `agenda-captacion.md` actualizado: P5 (preparación calendario) cubierto por
+  estos campos siguiente_accion + fecha_siguiente_accion.

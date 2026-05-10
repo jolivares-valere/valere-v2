@@ -60,4 +60,26 @@ jobs:
           echo "Chromium: $(which chromium-browser 2>/dev/null || which chromium 2>/dev/null || echo 'no en PATH — usa Playwright')"
           echo "========================================"
 
-      - name: Ejecutar sincronizac
+      - name: Ejecutar sincronización
+        working-directory: scripts/fv-sync
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FV_ENCRYPTION_KEY:    ${{ secrets.FV_ENCRYPTION_KEY }}
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.empresa_id }}" ]; then
+            ARGS="$ARGS --empresa ${{ github.event.inputs.empresa_id }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          python sync_job.py $ARGS
+
+      - name: Notificar fallo por Slack (opcional)
+        if: failure() && vars.NOTIFY_SLACK == 'true'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{"text": "⚠️ FV Sync falló — revisar logs en GitHub Actions"}'

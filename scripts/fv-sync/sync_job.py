@@ -524,4 +524,30 @@ def main() -> None:
 
     # ── Informe mensual (día 1) ──────────────────────────
     if hoy.day == 1:
-     
+        logger.info("📊 Día 1 → generando borradores de informe mensual…")
+        generar_informe_mensual_borrador(sb, dry_run=dry_run)
+
+    # ── Log global de sincronización ────────────────────
+    if not dry_run:
+        sb.table("fv_sync_log").insert({
+            "credenciales_ok":    total_ok,
+            "credenciales_total": len(credenciales),
+            "plantas_sync":       total_plantas,
+            "alarmas_detectadas": total_alarmas,
+            "resultado":          "ok" if total_ok == len(credenciales) else "parcial",
+            "detalles":           json.dumps(resultados, default=str),
+        }).execute()
+
+    # ── Resumen final ────────────────────────────────────
+    estado = "✅ OK" if total_ok == len(credenciales) else f"⚠️ {total_ok}/{len(credenciales)} OK"
+    logger.info(
+        "Sync finalizado: %s | %d plantas | %d alarmas",
+        estado, total_plantas, total_alarmas,
+    )
+
+    if total_ok < len(credenciales):
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
