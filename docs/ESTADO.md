@@ -1,8 +1,41 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-10 por Cowork — Sesión FV Sync: diagnósticos completos, StorageStateClient robusto, commit cda9a24.**
+> **Última actualización: 2026-05-10 por Cowork — Sesión FV alta manual credenciales: split-table security + Edge Function cifrado + Python adaptado. Pendiente ventana de despliegue coordinado.**
 >
-> ## ✅ SESIÓN 2026-05-10 — FV SYNC DIAGNÓSTICOS
+> ## ⏳ CAMBIO COORDINADO FV — PENDIENTE DESPLIEGUE (2026-05-10)
+>
+> **Todo listo en rama `feature/fv-operational-redesign`. NO aplicar por separado.**
+>
+> Orden de despliegue cuando estés listo:
+> 1. Backup tablas `fv_credenciales` y `fv_planta` en Supabase Dashboard
+> 2. Configurar `FV_ENCRYPTION_KEY` en Supabase → Edge Functions → Secrets (32 bytes base64, misma clave que Python)
+> 3. `supabase functions deploy fv-create-credential --project-ref gtphkowfcuiqbvfkwjxb`
+> 4. Aplicar `supabase/migrations/20260510_fv_alta_manual_credenciales.sql` en SQL Editor
+> 5. `python sync_job.py --check-secrets` — verifica secretos post-migración
+> 6. `python sync_job.py --dry-run` — smoke sin escritura
+> 7. Probar alta de credencial real desde CRM → verificar login FV
+> 8. Probar asignación de planta a empresa+CUPS
+> 9. Validar UI en `feature/fv-operational-redesign`
+> 10. Activar sincronización recurrente
+>
+> Rollback SQL documentado en docs/SESIONES/2026-05-10-resumen.md.
+>
+> ## ✅ SESIÓN 2026-05-10 — FV MÓDULO ALTA MANUAL + SEGURIDAD
+>
+> | Archivo | Cambio |
+> |---|---|
+> | `supabase/migrations/20260510_fv_alta_manual_credenciales.sql` | Split-table: `fv_credenciales` (operativa) + `fv_credenciales_secret` (secretos, solo service_role). RLS + REVOKE sobre authenticated/anon. `username_masked` generado. `fv_planta` con `cups_id`, `sync_enabled`, `nombre_fusionsolar`, `nombre_interno`, `empresa_id` nullable. |
+> | `supabase/functions/fv-create-credential/index.ts` | Edge Function: cifrado AES-256-GCM, JWT + rol admin/master, escribe en ambas tablas, rollback si falla secret, nunca devuelve password_enc |
+> | `src/features/seguimiento-fv/api.ts` | `useCrearCredencial`/`useActualizarCredencial` vía Edge Function, `usePlantasSinAsignar`, `useAsignarPlantaEmpresa` |
+> | `src/features/seguimiento-fv/components/CredencialFormModal.tsx` | Formulario alta/edición credencial con toggle password, aviso seguridad, plataformas pre-configuradas |
+> | `src/features/seguimiento-fv/components/AsignarPlantaModal.tsx` | Asignación planta → empresa + CUPS con selects en cascada |
+> | `src/features/seguimiento-fv/components/CredencialesTab.tsx` | Self-fetching, fallback a fixtures, banner demo mode, botones crear/editar |
+> | `src/features/seguimiento-fv/components/SinAsignarTab.tsx` | Self-fetching, tabla con "Asignar cliente" por planta |
+> | `scripts/fv-sync/sync_job.py` | `load_fv_credentials_with_secrets()` (JOIN a tabla secreta), `check_secrets_diagnostic()`, `--check-secrets` flag, sin KeyError si falta secret |
+> | `scripts/fv-sync/extract_cookies.py` | Lee password de `fv_credenciales_secret`, escribe cookies en `fv_credenciales_secret` vía upsert |
+> | `COMMIT_FV_MODULE_2026-05-10.ps1` | Incluye todos los archivos anteriores, checklist de despliegue en output |
+>
+> ## ✅ SESIÓN 2026-05-10 — FV SYNC DIAGNÓSTICOS (sesión anterior)
 >
 > | Archivo | Cambio | Commit |
 > |---|---|---|
