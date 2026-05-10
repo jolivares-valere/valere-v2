@@ -33,6 +33,42 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────
+# Excepciones propias
+# ─────────────────────────────────────────────────────────
+
+class FusionSolarAuthError(Exception):
+    """
+    La sesión de FusionSolar fue rechazada o ha expirado.
+    Causas comunes:
+      - El storage state ha expirado (cookies WAF o de sesión caducadas).
+      - FusionSolar redirigió a la página de login (/unisso/login.action).
+      - El storage state no contiene las cookies necesarias.
+    Solución: ejecutar extract_cookies.py localmente para renovar.
+    """
+    def __init__(self, reason: str, redirect_url: str = "", endpoint: str = ""):
+        self.reason       = reason
+        self.redirect_url = redirect_url
+        self.endpoint     = endpoint
+        super().__init__(
+            f"[AUTH_ERROR] {reason}"
+            + (f" | redirect→{redirect_url}" if redirect_url else "")
+            + (f" | endpoint={endpoint}"     if endpoint     else "")
+        )
+
+
+class FusionSolarResponseError(Exception):
+    """Respuesta HTTP inesperada (no-JSON, status 5xx, etc.)."""
+    def __init__(self, status: int, body_preview: str, endpoint: str = ""):
+        self.status       = status
+        self.body_preview = body_preview
+        self.endpoint     = endpoint
+        super().__init__(
+            f"[RESPONSE_ERROR] HTTP {status} en {endpoint} — "
+            f"body(primeros 300 chars): {body_preview}"
+        )
+
+
+# ─────────────────────────────────────────────────────────
 # Interfaz abstracta común
 # ─────────────────────────────────────────────────────────
 
@@ -394,10 +430,85 @@ class StorageStateClient(FusionSolarClient):
     _DEV_LIST     = WebAuthClient._DEV_LIST
     _DAILY_KPI    = WebAuthClient._DAILY_KPI
 
+    # ── Diagnóstico de cookies ──────────────────────────────
+
+    def _log_storage_state_info(self, state: dict) -> None:
+        """Registra metadatos del storage state sin exponer valores secretos."""
+        cookies = state.get("cookies", [])
+        origins = state.get("origins", [])
+        nombres  = [c["name"] for c in cookies]
+        dominios = list({c.get("domain", "") for c in cookies})
+        tiene_roarand  = "roarand"  in nombres
+        tiene_jsess    = "JSESSIONID" in nombres
+        tiene_waf      = any("HWWAFSESID" in n for n in nombres)
+        tiene_dp_sess  = "dp-session" in nombres
+
+        logger.info("  Cookies (%d): %s", len(cookies), nombres)
+        logger.info("  Dominios:     %s", dominios)
+        logger.info("  roarand: %s | JSESSIONID: %s | HWWAF: %s | dp-session: %s",
+                    tiene_roarand, tiene_jsess, tiene_waf, tiene_dp_sess)
+        if not tiene_roarand:
+            logger.warning("  ADVERTENCIA: cookie 'roarand' (CSRF) ausente — "
+                           "puede causar rechazo en endpoints POST.")
+        for origin in origins:
+            keys = [item["name"] for item in origin.get("localStorage", [])]
+            if keys:
+                logger.info("  localStorage [%s]: %s", origin.get("origin","?"), keys)
+
+    def check_session(self) -> str:
+        """
+        Hace una llamada mínima para verificar si la sesión sigue activa.
+        Devuelve uno de: OK | AUTH_REDIRECT | NON_JSON_RESPONSE | HTTP_ERROR | EXCEPTION
+        """
+        url = self.base_url + self._STATION_LIST
+        try:
+            result = self._page.evaluate(
+                """([url]) =>
+                    fetch(url, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({pageNo:1, pageSize:1, locale:"es_ES"}),
+                    }).then(async r => {
+                        const finalUrl = r.url;
+                        const ct = r.headers.get("content-type") || "";
+                        if (finalUrl.includes("login") || finalUrl.includes("unisso")) {
+                            return {status: "AUTH_REDIRECT", url: finalUrl};
+                        }
+                        if (!ct.includes("json")) {
+                            const txt = await r.text();
+                            return {status: "NON_JSON_RESPONSE", code: r.status,
+                                    preview: txt.substring(0, 200)};
+                        }
+                        if (!r.ok) {
+                            return {status: "HTTP_ERROR", code: r.status};
+                        }
+                        return {status: "OK"};
+                    })
+                """,
+                [url],
+            )
+            status = result.get("status", "EXCEPTION")
+            if status == "AUTH_REDIRECT":
+                logger.warning("check_session → AUTH_REDIRECT a %s", result.get("url"))
+            elif status == "NON_JSON_RESPONSE":
+                logger.warning("check_session → NON_JSON HTTP %s | preview: %s",
+                               result.get("code"), result.get("preview",""))
+            elif status == "HTTP_ERROR":
+                logger.warning("check_session → HTTP_ERROR %s", result.get("code"))
+            else:
+                logger.info("check_session → %s", status)
+            return status
+        except Exception as e:
+            logger.error("check_session → EXCEPTION: %s", e)
+            return "EXCEPTION"
+
+    # ── Login ───────────────────────────────────────────────
+
     def login(self) -> None:
         """
         Inicializa un browser headless con el storage state pre-extraído.
         Navega directamente al portal (sin pasar por la pantalla de login).
+        Lanza FusionSolarAuthError si la sesión es rechazada.
         """
         from playwright.sync_api import sync_playwright
 
@@ -413,22 +524,16 @@ class StorageStateClient(FusionSolarClient):
             ],
         )
 
-        # Inyectar storage state directamente en el contexto del browser.
-        # Esto restaura cookies + localStorage sin necesidad de hacer login.
-        # storage_state puede ser dict (nuevo formato) o list (formato legacy
-        # con solo cookies → convertir automáticamente).
+        # Normalizar formato: acepta lista legacy (solo cookies) o dict completo
         if isinstance(self._storage, list):
-            # Formato legacy: lista plana de cookies
             state_to_load = {"cookies": self._storage, "origins": []}
         else:
             state_to_load = self._storage
 
         n_cookies = len(state_to_load.get("cookies", []))
         n_origins = len(state_to_load.get("origins", []))
-        logger.info(
-            "StorageStateClient: cargando %d cookies + %d origenes localStorage",
-            n_cookies, n_origins,
-        )
+        logger.info("StorageStateClient: %d cookies, %d origenes localStorage", n_cookies, n_origins)
+        self._log_storage_state_info(state_to_load)
 
         context = self._browser.new_context(
             storage_state=state_to_load,
@@ -441,32 +546,57 @@ class StorageStateClient(FusionSolarClient):
         )
         self._page = context.new_page()
 
-        # Navegar directamente al portal (no a la página de login).
-        # Con el storage state cargado, el browser ya está autenticado.
-        portal_url = self.base_url + "/uniportal/pvmswebsite/nologin.html"
-        logger.info("Navegando al portal sin login: %s", portal_url)
-        self._page.goto(portal_url, wait_until="domcontentloaded", timeout=30_000)
+        # Navegar a la raíz del portal. Con el storage state cargado el servidor
+        # debería ir directamente a /uniportal/... sin pasar por el login.
+        # NO usamos una URL hardcodeada de nologin.html (podría no existir).
+        logger.info("Navegando a %s (esperando redirect directo a /uniportal/...)", self.base_url)
+        try:
+            self._page.goto(self.base_url + "/", wait_until="domcontentloaded", timeout=30_000)
+        except Exception as nav_err:
+            logger.warning("goto() excepción (puede ser timeout en networkidle): %s", nav_err)
 
-        # Verificar que no nos redirigió al login
         current_url = self._page.url
+        logger.info("URL tras navegación: %s", current_url)
+
         if "login" in current_url.lower() or "unisso" in current_url.lower():
-            raise RuntimeError(
-                f"Storage state rechazado — redirigido a login: {current_url}. "
-                "Ejecuta extract_cookies.py para renovar el storage state."
+            # Hacer screenshot de diagnóstico si estamos en CI
+            try:
+                import os
+                shot = os.path.join(os.getcwd(), "playwright_auth_fail.png")
+                self._page.screenshot(path=shot, full_page=False)
+                logger.info("Screenshot guardado: %s", shot)
+            except Exception:
+                pass
+            raise FusionSolarAuthError(
+                reason="Storage state rechazado — redirigido a login",
+                redirect_url=current_url,
             )
 
-        logger.info("StorageStateClient: portal cargado OK. URL: %s", current_url)
+        logger.info("StorageStateClient: portal OK. URL: %s", current_url)
 
-        # Esperar un poco para que el SPA inicialice
+        # Verificación rápida de sesión via fetch antes de proceder
+        session_status = self.check_session()
+        if session_status == "AUTH_REDIRECT":
+            raise FusionSolarAuthError(
+                reason="check_session confirma redirect a login tras navegación",
+                redirect_url=current_url,
+            )
+        if session_status in ("NON_JSON_RESPONSE", "HTTP_ERROR"):
+            logger.warning("check_session=%s — continuando (puede ser transitorio)", session_status)
+
+        # Pequeña pausa para que el SPA inicialice
         try:
-            self._page.wait_for_load_state("networkidle", timeout=15_000)
+            self._page.wait_for_load_state("networkidle", timeout=10_000)
         except Exception:
-            self._page.wait_for_timeout(3_000)
+            self._page.wait_for_timeout(2_000)
+
+    # ── Fetch con diagnóstico detallado ─────────────────────
 
     def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
         """
-        Igual que WebAuthClient._fetch(): ejecuta fetch() en el contexto del browser.
-        Las cookies y el fingerprint TLS son los de Chrome → CloudWAF los acepta.
+        Ejecuta fetch() en el contexto del browser Chromium.
+        Detecta explícitamente redirects a login, respuestas no-JSON y errores HTTP.
+        Lanza FusionSolarAuthError o FusionSolarResponseError según el caso.
         """
         url = path if path.startswith("http") else self.base_url + path
         result = self._page.evaluate(
@@ -477,18 +607,64 @@ class StorageStateClient(FusionSolarClient):
                     body: (method !== "GET" && payload !== null)
                           ? JSON.stringify(payload)
                           : undefined,
-                }).then(r => {
-                    if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
+                }).then(async r => {
+                    const finalUrl  = r.url || "";
+                    const ct        = r.headers.get("content-type") || "";
+                    const status    = r.status;
+
+                    // Detectar redirect a login (el fetch del browser sigue redirects)
+                    if (finalUrl.includes("login.action") || finalUrl.includes("unisso")) {
+                        return {__error: "AUTH_REDIRECT", url: finalUrl, status};
+                    }
+
+                    // Respuesta no-JSON
+                    if (!ct.includes("json")) {
+                        const body = await r.text();
+                        return {__error: "NON_JSON", status, ct,
+                                preview: body.substring(0, 300)};
+                    }
+
+                    // Error HTTP pero con JSON (FusionSolar devuelve errores como JSON)
+                    if (!r.ok) {
+                        const body = await r.json().catch(() => ({}));
+                        return {__error: "HTTP_ERROR", status, body};
+                    }
+
                     return r.json();
                 })
             """,
             [method.upper(), url, payload],
         )
+
+        # Procesar respuestas de error devueltas como dict con __error
+        if isinstance(result, dict) and "__error" in result:
+            err = result["__error"]
+            if err == "AUTH_REDIRECT":
+                raise FusionSolarAuthError(
+                    reason="API redirigida a login (sesión expirada o rechazada)",
+                    redirect_url=result.get("url", ""),
+                    endpoint=url,
+                )
+            if err == "NON_JSON":
+                raise FusionSolarResponseError(
+                    status=result.get("status", 0),
+                    body_preview=result.get("preview", ""),
+                    endpoint=url,
+                )
+            if err == "HTTP_ERROR":
+                raise FusionSolarResponseError(
+                    status=result.get("status", 0),
+                    body_preview=str(result.get("body", "")),
+                    endpoint=url,
+                )
+
         return result
 
     def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
         try:
             return self._fetch(method, path, payload)
+        except (FusionSolarAuthError, FusionSolarResponseError):
+            raise   # propagar errores conocidos para que sync_job los trate
         except Exception as e:
             logger.warning("_fetch error [%s %s]: %s", method, path, e)
             return default if default is not None else {}

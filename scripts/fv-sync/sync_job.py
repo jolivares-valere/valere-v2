@@ -34,7 +34,7 @@ from datetime import date, timedelta, timezone, datetime
 from supabase import create_client, Client
 
 from crypto import decrypt_password
-from fusionsolar_client import make_client, FusionSolarClient
+from fusionsolar_client import make_client, FusionSolarClient, FusionSolarAuthError, FusionSolarResponseError
 
 # ─────────────────────────────────────────────────────────
 # Logging
@@ -313,9 +313,19 @@ def sync_credencial(
 
     try:
         client.login()
+    except FusionSolarAuthError as e:
+        msg = f"AUTH_REDIRECT — sesión rechazada por FusionSolar: {e}"
+        logger.error("❌ %s", msg)
+        logger.error(
+            "ACCIÓN REQUERIDA: las cookies de sesión han expirado o FusionSolar ha cerrado la sesión. "
+            "Ejecuta extract_cookies.py localmente y vuelve a lanzar el sync."
+        )
+        if not dry_run:
+            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+        return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
     except Exception as e:
-        msg = f"Login fallido: {e}"
-        logger.error(msg)
+        msg = f"UNEXPECTED_ERROR en login: {type(e).__name__}: {e}"
+        logger.error("❌ %s", msg, exc_info=True)
         if not dry_run:
             sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
@@ -424,9 +434,16 @@ def sync_credencial(
 
             total_plantas += 1
 
+    except FusionSolarAuthError as e:
+        msg = f"AUTH_REDIRECT durante sync: {e}"
+        logger.error("❌ %s", msg)
+        logger.error("La sesión expiró a mitad de sincronización. Ejecuta extract_cookies.py.")
+        if not dry_run:
+            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+        return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
     except Exception as e:
-        msg = f"Error en sync loop: {e}"
-        logger.error(msg)
+        msg = f"UNEXPECTED_ERROR en sync loop: {type(e).__name__}: {e}"
+        logger.error("❌ %s", msg, exc_info=True)
         if not dry_run:
             sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
         return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
@@ -507,30 +524,4 @@ def main() -> None:
 
     # ── Informe mensual (día 1) ──────────────────────────
     if hoy.day == 1:
-        logger.info("📊 Día 1 → generando borradores de informe mensual…")
-        generar_informe_mensual_borrador(sb, dry_run=dry_run)
-
-    # ── Log global de sincronización ────────────────────
-    if not dry_run:
-        sb.table("fv_sync_log").insert({
-            "credenciales_ok":    total_ok,
-            "credenciales_total": len(credenciales),
-            "plantas_sync":       total_plantas,
-            "alarmas_detectadas": total_alarmas,
-            "resultado":          "ok" if total_ok == len(credenciales) else "parcial",
-            "detalles":           json.dumps(resultados, default=str),
-        }).execute()
-
-    # ── Resumen final ────────────────────────────────────
-    estado = "✅ OK" if total_ok == len(credenciales) else f"⚠️ {total_ok}/{len(credenciales)} OK"
-    logger.info(
-        "Sync finalizado: %s | %d plantas | %d alarmas",
-        estado, total_plantas, total_alarmas,
-    )
-
-    if total_ok < len(credenciales):
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+     
