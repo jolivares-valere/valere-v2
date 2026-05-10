@@ -378,10 +378,28 @@ class CookieAuthClient(FusionSolarClient):
         """Inicializa la sesión httpx con las cookies pre-extraídas."""
         import httpx
 
-        cookie_jar = {c["name"]: c["value"] for c in self._cookies}
+        # Usar httpx.Cookies con información de dominio preservada.
+        # El dict plano {name: value} pierde el dominio → si hay cookies con el
+        # mismo nombre en eu5.fusionsolar.huawei.com y uni003eu5.fusionsolar.huawei.com
+        # (p.ej. "session"), solo sobreviviría una. Con httpx.Cookies.set() se guardan
+        # por separado y se envían según el dominio de destino.
+        cookie_jar = httpx.Cookies()
+        for c in self._cookies:
+            # httpx espera dominio sin punto inicial
+            domain = c.get("domain", "").lstrip(".")
+            path   = c.get("path", "/")
+            cookie_jar.set(c["name"], c["value"], domain=domain or None, path=path)
 
         # roarand es el CSRF token de Huawei SSO — también va como header
-        csrf_token = cookie_jar.get("roarand", "")
+        csrf_token = next(
+            (c["value"] for c in self._cookies if c["name"] == "roarand"), ""
+        )
+
+        logger.info(
+            "CookieAuthClient: inicializando sesión con %d cookies: %s",
+            len(self._cookies),
+            [c["name"] for c in self._cookies],
+        )
 
         self._session = httpx.Client(
             cookies=cookie_jar,
@@ -398,11 +416,7 @@ class CookieAuthClient(FusionSolarClient):
                 "Accept":         "application/json, text/plain, */*",
             },
             timeout=30.0,
-            follow_redirects=True,
-        )
-        logger.info(
-            "CookieAuthClient: sesión httpx inicializada con %d cookies",
-            len(self._cookies),
+            follow_redirects=False,   # NO seguir redirects: un 302 = sesión rechazada
         )
 
     def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
@@ -412,6 +426,19 @@ class CookieAuthClient(FusionSolarClient):
         else:
             r = self._session.post(url, json=payload)
 
+        # Un redirect (3xx) desde la API = sesión no reconocida por el servidor.
+        # Causas posibles:
+        #   1. Las cookies expiraron → ejecutar extract_cookies.py
+        #   2. FusionSolar vincula sesiones a IP → las cookies solo funcionan
+        #      desde la misma IP donde se extrajeron (casa/oficina, no desde CI).
+        if r.is_redirect:
+            location = r.headers.get("location", "desconocido")
+            raise RuntimeError(
+                f"Sesión rechazada: redirect {r.status_code} → {location}. "
+                "Posibles causas: (1) cookies expiradas → ejecuta extract_cookies.py; "
+                "(2) FusionSolar vincula sesiones a IP de origen → las cookies no "
+                "son válidas desde GitHub Actions (IP distinta)."
+            )
         if r.status_code == 401:
             raise RuntimeError(
                 "Sesión expirada (401). Ejecuta extract_cookies.py para renovar."
