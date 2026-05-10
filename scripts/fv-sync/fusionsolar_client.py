@@ -353,98 +353,138 @@ class WebAuthClient(FusionSolarClient):
 
 
 # ─────────────────────────────────────────────────────────
-# Cliente basado en cookies (sin login en CI)
+# Cliente con storage state pre-extraído (sin login en CI)
 # ─────────────────────────────────────────────────────────
 
-class CookieAuthClient(FusionSolarClient):
+class StorageStateClient(FusionSolarClient):
     """
-    Cliente FusionSolar usando cookies de sesión pre-extraídas (sin Playwright login en CI).
+    Cliente FusionSolar usando Playwright headless con storage state pre-extraído.
+
+    Por qué Playwright y NO httpx:
+      FusionSolar usa CloudWAF de Huawei que vincula las cookies al fingerprint TLS
+      del browser (JA3/JA4). httpx tiene un fingerprint TLS diferente al de Chrome,
+      por lo que CloudWAF rechaza las peticiones con 302 incluso desde la misma IP.
+      Playwright headless usa el mismo engine Chromium → fingerprint TLS idéntico →
+      CloudWAF acepta las peticiones.
 
     Flujo:
-      1. El usuario ejecuta extract_cookies.py UNA VEZ en su máquina local
-         (browser visible → resuelve CAPTCHAs si los hay → cookies guardadas en Supabase).
-      2. El job de CI carga esas cookies y hace llamadas REST directamente con httpx.
-         No hay login ni Playwright en CI → más rápido, más fiable.
+      1. extract_cookies.py (local, headful): login real → context.storage_state()
+         → cifrado AES-256-GCM → guardado en fv_credenciales.session_cookies.
+      2. sync_job.py (CI, headless): carga storage state → browser.new_context(
+         storage_state=state) → navega al portal SIN login → API calls via
+         page.evaluate(fetch(...)) exactamente como WebAuthClient.
 
-    Las cookies expiran en ~7-30 días. extract_cookies.py avisa cuando hay que renovar.
+    Las cookies WAF expiran en ~7-30 días. extract_cookies.py se re-ejecuta cuando
+    sync_job detecta que el storage state ha expirado o es rechazado.
     """
 
-    def __init__(self, base_url: str, cookies: list[dict]):
-        self.base_url = base_url.rstrip("/")
-        self._cookies = cookies          # lista de dicts del formato Playwright
-        self._session = None             # httpx.Client, se crea en login()
+    def __init__(self, base_url: str, storage_state: dict):
+        self.base_url      = base_url.rstrip("/")
+        self._storage      = storage_state   # dict con "cookies" + "origins"
+        self._pw_ctx       = None
+        self._pw           = None
+        self._browser      = None
+        self._page         = None
+        self._station_cache: dict[str, dict] = {}
+
+    # Reutilizamos constantes de WebAuthClient
+    _STATION_LIST = WebAuthClient._STATION_LIST
+    _TOTAL_KPI    = WebAuthClient._TOTAL_KPI
+    _ALARM_LIST   = WebAuthClient._ALARM_LIST
+    _DEV_LIST     = WebAuthClient._DEV_LIST
+    _DAILY_KPI    = WebAuthClient._DAILY_KPI
 
     def login(self) -> None:
-        """Inicializa la sesión httpx con las cookies pre-extraídas."""
-        import httpx
+        """
+        Inicializa un browser headless con el storage state pre-extraído.
+        Navega directamente al portal (sin pasar por la pantalla de login).
+        """
+        from playwright.sync_api import sync_playwright
 
-        # Usar httpx.Cookies con información de dominio preservada.
-        # El dict plano {name: value} pierde el dominio → si hay cookies con el
-        # mismo nombre en eu5.fusionsolar.huawei.com y uni003eu5.fusionsolar.huawei.com
-        # (p.ej. "session"), solo sobreviviría una. Con httpx.Cookies.set() se guardan
-        # por separado y se envían según el dominio de destino.
-        cookie_jar = httpx.Cookies()
-        for c in self._cookies:
-            # httpx espera dominio sin punto inicial
-            domain = c.get("domain", "").lstrip(".")
-            path   = c.get("path", "/")
-            cookie_jar.set(c["name"], c["value"], domain=domain or None, path=path)
+        self._pw_ctx = sync_playwright()
+        self._pw     = self._pw_ctx.__enter__()
 
-        # roarand es el CSRF token de Huawei SSO — también va como header
-        csrf_token = next(
-            (c["value"] for c in self._cookies if c["name"] == "roarand"), ""
+        self._browser = self._pw.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
 
+        # Inyectar storage state directamente en el contexto del browser.
+        # Esto restaura cookies + localStorage sin necesidad de hacer login.
+        # storage_state puede ser dict (nuevo formato) o list (formato legacy
+        # con solo cookies → convertir automáticamente).
+        if isinstance(self._storage, list):
+            # Formato legacy: lista plana de cookies
+            state_to_load = {"cookies": self._storage, "origins": []}
+        else:
+            state_to_load = self._storage
+
+        n_cookies = len(state_to_load.get("cookies", []))
+        n_origins = len(state_to_load.get("origins", []))
         logger.info(
-            "CookieAuthClient: inicializando sesión con %d cookies: %s",
-            len(self._cookies),
-            [c["name"] for c in self._cookies],
+            "StorageStateClient: cargando %d cookies + %d origenes localStorage",
+            n_cookies, n_origins,
         )
 
-        self._session = httpx.Client(
-            cookies=cookie_jar,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Origin":         self.base_url,
-                "Referer":        self.base_url + "/",
-                "roarand":        csrf_token,        # CSRF header que exige FusionSolar
-                "Content-Type":   "application/json",
-                "Accept":         "application/json, text/plain, */*",
-            },
-            timeout=30.0,
-            follow_redirects=False,   # NO seguir redirects: un 302 = sesión rechazada
+        context = self._browser.new_context(
+            storage_state=state_to_load,
+            viewport={"width": 1280, "height": 720},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
         )
+        self._page = context.new_page()
+
+        # Navegar directamente al portal (no a la página de login).
+        # Con el storage state cargado, el browser ya está autenticado.
+        portal_url = self.base_url + "/uniportal/pvmswebsite/nologin.html"
+        logger.info("Navegando al portal sin login: %s", portal_url)
+        self._page.goto(portal_url, wait_until="domcontentloaded", timeout=30_000)
+
+        # Verificar que no nos redirigió al login
+        current_url = self._page.url
+        if "login" in current_url.lower() or "unisso" in current_url.lower():
+            raise RuntimeError(
+                f"Storage state rechazado — redirigido a login: {current_url}. "
+                "Ejecuta extract_cookies.py para renovar el storage state."
+            )
+
+        logger.info("StorageStateClient: portal cargado OK. URL: %s", current_url)
+
+        # Esperar un poco para que el SPA inicialice
+        try:
+            self._page.wait_for_load_state("networkidle", timeout=15_000)
+        except Exception:
+            self._page.wait_for_timeout(3_000)
 
     def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
+        """
+        Igual que WebAuthClient._fetch(): ejecuta fetch() en el contexto del browser.
+        Las cookies y el fingerprint TLS son los de Chrome → CloudWAF los acepta.
+        """
         url = path if path.startswith("http") else self.base_url + path
-        if method.upper() == "GET":
-            r = self._session.get(url)
-        else:
-            r = self._session.post(url, json=payload)
-
-        # Un redirect (3xx) desde la API = sesión no reconocida por el servidor.
-        # Causas posibles:
-        #   1. Las cookies expiraron → ejecutar extract_cookies.py
-        #   2. FusionSolar vincula sesiones a IP → las cookies solo funcionan
-        #      desde la misma IP donde se extrajeron (casa/oficina, no desde CI).
-        if r.is_redirect:
-            location = r.headers.get("location", "desconocido")
-            raise RuntimeError(
-                f"Sesión rechazada: redirect {r.status_code} → {location}. "
-                "Posibles causas: (1) cookies expiradas → ejecuta extract_cookies.py; "
-                "(2) FusionSolar vincula sesiones a IP de origen → las cookies no "
-                "son válidas desde GitHub Actions (IP distinta)."
-            )
-        if r.status_code == 401:
-            raise RuntimeError(
-                "Sesión expirada (401). Ejecuta extract_cookies.py para renovar."
-            )
-        r.raise_for_status()
-        return r.json()
+        result = self._page.evaluate(
+            """([method, url, payload]) =>
+                fetch(url, {
+                    method,
+                    headers: {"Content-Type": "application/json"},
+                    body: (method !== "GET" && payload !== null)
+                          ? JSON.stringify(payload)
+                          : undefined,
+                }).then(r => {
+                    if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
+                    return r.json();
+                })
+            """,
+            [method.upper(), url, payload],
+        )
+        return result
 
     def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
         try:
@@ -452,13 +492,6 @@ class CookieAuthClient(FusionSolarClient):
         except Exception as e:
             logger.warning("_fetch error [%s %s]: %s", method, path, e)
             return default if default is not None else {}
-
-    # Reutilizamos la misma lógica de WebAuthClient para parsear respuestas
-    _STATION_LIST = WebAuthClient._STATION_LIST
-    _TOTAL_KPI    = WebAuthClient._TOTAL_KPI
-    _ALARM_LIST   = WebAuthClient._ALARM_LIST
-    _DEV_LIST     = WebAuthClient._DEV_LIST
-    _DAILY_KPI    = WebAuthClient._DAILY_KPI
 
     def get_station_list(self) -> list[dict]:
         data = self._fetch("POST", self._STATION_LIST, {
@@ -470,10 +503,17 @@ class CookieAuthClient(FusionSolarClient):
             stations = raw.get("list", raw.get("pageList", []))
         elif isinstance(raw, list):
             stations = raw
+        for st in stations:
+            code = st.get("stationCode") or st.get("stationDn", "")
+            if code:
+                self._station_cache[code] = st
         logger.debug("get_station_list: %d plantas", len(stations))
         return stations
 
     def get_station_kpi(self, station_code: str) -> dict:
+        cached = self._station_cache.get(station_code, {})
+        if cached.get("currentPower") is not None or cached.get("dayPower") is not None:
+            return cached
         ts_ms = int(time.time() * 1000)
         return self._safe_fetch(
             "GET", f"{self._TOTAL_KPI}?queryTime={ts_ms}&timeZone=2"
@@ -514,11 +554,18 @@ class CookieAuthClient(FusionSolarClient):
 
     def close(self) -> None:
         try:
-            if self._session:
-                self._session.close()
+            if self._browser:
+                self._browser.close()
         except Exception as e:
-            logger.debug("httpx session.close() error: %s", e)
-        self._session = None
+            logger.debug("browser.close() error: %s", e)
+        try:
+            if self._pw_ctx and self._pw:
+                self._pw_ctx.__exit__(None, None, None)
+        except Exception as e:
+            logger.debug("playwright.__exit__() error: %s", e)
+        self._browser = None
+        self._page    = None
+        self._pw      = None
 
 
 # ─────────────────────────────────────────────────────────
@@ -530,28 +577,32 @@ def make_client(
     base_url: str,
     username: str,
     password: str,
-    cookies: list[dict] | None = None,
+    storage_state: dict | None = None,
 ) -> FusionSolarClient:
     """
     Crea el cliente correcto según la plataforma y el modo de autenticación.
 
     Args:
-        plataforma: "fusionsolar" (único implementado)
-        base_url:   URL del portal (ej. https://uni003eu5.fusionsolar.huawei.com)
-        username:   Usuario del portal
-        password:   Contraseña en claro (ya descifrada)
-        cookies:    Lista de cookies pre-extraídas (formato Playwright). Si se
-                    proporcionan, se usa CookieAuthClient (httpx, sin login en CI).
-                    Si None → WebAuthClient (Playwright login).
+        plataforma:    "fusionsolar" (unico implementado)
+        base_url:      URL del portal (ej. https://uni003eu5.fusionsolar.huawei.com)
+        username:      Usuario del portal
+        password:      Contrasena en claro (ya descifrada)
+        storage_state: Storage state completo de Playwright (cookies + localStorage).
+                       Si se proporciona → StorageStateClient (Playwright headless sin login).
+                       Si None → WebAuthClient (Playwright login headless completo).
+
+    Nota: httpx (CookieAuthClient) no funciona con FusionSolar porque CloudWAF
+    verifica el fingerprint TLS del cliente. Playwright replica el fingerprint de
+    Chrome, httpx no. Por eso ambos modos usan Playwright.
     """
     if plataforma != "fusionsolar":
-        raise NotImplementedError(f"Plataforma '{plataforma}' no implementada aún")
+        raise NotImplementedError(f"Plataforma '{plataforma}' no implementada aun")
 
-    if cookies:
+    if storage_state:
         logger.info(
-            "make_client: usando CookieAuthClient (cookies pre-extraídas, sin login en CI)"
+            "make_client: usando StorageStateClient (storage state pre-extraido, sin login en CI)"
         )
-        return CookieAuthClient(base_url, cookies)
+        return StorageStateClient(base_url, storage_state)
 
     logger.info("make_client: usando WebAuthClient (Playwright login headless)")
     return WebAuthClient(base_url, username, password)

@@ -1,8 +1,8 @@
 """
-test_cookie_auth.py — Verifica que CookieAuthClient funciona con las cookies guardadas.
+test_cookie_auth.py -- Verifica que CookieAuthClient funciona con las cookies guardadas.
 
-Ejecutar LOCALMENTE (desde tu máquina, con el .env configurado):
-    cd C:\Users\joliv\valere-v2\scripts\fv-sync
+Ejecutar LOCALMENTE (desde tu maquina, con el .env configurado):
+    cd valere-v2/scripts/fv-sync
     python test_cookie_auth.py
 
 Si funciona aquí pero NO en CI → FusionSolar vincula sesiones a IP.

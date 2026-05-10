@@ -43,6 +43,9 @@ jobs:
       - name: Instalar Playwright + Chromium
         run: playwright install chromium --with-deps
 
+      - name: Instalar Playwright + Chromium
+        run: playwright install chromium --with-deps
+
       - name: Ejecutar sincronización
         working-directory: scripts/fv-sync
         env:

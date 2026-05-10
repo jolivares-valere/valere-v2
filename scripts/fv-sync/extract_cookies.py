@@ -130,38 +130,46 @@ def _extract_cookies_for_cred(cred: dict, enc_key: str, headless: bool) -> list[
 
         logger.info("✅ Login OK. URL: %s", page.url)
 
-        # Extraer todas las cookies del contexto
-        cookies = context.cookies()
-        logger.info("  %d cookies extraídas", len(cookies))
+        # Extraer storage state completo: cookies + localStorage
+        # context.storage_state() es un superconjunto de context.cookies().
+        # El SPA de FusionSolar puede guardar tokens adicionales en localStorage
+        # que son necesarios para que las llamadas API funcionen.
+        # Además, al cargar storage_state en CI podemos usar Playwright headless
+        # sin login (evita CAPTCHA) manteniendo el fingerprint TLS de Chrome
+        # (httpx tiene fingerprint diferente → el WAF CloudWAF de FusionSolar lo rechaza).
+        storage_state = context.storage_state()
+        n_cookies = len(storage_state.get("cookies", []))
+        n_origins = len(storage_state.get("origins", []))
+        logger.info("  %d cookies + %d orígenes localStorage extraídos", n_cookies, n_origins)
 
         browser.close()
-        return cookies
+        return storage_state
 
 
-def _store_cookies(sb, cred_id: str, cookies: list[dict], enc_key: str) -> None:
-    """Cifra y guarda las cookies en fv_credenciales."""
-    cookies_json = json.dumps(cookies)
-    cookies_enc  = encrypt_password(cookies_json, enc_key)
+def _store_cookies(sb, cred_id: str, storage_state: dict, enc_key: str) -> None:
+    """Cifra y guarda el storage state completo en fv_credenciales."""
+    state_json = json.dumps(storage_state)
+    state_enc  = encrypt_password(state_json, enc_key)
 
     # Estimamos expiración en 7 días (las cookies de FusionSolar suelen durar 7-30 días)
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
 
     sb.table("fv_credenciales").update({
-        "session_cookies":    cookies_enc,
+        "session_cookies":    state_enc,
         "cookies_expires_at": expires_at,
         "cookies_updated_at": datetime.now(timezone.utc).isoformat(),
         "ultimo_error":       None,
     }).eq("id", cred_id).execute()
 
     logger.info(
-        "Cookies guardadas en Supabase para cred=%s (expiran ~%s)",
+        "Storage state guardado en Supabase para cred=%s (expira ~%s)",
         cred_id, expires_at[:10],
     )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extrae cookies de sesión de FusionSolar")
-    parser.add_argument("--cred",     help="UUID de la credencial (vacío = todas las activas)")
+    parser = argparse.ArgumentParser(description="Extrae storage state de sesion de FusionSolar")
+    parser.add_argument("--cred",     help="UUID de la credencial (vacio = todas las activas)")
     parser.add_argument("--headless", action="store_true", help="Lanzar browser sin UI")
     args = parser.parse_args()
 
@@ -193,15 +201,15 @@ def main():
     for cred in credenciales:
         cred_id  = cred["id"]
         username = cred["username"]
-        logger.info("─── Procesando %s (%s)", username, cred_id)
+        logger.info("Procesando %s (%s)", username, cred_id)
 
         try:
-            cookies = _extract_cookies_for_cred(cred, enc_key, args.headless)
-            _store_cookies(sb, cred_id, cookies, enc_key)
+            storage_state = _extract_cookies_for_cred(cred, enc_key, args.headless)
+            _store_cookies(sb, cred_id, storage_state, enc_key)
             ok += 1
-            logger.info("✅ %s — cookies guardadas", username)
+            logger.info("OK %s -- storage state guardado", username)
         except Exception as e:
-            logger.error("❌ %s — fallo: %s", username, e)
+            logger.error("FALLO %s -- %s", username, e)
 
     logger.info("Finalizado: %d/%d OK", ok, len(credenciales))
     if ok < len(credenciales):

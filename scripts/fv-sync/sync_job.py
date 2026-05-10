@@ -262,13 +262,19 @@ def sync_credencial(
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
 
     # ── Seleccionar modo de autenticación ───────────────────
-    # Si hay cookies pre-extraídas y no están expiradas → CookieAuthClient (httpx, sin login en CI)
-    # Si no                                              → WebAuthClient (Playwright login)
-    session_cookies_enc = cred.get("session_cookies")
-    cookies_expires_at  = cred.get("cookies_expires_at")
-    cookies: list[dict] | None = None
+    # Si hay storage state pre-extraído y no está expirado → StorageStateClient
+    #   (Playwright headless sin login: navega directamente al portal con sesión pre-cargada)
+    # Si no                                                → WebAuthClient
+    #   (Playwright login completo: puede fallar en CI por CAPTCHA)
+    #
+    # IMPORTANTE: httpx (CookieAuthClient anterior) NO funciona porque CloudWAF de
+    # FusionSolar verifica el fingerprint TLS del cliente. Playwright reproduce el
+    # fingerprint de Chrome; httpx no.
+    session_state_enc  = cred.get("session_cookies")   # columna reutilizada para storage state
+    cookies_expires_at = cred.get("cookies_expires_at")
+    storage_state: dict | None = None
 
-    if session_cookies_enc:
+    if session_state_enc:
         from datetime import timezone as _tz
         now = datetime.now(_tz.utc)
         expired = (
@@ -277,24 +283,33 @@ def sync_credencial(
         )
         if expired:
             logger.warning(
-                "Cookies de sesión expiradas para cred=%s (expiraron %s). "
+                "Storage state expirado para cred=%s (expiró %s). "
                 "Ejecuta extract_cookies.py para renovar. Intentando login Playwright...",
                 cred_id, cookies_expires_at,
             )
         else:
             try:
                 import json as _json
-                cookies_json = decrypt_password(session_cookies_enc, enc_key)
-                cookies = _json.loads(cookies_json)
-                logger.info(
-                    "Usando %d cookies pre-extraídas para cred=%s (expiran %s)",
-                    len(cookies), cred_id, (cookies_expires_at or "N/A")[:10],
-                )
+                state_json    = decrypt_password(session_state_enc, enc_key)
+                storage_state = _json.loads(state_json)
+                # Soporte formato legacy (lista de cookies) y nuevo (dict con cookies+origins)
+                if isinstance(storage_state, list):
+                    n = len(storage_state)
+                    logger.info(
+                        "Usando %d cookies (formato legacy) para cred=%s (expiran %s)",
+                        n, cred_id, (cookies_expires_at or "N/A")[:10],
+                    )
+                else:
+                    n = len(storage_state.get("cookies", []))
+                    logger.info(
+                        "Usando storage state con %d cookies para cred=%s (expiran %s)",
+                        n, cred_id, (cookies_expires_at or "N/A")[:10],
+                    )
             except Exception as e:
-                logger.warning("Error al descifrar cookies: %s. Fallback a Playwright.", e)
-                cookies = None
+                logger.warning("Error al descifrar storage state: %s. Fallback a Playwright.", e)
+                storage_state = None
 
-    client: FusionSolarClient = make_client(plataforma, region_url, username, password, cookies=cookies)
+    client: FusionSolarClient = make_client(plataforma, region_url, username, password, storage_state=storage_state)
 
     try:
         client.login()
