@@ -486,13 +486,32 @@ def sync_credencial(
         stations = client.get_station_list()
         logger.info("  %d plantas encontradas", len(stations))
 
+        # Loguear claves del primer station para diagnóstico de campo
+        if stations:
+            logger.info("  [DIAG] keys primer station: %s", list(stations[0].keys()))
+
         for st in stations:
-            station_code = st.get("stationCode") or st.get("stationDn", "")
+            # FusionSolar EU5 usa "dn" (ej: "NE=137403508"), no stationCode/stationDn
+            station_code = (
+                st.get("stationCode")
+                or st.get("stationDn")
+                or st.get("dn", "")
+            )
             if not station_code:
+                logger.warning("  [SKIP] station sin station_code: %s", list(st.keys()))
                 continue
 
-            planta_estado = normalize_status(st.get("status", "desconocido"))
-            planta_nombre = st.get("stationName") or st.get("plantName", station_code)
+            # FusionSolar EU5 usa "plantStatus", no "status"
+            planta_estado = normalize_status(
+                st.get("status") or st.get("plantStatus", "desconocido")
+            )
+            # Nombre: probar varias claves posibles
+            planta_nombre = (
+                st.get("stationName")
+                or st.get("plantName")
+                or st.get("name")
+                or station_code
+            )
 
             # ── Upsert fv_planta (via función segura anti-duplicados) ──────
             if dry_run:
@@ -667,12 +686,19 @@ def main() -> None:
                 total_ok, len(credenciales), total_plantas, total_alarmas)
 
     if not dry_run:
+        # Columnas reales de fv_sync_log (verificadas contra schema Supabase 2026-05-11):
+        # id, empresa_id, plataforma, ok, plantas_sync, alarmas_sync, mensaje,
+        # iniciado_en, duracion_ms, credenciales_ok, credenciales_total,
+        # alarmas_detectadas, resultado, detalles
         sb.table("fv_sync_log").insert({
             "credenciales_ok":    total_ok,
             "credenciales_total": len(credenciales),
-            "plantas_synced":     total_plantas,
-            "alarmas_found":      total_alarmas,
-            "ejecutado_en":       datetime.now(timezone.utc).isoformat(),
+            "plantas_sync":       total_plantas,
+            "alarmas_sync":       total_alarmas,
+            "alarmas_detectadas": total_alarmas,
+            "ok":                 total_ok == len(credenciales),
+            "resultado":          "ok" if total_ok == len(credenciales) else "parcial",
+            "iniciado_en":        datetime.now(timezone.utc).isoformat(),
         }).execute()
 
 
