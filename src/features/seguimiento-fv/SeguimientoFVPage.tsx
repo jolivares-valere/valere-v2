@@ -1,183 +1,147 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Sun, Zap, AlertTriangle, CheckCircle, WifiOff, Search } from 'lucide-react'
+import {
+  Sun, LayoutDashboard, MapPin, BarChart2, ArrowLeftRight,
+  AlertTriangle, KeyRound, UserX, FileText, FlaskConical,
+} from 'lucide-react'
 import { useTodasLasPlantas } from './api'
+import {
+  FIXTURE_PLANTAS, FIXTURE_PLANTAS_SIN_ASIGNAR, FIXTURE_KPI_DIARIO,
+  FIXTURE_COMPARATIVA, FIXTURE_INCIDENCIAS, FIXTURE_CREDENCIALES, FIXTURE_INFORMES,
+} from './fixtures'
+import ResumenTab        from './components/ResumenTab'
+import PlantasTab        from './components/PlantasTab'
+import ProduccionTab     from './components/ProduccionTab'
+import ExcedentesTab     from './components/ExcedentesTab'
+import IncidenciasTab    from './components/IncidenciasTab'
+import CredencialesTab   from './components/CredencialesTab'
+import SinAsignarTab     from './components/SinAsignarTab'
+import InformesTab       from './components/InformesTab'
 
-const ESTADO_CONFIG = {
-  normal:       { label: 'Normal',       color: 'bg-green-100 text-green-800',   dot: 'bg-green-500' },
-  defectuoso:   { label: 'Defectuoso',   color: 'bg-red-100 text-red-800',       dot: 'bg-red-500' },
-  desconectado: { label: 'Desconectado', color: 'bg-slate-100 text-slate-600',   dot: 'bg-slate-400' },
-  desconocido:  { label: 'Desconocido',  color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-400' },
-}
+type TabId =
+  | 'resumen' | 'plantas' | 'produccion' | 'excedentes'
+  | 'incidencias' | 'credenciales' | 'sin-asignar' | 'informes'
 
-function fmt(n: number | null | undefined, dec = 1, suffix = '') {
-  if (n == null) return '—'
-  return n.toFixed(dec) + suffix
+interface Tab {
+  id: TabId
+  label: string
+  Icon: React.ElementType
+  badge?: number
+  badgeColor?: string
 }
 
 export default function SeguimientoFVPage() {
-  const { data: plantas, isLoading } = useTodasLasPlantas()
-  const [search, setSearch] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState<string>('todos')
+  const [tabActual, setTabActual] = useState<TabId>('resumen')
 
-  const plantasFiltradas = (plantas ?? []).filter((p: any) => {
-    const matchSearch = !search || p.nombre.toLowerCase().includes(search.toLowerCase())
-      || (p.empresa?.nombre ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchEstado = filtroEstado === 'todos' || p.estado === filtroEstado
-    return matchSearch && matchEstado
-  })
+  const { data: plantasReales, isLoading } = useTodasLasPlantas()
+  const usarFixtures = !isLoading && (!plantasReales || plantasReales.length === 0)
 
-  // Resumen global
-  const allPlantas = plantas ?? []
-  const totalPotencia = allPlantas.reduce((s: number, p: any) => s + (p.kpi_realtime?.potencia_actual_kw ?? 0), 0)
-  const totalHoy = allPlantas.reduce((s: number, p: any) => s + (p.kpi_realtime?.energia_hoy_kwh ?? 0), 0)
-  const totals = {
-    normal:       allPlantas.filter((p: any) => p.estado === 'normal').length,
-    defectuoso:   allPlantas.filter((p: any) => p.estado === 'defectuoso').length,
-    desconectado: allPlantas.filter((p: any) => p.estado === 'desconectado').length,
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const plantas: any[]  = usarFixtures ? FIXTURE_PLANTAS          : (plantasReales ?? [])
+  const sinAsignar      = usarFixtures ? FIXTURE_PLANTAS_SIN_ASIGNAR : (plantasReales ?? []).filter((p: any) => !p.empresa_id)
+  const kpiDiario       = FIXTURE_KPI_DIARIO
+  const comparativa     = FIXTURE_COMPARATIVA
+  const incidencias     = FIXTURE_INCIDENCIAS
+  const informes        = FIXTURE_INFORMES
+
+  const nIncidencias    = incidencias.filter(i => !i.resuelta).length
+  const nCriticos       = comparativa.filter(c => c.estado === 'critico').length
+  const nSinAsignar     = sinAsignar.length
+
+  const tabs: Tab[] = [
+    { id: 'resumen',      label: 'Resumen',              Icon: LayoutDashboard },
+    { id: 'plantas',      label: 'Plantas',               Icon: MapPin,         badge: plantas.length },
+    { id: 'produccion',   label: 'Producción',            Icon: BarChart2 },
+    { id: 'excedentes',   label: 'Excedentes / Datadis',  Icon: ArrowLeftRight, badge: nCriticos  || undefined, badgeColor: 'bg-red-500' },
+    { id: 'incidencias',  label: 'Incidencias',           Icon: AlertTriangle,  badge: nIncidencias || undefined, badgeColor: 'bg-red-500' },
+    { id: 'credenciales', label: 'Credenciales',          Icon: KeyRound },
+    { id: 'sin-asignar',  label: 'Sin asignar',           Icon: UserX,          badge: nSinAsignar || undefined, badgeColor: 'bg-slate-500' },
+    { id: 'informes',     label: 'Informes',              Icon: FileText },
+  ]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Cabecera */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <Sun className="w-8 h-8 text-amber-400" />
-          <h1 className="text-2xl font-display font-bold text-valere-blue-dark">Seguimiento Plantas FV</h1>
-        </div>
-        <p className="text-slate-500 text-sm">
-          Monitorización de instalaciones fotovoltaicas de clientes. Datos actualizados diariamente.
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      {/* Cabecera + tabs */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-screen-xl mx-auto px-6 pt-6 pb-0">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                <Sun className="w-6 h-6 text-amber-500" />
+              </div>
+              <div>
+                <h1 className="text-xl font-display font-bold text-valere-blue-dark">
+                  Seguimiento Plantas FV
+                </h1>
+                <p className="text-xs text-slate-500">Control operativo · producción · excedentes · Datadis</p>
+              </div>
+            </div>
 
-      {/* KPIs globales */}
-      {!isLoading && allPlantas.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-xs text-slate-500 mb-1">Total plantas</p>
-            <p className="text-2xl font-bold text-slate-800">{allPlantas.length}</p>
+            {usarFixtures && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-700">
+                <FlaskConical className="w-3.5 h-3.5" />
+                Datos de demostración
+              </span>
+            )}
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-xs text-slate-500 mb-1">Operativas</p>
-            <p className="text-2xl font-bold text-green-600">{totals.normal}</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-xs text-slate-500 mb-1">Con incidencia</p>
-            <p className="text-2xl font-bold text-red-600">{totals.defectuoso + totals.desconectado}</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4 col-span-1">
-            <p className="text-xs text-slate-500 mb-1">Potencia actual</p>
-            <p className="text-2xl font-bold text-yellow-600">{fmt(totalPotencia, 1, ' kW')}</p>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4 col-span-1">
-            <p className="text-xs text-slate-500 mb-1">Energía hoy</p>
-            <p className="text-2xl font-bold text-orange-500">{fmt(totalHoy, 0, ' kWh')}</p>
-          </div>
-        </div>
-      )}
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar planta o cliente…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-valere-blue/20"
-          />
-        </div>
-        <div className="flex gap-2">
-          {(['todos', 'normal', 'defectuoso', 'desconectado'] as const).map(estado => (
-            <button
-              key={estado}
-              onClick={() => setFiltroEstado(estado)}
-              className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
-                filtroEstado === estado
-                  ? 'bg-valere-blue text-white border-valere-blue'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              {estado === 'todos' ? 'Todas' : (ESTADO_CONFIG[estado]?.label ?? estado)}
-            </button>
-          ))}
+          <nav className="flex gap-0.5 overflow-x-auto">
+            {tabs.map(({ id, label, Icon, badge, badgeColor }) => {
+              const active = tabActual === id
+              return (
+                <button
+                  key={id}
+                  onClick={() => setTabActual(id)}
+                  className={`
+                    flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium
+                    border-b-2 transition-colors whitespace-nowrap shrink-0
+                    ${active
+                      ? 'border-valere-blue text-valere-blue'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }
+                  `}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                  {badge != null && badge > 0 && (
+                    <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white ${badgeColor ?? 'bg-slate-400'}`}>
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
         </div>
       </div>
 
-      {/* Tabla de plantas */}
-      {isLoading ? (
-        <div className="py-16 text-center text-slate-400 text-sm">Cargando plantas…</div>
-      ) : plantasFiltradas.length === 0 ? (
-        <div className="py-16 text-center">
-          <Sun className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500">No se encontraron plantas con esos filtros</p>
-        </div>
-      ) : (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Planta</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide hidden md:table-cell">Cliente</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide hidden lg:table-cell">Capacidad</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Estado</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide hidden md:table-cell">Potencia</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide hidden md:table-cell">Hoy</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide hidden lg:table-cell">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {plantasFiltradas.map((planta: any) => {
-                const cfg = ESTADO_CONFIG[planta.estado as keyof typeof ESTADO_CONFIG] ?? ESTADO_CONFIG.desconocido
-                const kpi = planta.kpi_realtime
-                return (
-                  <tr key={planta.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                        <div>
-                          <p className="font-medium text-slate-800">{planta.nombre}</p>
-                          <p className="text-xs text-slate-400">{planta.station_code}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      {planta.empresa ? (
-                        <Link
-                          to={`/empresas/${planta.empresa.id}`}
-                          className="text-valere-blue hover:underline font-medium"
-                        >
-                          {planta.empresa.nombre}
-                        </Link>
-                      ) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">
-                      {planta.capacidad_kwp ? `${planta.capacidad_kwp} kWp` : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.color}`}>
-                        {cfg.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-700 hidden md:table-cell font-medium">
-                      {fmt(kpi?.potencia_actual_kw, 2, ' kW')}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-700 hidden md:table-cell">
-                      {fmt(kpi?.energia_hoy_kwh, 1, ' kWh')}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-500 hidden lg:table-cell">
-                      {kpi?.energia_total_kwh != null
-                        ? fmt(kpi.energia_total_kwh / 1000, 1, ' MWh')
-                        : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Contenido */}
+      <div className="max-w-screen-xl mx-auto px-6 py-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-24 text-slate-400">
+            <Sun className="w-8 h-8 animate-pulse" />
+          </div>
+        ) : (
+          <>
+            {tabActual === 'resumen'      && <ResumenTab      plantas={plantas} incidencias={incidencias} comparativa={comparativa} credenciales={FIXTURE_CREDENCIALES} />}
+            {tabActual === 'plantas'      && <PlantasTab      plantas={plantas} />}
+            {tabActual === 'produccion'   && <ProduccionTab   plantas={plantas} kpiDiario={kpiDiario} />}
+            {tabActual === 'excedentes'   && <ExcedentesTab   comparativa={comparativa} />}
+            {tabActual === 'incidencias'  && <IncidenciasTab  incidencias={incidencias} />}
+            {tabActual === 'credenciales' && (
+              <CredencialesTab
+                fixtureCredenciales={usarFixtures ? FIXTURE_CREDENCIALES : undefined}
+                fixturesPlantas={usarFixtures ? FIXTURE_PLANTAS as any : undefined}
+              />
+            )}
+            {tabActual === 'sin-asignar'  && (
+              <SinAsignarTab
+                fixturasPlantas={usarFixtures ? FIXTURE_PLANTAS_SIN_ASIGNAR : undefined}
+              />
+            )}
+            {tabActual === 'informes'     && <InformesTab     informes={informes} />}
+          </>
+        )}
+      </div>
     </div>
   )
 }
