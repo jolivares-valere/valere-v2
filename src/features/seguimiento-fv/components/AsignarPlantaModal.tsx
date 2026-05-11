@@ -232,4 +232,3 @@ export default function AsignarPlantaModal({ open, onClose, planta }: Props) {
     </div>
   )
 }
-}
