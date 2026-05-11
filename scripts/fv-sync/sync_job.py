@@ -536,7 +536,7 @@ def sync_credencial(
                 "p_estado":        planta_estado,
                 "p_empresa_id":    empresa_id,
             }).execute()
-            planta_id = res.data[0]["id"] if res.data else None
+            planta_id = res.data[0]["planta_id"] if res.data else None
             if not planta_id:
                 logger.warning("  fv_upsert_planta sin resultado para %s", station_code)
                 total_plantas += 1
@@ -595,11 +595,13 @@ def sync_credencial(
                     desc = al.get("alarmName") or al.get("description", "Sin descripcion")
                     sb.table("fv_alarma").upsert({
                         "planta_id":    planta_id,
+                        "alarm_id":     str(al.get("alarmId") or al.get("id", "")),
                         "codigo":       str(al.get("alarmId") or al.get("id", "")),
                         "severidad":    severidad,
                         "descripcion":  desc,
+                        "dispositivo":  al.get("devName") or al.get("deviceName") or "",
                         "activa":       True,
-                        "detectada_en": al.get("raiseTime") or datetime.now(timezone.utc).isoformat(),
+                        "iniciada_en":  al.get("raiseTime") or datetime.now(timezone.utc).isoformat(),
                     }, on_conflict="planta_id,codigo").execute()
                     total_alarmas += 1
                     if severidad in ("critica", "mayor"):
@@ -659,7 +661,7 @@ def main() -> None:
     enc_key      = os.environ["FV_ENCRYPTION_KEY"]
     resend_key   = os.environ.get("RESEND_API_KEY")
 
-    sb: Client = create_client(supabase_url, supabase_key)
+    sb = create_client(supabase_url, supabase_key)
 
     if args.check_secrets:
         fallos = check_secrets_diagnostic(sb, empresa_filter=args.empresa)
@@ -694,10 +696,6 @@ def main() -> None:
                 total_ok, len(credenciales), total_plantas, total_alarmas)
 
     if not dry_run:
-        # Columnas reales de fv_sync_log (verificadas contra schema Supabase 2026-05-11):
-        # id, empresa_id, plataforma, ok, plantas_sync, alarmas_sync, mensaje,
-        # iniciado_en, duracion_ms, credenciales_ok, credenciales_total,
-        # alarmas_detectadas, resultado, detalles
         sb.table("fv_sync_log").insert({
             "credenciales_ok":    total_ok,
             "credenciales_total": len(credenciales),
