@@ -40,6 +40,13 @@ import time
 from collections import defaultdict
 from datetime import date, timedelta, timezone, datetime
 
+# Cargar .env automáticamente si existe (dev local; en GitHub Actions las vars vienen del entorno)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv no instalado — se usan las vars del entorno directamente
+
 from supabase import create_client, Client
 
 from crypto import decrypt_password
@@ -103,7 +110,7 @@ def load_fv_credentials_with_secrets(
         sb.table("fv_credenciales")
         .select(
             "id, plataforma, nombre, username, region_url, activo, tipo, "
-            "descripcion, empresa_id, ultimo_error, ultima_sincronizacion, "
+            "descripcion, empresa_id, ultimo_ok_at, ultimo_error, "
             "fv_credenciales_secret(password_enc, session_cookies, cookies_expires_at)"
         )
         .eq("activo", True)
@@ -599,8 +606,8 @@ def sync_credencial(
 
     if not dry_run:
         sb.table("fv_credenciales").update({
-            "ultimo_error":          None,
-            "ultima_sincronizacion": datetime.now(timezone.utc).isoformat(),
+            "ultimo_error": None,
+            "ultimo_ok_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", cred_id).execute()
 
     return {"ok": True, "plantas": total_plantas, "alarmas": total_alarmas, "elapsed": elapsed}
