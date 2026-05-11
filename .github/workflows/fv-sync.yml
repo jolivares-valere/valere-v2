@@ -76,10 +76,3 @@ jobs:
             ARGS="$ARGS --dry-run"
           fi
           python sync_job.py $ARGS
-
-      - name: Notificar fallo por Slack (opcional)
-        if: failure() && vars.NOTIFY_SLACK == 'true'
-        run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d '{"text": "⚠️ FV Sync falló — revisar logs en GitHub Actions"}'
