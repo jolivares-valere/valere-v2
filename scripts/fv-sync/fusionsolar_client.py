@@ -497,15 +497,26 @@ class StorageStateClient(FusionSolarClient):
         return self.base_url + path
 
     def _api_headers(self) -> dict:
-        """Headers que usa el SPA de FusionSolar en sus llamadas REST.
-        Capturados mediante diagnóstico page.on('request').
+        """Headers exactos que usa el SPA de FusionSolar en sus llamadas REST.
+        Capturados mediante page.on('request') en extract_cookies.py (2026-05-11).
+
+        Campos obligatorios descubiertos:
+          roarand              — token CSRF inyectado por el SPA como header (no cookie)
+          x-non-renewal-session — "true" en todos los POSTs del SPA
+          x-timezone-offset    — offset UTC en minutos (120 = UTC+2, Europa/Madrid verano)
+          accept               — "application/json, text/javascript, */*; q=0.01"
         """
-        return {
-            "Content-Type":     "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer":          self._portal_url or f"{self.base_url}/uniportal/",
-            "Accept":           "application/json, */*",
+        headers: dict = {
+            "Content-Type":           "application/json",
+            "X-Requested-With":       "XMLHttpRequest",
+            "X-Non-Renewal-Session":  "true",
+            "X-Timezone-Offset":      "120",
+            "Referer":                self._portal_url or f"{self.base_url}/uniportal/",
+            "Accept":                 "application/json, text/javascript, */*; q=0.01",
         }
+        if self._roarand:
+            headers["roarand"] = self._roarand
+        return headers
 
     def check_session(self) -> str:
         """
@@ -590,15 +601,26 @@ class StorageStateClient(FusionSolarClient):
         self._roarand    = None     # token CSRF (cookie roarand leída post-navegación)
         self._page = context.new_page()
 
-        # ── Captura de requests del SPA para diagnóstico ────────────────────
+        # ── Captura de requests del SPA para diagnóstico y extracción de roarand ──
+        # roarand es un token CSRF que FusionSolar inyecta como request header
+        # (no como cookie). El SPA lo obtiene del servidor tras el login y lo
+        # almacena en memoria JS — no es accesible via document.cookie ni window.
+        # Capturamos el valor de los headers de los requests reales del SPA.
         _captured_spa_requests: list[dict] = []
+        _roarand_found: list[str] = []   # lista para poder mutar en closure
+
         def _on_spa_request(request):
             url = request.url
             if "/rest/pvms/" in url or "/rest/fo/" in url:
+                headers = dict(request.headers)
                 _captured_spa_requests.append({
                     "method": request.method,
                     "url":    url,
                 })
+                rr = headers.get("roarand")
+                if rr and not _roarand_found:
+                    _roarand_found.append(rr)
+
         self._page.on("request", _on_spa_request)
 
         # Navegar a la raíz del portal. Con el storage state cargado el servidor
@@ -644,17 +666,17 @@ class StorageStateClient(FusionSolarClient):
         for r in _captured_spa_requests:
             logger.info("  [SPA] %s %s", r["method"], r["url"])
 
-        # Leer roarand del cookie jar del contexto (seteado por el servidor al cargar el portal)
-        self._roarand = None
-        for cookie in self._context.cookies():
-            if cookie.get("name") == "roarand":
-                self._roarand = cookie["value"]
-                break
-        if self._roarand:
-            logger.info("roarand leído del contexto post-navegación ✅")
+        # Extraer roarand de los headers capturados del SPA.
+        # roarand NO está en cookies — el SPA lo gestiona como header CSRF en memoria.
+        if _roarand_found:
+            self._roarand = _roarand_found[0]
+            logger.info("roarand capturado del SPA ✅ (%s...)", self._roarand[:8])
         else:
-            logger.warning("roarand no encontrado en cookies post-navegación — "
-                           "los POSTs a la API pueden ser rechazados con AUTH_REDIRECT")
+            self._roarand = None
+            logger.warning(
+                "roarand NO capturado del SPA — el SPA no hizo ninguna llamada autenticada "
+                "durante la inicialización. Los POSTs podrían fallar."
+            )
 
         # Verificación rápida de sesión via context.request (ya con SPA inicializado)
         session_status = self.check_session()
@@ -750,8 +772,22 @@ class StorageStateClient(FusionSolarClient):
             return default if default is not None else {}
 
     def get_station_list(self) -> list[dict]:
+        # Body exacto capturado del SPA (2026-05-11):
+        # curPage (no pageNo), queryTime = medianoche del día actual en el portal,
+        # timeZone = 2 (UTC+2, Europa/Madrid verano).
+        # pageSize 100 para obtener todas las plantas en una sola llamada.
+        ts_ms = int(datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).timestamp() * 1000)
         data = self._fetch("POST", self._STATION_LIST, {
-            "pageNo": 1, "pageSize": 100, "locale": "es_ES",
+            "curPage":           1,
+            "pageSize":          100,
+            "gridConnectedTime": "",
+            "queryTime":         ts_ms,
+            "timeZone":          2,
+            "sortId":            "createTime",
+            "sortDir":           "DESC",
+            "locale":            "es_ES",
         })
         raw = data.get("data", data)
         stations: list[dict] = []
