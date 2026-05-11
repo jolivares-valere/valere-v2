@@ -532,35 +532,3 @@ export function useAsignarPlantaEmpresa() {
     },
   })
 }
-:       string | null
-  nombreInterno?: string | null
-  syncEnabled?:  boolean
-}
-
-export function useAsignarPlantaEmpresa() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (values: AsignarPlantaInput) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from('fv_planta')
-        .update({
-          empresa_id:    values.empresaId,
-          cups_id:       values.cupsId ?? null,
-          nombre_interno: values.nombreInterno ?? null,
-          sync_enabled:  values.syncEnabled ?? true,
-        })
-        .eq('id', values.plantaId)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Planta asignada al cliente correctamente')
-      qc.invalidateQueries({ queryKey: ['fv_planta'] })
-      qc.invalidateQueries({ queryKey: ['fv_credenciales'] })
-    },
-    onError: (err: Error) => {
-      logError(err, 'useAsignarPlantaEmpresa')
-      toast.error('Error al asignar la planta')
-    },
-  })
-}
