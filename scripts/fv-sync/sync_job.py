@@ -553,35 +553,43 @@ def sync_credencial(
                     alerta_planta_caida(planta_nombre, planta_estado, resend_key)
 
             # ── KPIs realtime ─────────────────────────────────
+            # Columnas reales de fv_kpi_realtime (verificadas 2026-05-11):
+            # potencia_actual_kw, energia_hoy_kwh, energia_mes_kwh,
+            # energia_total_kwh, ingresos_hoy_eur, actualizado_en
+            # FusionSolar usa: currentPower, dailyEnergy (str), monthEnergy (str), cumulativeEnergy
             try:
                 kpi = client.get_station_kpi(station_code)
                 sb.table("fv_kpi_realtime").upsert({
                     "planta_id":          planta_id,
-                    "potencia_actual_kw":  kpi.get("currentPower") or kpi.get("activePower"),
-                    "energia_hoy_kwh":     kpi.get("dayPower") or kpi.get("dayEnergy"),
-                    "factor_rendimiento":  kpi.get("performanceRatio") or kpi.get("pr"),
-                    "ts":                  datetime.now(timezone.utc).isoformat(),
+                    "potencia_actual_kw":  float(kpi.get("currentPower") or kpi.get("inverterPower") or 0),
+                    "energia_hoy_kwh":     float(kpi.get("dailyEnergy") or kpi.get("dayPower") or kpi.get("dayEnergy") or 0),
+                    "energia_mes_kwh":     float(kpi.get("monthEnergy") or 0),
+                    "energia_total_kwh":   float(kpi.get("cumulativeEnergy") or kpi.get("totalEnergy") or 0),
+                    "ingresos_hoy_eur":    0,  # FusionSolar no devuelve ingresos en EUR
+                    "actualizado_en":      datetime.now(timezone.utc).isoformat(),
                 }, on_conflict="planta_id").execute()
             except Exception as e:
                 logger.warning("  KPI realtime error %s: %s", station_code, e)
 
             # ── KPIs diarios ──────────────────────────────────
+            # Usamos los datos del station-list (ya disponibles en kpi) ya que
+            # get_station_kpi devuelve la caché del station-list que incluye dailyEnergy.
             try:
                 hoy_str = date.today().isoformat()
-                kpi_d = client.get_station_kpi_daily(station_code)
+                kpi_d = client.get_station_kpi(station_code)  # usa caché station-list
                 sb.table("fv_kpi_diario").upsert({
                     "planta_id":       planta_id,
                     "fecha":           hoy_str,
-                    "energia_kwh":     kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0,
-                    "potencia_max_kw": kpi_d.get("peakPower") or 0,
-                    "ingresos_eur":    kpi_d.get("income") or 0,
+                    "energia_kwh":     float(kpi_d.get("dailyEnergy") or kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0),
+                    "potencia_max_kw": float(kpi_d.get("inverterPower") or kpi_d.get("peakPower") or 0),
+                    "ingresos_eur":    0,
                 }, on_conflict="planta_id,fecha").execute()
             except Exception as e:
                 logger.warning("  KPI diario error %s: %s", station_code, e)
 
             # -- Alarmas activas
             try:
-                alarmas = client.get_station_alarms(station_code)
+                alarmas = client.get_alarms(station_code)
                 for al in alarmas:
                     severidad = normalize_severity(al.get("lev") or al.get("severity", "4"))
                     desc = al.get("alarmName") or al.get("description", "Sin descripcion")

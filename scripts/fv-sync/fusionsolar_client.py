@@ -102,6 +102,22 @@ class FusionSolarClient(ABC):
     def close(self) -> None:
         """Libera recursos. Llamar siempre en un bloque finally."""
 
+    # ── Aliases de conveniencia ────────────────────────────────────────────
+    # sync_job.py usa estos nombres; delegan en los métodos abstractos.
+
+    def get_station_kpi_daily(self, station_code: str) -> dict:
+        """Alias de get_daily_kpi para hoy."""
+        from datetime import date
+        return self.get_daily_kpi(station_code, date.today())
+
+    def get_station_alarms(self, station_code: str) -> list[dict]:
+        """Alias de get_alarms."""
+        return self.get_alarms(station_code)
+
+    def logout(self) -> None:
+        """Alias de close() — compatibilidad con sync_job.py."""
+        self.close()
+
 
 # ─────────────────────────────────────────────────────────
 # Implementación con Playwright
