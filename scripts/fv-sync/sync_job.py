@@ -79,9 +79,9 @@ def normalize_severity(raw) -> str:
 
 def normalize_status(raw) -> str:
     s = str(raw).lower()
-    if s in ("0", "normal", "ok", "running", "1"):            return "normal"
-    if s in ("2", "fault", "error", "defectuoso"):             return "defectuoso"
-    if s in ("3", "offline", "disconnected", "desconectado"):  return "desconectado"
+    if s in ("0", "normal", "ok", "running", "1", "connected", "on-grid"): return "normal"
+    if s in ("2", "fault", "error", "defectuoso", "faulty"):               return "defectuoso"
+    if s in ("3", "offline", "disconnected", "desconectado", "off-grid"):  return "desconectado"
     return "desconocido"
 
 

@@ -106,7 +106,7 @@ export default function AsignarPlantaModal({ open, onClose, planta }: Props) {
                 <span className="capitalize">{planta.plataforma}</span>
                 <span>·</span>
                 <span className="font-mono">{planta.station_code}</span>
-                {planta.capacidad_kwp && (
+                {!!planta.capacidad_kwp && (
                   <>
                     <span>·</span>
                     <span>{planta.capacidad_kwp} kWp</span>
@@ -231,4 +231,5 @@ export default function AsignarPlantaModal({ open, onClose, planta }: Props) {
       </div>
     </div>
   )
+}
 }

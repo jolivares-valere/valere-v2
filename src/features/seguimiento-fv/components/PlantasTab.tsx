@@ -125,7 +125,7 @@ export default function PlantasTab({ plantas }: Props) {
                     {fmt(p.kpi_realtime?.energia_hoy_kwh, 1, ' kWh')}
                   </td>
                   <td className="px-4 py-3">
-                    {p.cups_asociados.length > 0 ? (
+                    {(p.cups_asociados ?? []).length > 0 ? (
                       <span className="font-mono text-xs text-slate-600">{p.cups_asociados[0]}</span>
                     ) : (
                       <span className="text-xs text-slate-300">Sin CUPS</span>
@@ -141,5 +141,7 @@ export default function PlantasTab({ plantas }: Props) {
         </table>
       </div>
     </div>
+  )
+}
   )
 }
