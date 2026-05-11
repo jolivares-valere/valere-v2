@@ -537,7 +537,13 @@ def sync_credencial(
                 "p_credencial_id": cred_id,
                 "p_nombre":        planta_nombre,
                 "p_pais":          st.get("country", "ES"),
-                "p_capacidad_kwp": st.get("installedCapacity") or st.get("capacity"),
+                # EU5: installedCapacity suele ser "0.0"; onlyInverterPower = suma kW inversores
+                # Usamos la mejor fuente disponible (todas en kW/kWp)
+                "p_capacidad_kwp": (
+                    st.get("installedCapacity") or st.get("capacity")
+                    or st.get("onlyInverterPower") or st.get("inverterPower")
+                    or None
+                ),
                 "p_tiene_bateria": bool(st.get("hasBattery") or st.get("batteryCapacity")),
                 "p_fecha_conexion":st.get("gridConnectedDay") or st.get("buildDate"),
                 "p_estado":        planta_estado,

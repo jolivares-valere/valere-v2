@@ -822,17 +822,32 @@ class StorageStateClient(FusionSolarClient):
         elif isinstance(raw, list):
             stations = raw
         for st in stations:
-            code = st.get("stationCode") or st.get("stationDn", "")
+            # EU5 usa "dn" (ej: "NE=137403508"); otras versiones usan stationCode/stationDn.
+            code = st.get("stationCode") or st.get("stationDn") or st.get("dn", "")
             if code:
                 self._station_cache[code] = st
         logger.debug("get_station_list: %d plantas", len(stations))
         return stations
 
     def get_station_kpi(self, station_code: str) -> dict:
+        """Devuelve KPIs de la planta desde la caché del station-list (sin llamada extra).
+        El station-list de EU5 ya incluye currentPower, dailyEnergy, etc. para cada planta.
+        Si la caché no tiene la planta (no debería ocurrir), cae al endpoint total-KPI
+        (que devuelve totales globales de la cuenta, no por planta).
+        """
         cached = self._station_cache.get(station_code, {})
-        if cached.get("currentPower") is not None or cached.get("dayPower") is not None:
+        # EU5 station-list incluye currentPower y dailyEnergy directamente
+        has_realtime = any(
+            cached.get(k) is not None
+            for k in ("currentPower", "dayPower", "realTimePower",
+                      "activePower", "dailyEnergy", "dayEnergy")
+        )
+        if has_realtime:
             return cached
+        # Fallback: endpoint total-KPI (devuelve suma global, no por planta)
         ts_ms = int(time.time() * 1000)
+        logger.warning("  get_station_kpi: %s no en caché → fallback total-KPI (valores globales)",
+                       station_code)
         return self._safe_fetch(
             "GET", f"{self._TOTAL_KPI}?queryTime={ts_ms}&timeZone=2"
         ).get("data", {})
