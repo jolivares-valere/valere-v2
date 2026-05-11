@@ -122,6 +122,72 @@ def _extract_cookies_for_cred(cred: dict, enc_key: str, headless: bool) -> dict:
             "El script espera hasta 3 minutos."
         )
 
+    # ── Estructura de diagnóstico para capturar requests reales del SPA ──────
+    # Interceptamos TODOS los requests del portal para ver qué headers usa
+    # FusionSolar en sus llamadas API.
+    captured_api_requests: list[dict] = []
+
+    # Captura especial para station-list: headers + body + response completos
+    captured_station_list_reqs:  list[dict] = []
+    captured_station_list_resps: list[dict] = []
+
+    def _on_request(request):
+        url = request.url
+        # Solo capturamos requests a la API del portal (no estáticos ni SSO)
+        if "/rest/pvms/" in url or "/rest/fo/" in url:
+            headers = dict(request.headers)
+            # Enmascarar valores largos para el log general
+            safe_headers = {}
+            for k, v in headers.items():
+                if len(v) > 12:
+                    safe_headers[k] = f"{v[:4]}…{v[-4:]}"
+                else:
+                    safe_headers[k] = v
+            captured_api_requests.append({
+                "method":  request.method,
+                "url":     url,
+                "headers": safe_headers,
+            })
+
+            # Captura completa para station-list (sin truncar, sin valores de cookies)
+            if "station-list" in url:
+                detailed_headers = {}
+                for k, v in headers.items():
+                    if k.lower() == "cookie":
+                        names = [p.split("=")[0].strip() for p in v.split(";") if "=" in p]
+                        detailed_headers[k] = f"[cookie names: {names}]"
+                    else:
+                        detailed_headers[k] = v
+                try:
+                    post_data = request.post_data
+                except Exception:
+                    post_data = None
+                captured_station_list_reqs.append({
+                    "method":    request.method,
+                    "url":       url,
+                    "headers":   detailed_headers,
+                    "post_data": post_data,
+                })
+
+    def _on_response(response):
+        url = response.url
+        if "station-list" in url:
+            try:
+                ct     = response.headers.get("content-type", "")
+                status = response.status
+                try:
+                    body = response.text()[:600]
+                except Exception as e:
+                    body = f"(error leyendo body: {e})"
+                captured_station_list_resps.append({
+                    "url":          url,
+                    "status":       status,
+                    "content-type": ct,
+                    "body_preview": body,
+                })
+            except Exception as e:
+                logger.warning("Error capturando response station-list: %s", e)
+
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
             headless=headless,
@@ -140,6 +206,10 @@ def _extract_cookies_for_cred(cred: dict, enc_key: str, headless: bool) -> dict:
             ),
         )
         page = context.new_page()
+
+        # Registrar listeners ANTES de navegar
+        page.on("request",  _on_request)
+        page.on("response", _on_response)
 
         # Navegar al portal
         page.goto(base_url + "/", wait_until="domcontentloaded", timeout=30_000)
@@ -169,34 +239,92 @@ def _extract_cookies_for_cred(cred: dict, enc_key: str, headless: bool) -> dict:
             [username, password_raw],
         )
         logger.info("Credenciales pre-rellenadas. Intentando submit...")
-        # Limpiar referencia a password_raw lo antes posible
         del password_raw
 
         # Submit: focus + Enter
         page.evaluate("document.querySelector('input[type=\"password\"]').focus()")
         page.keyboard.press("Enter")
 
-        # Esperar redirección al portal — timeout largo para dar tiempo a CAPTCHAs manuales
+        # Esperar redirección al portal
         timeout_ms = 60_000 if headless else 180_000
-        logger.info(
-            "Esperando navegación a /uniportal/ (timeout=%ds)...",
-            timeout_ms // 1000,
-        )
+        logger.info("Esperando navegación a /uniportal/ (timeout=%ds)...", timeout_ms // 1000)
         page.wait_for_url("**/uniportal/**", timeout=timeout_ms)
-
         logger.info("✅ Login OK. URL: %s", page.url)
 
-        # Extraer storage state completo: cookies + localStorage
-        # context.storage_state() es un superconjunto de context.cookies().
-        # El SPA de FusionSolar puede guardar tokens adicionales en localStorage
-        # que son necesarios para que las llamadas API funcionen.
-        # Además, al cargar storage_state en CI podemos usar Playwright headless
-        # sin login (evita CAPTCHA) manteniendo el fingerprint TLS de Chrome
-        # (httpx tiene fingerprint diferente → el WAF CloudWAF de FusionSolar lo rechaza).
+        # Esperar a que el SPA inicialice y haga sus llamadas API iniciales
+        logger.info("Esperando 20s para que el SPA haga sus llamadas iniciales (diagnóstico)...")
+        try:
+            page.wait_for_load_state("networkidle", timeout=20_000)
+        except Exception:
+            pass
+        page.wait_for_timeout(5_000)   # margen extra
+
+        # ── DIAGNÓSTICO: requests capturadas (URLs, sin detalle de headers) ────
+        logger.info("=== REQUESTS API CAPTURADAS DEL SPA (%d) ===", len(captured_api_requests))
+        for req in captured_api_requests:
+            logger.info("  %s %s", req["method"], req["url"])
+
+        # ── DIAGNÓSTICO: station-list — REQUEST + RESPONSE completos ─────────
+        logger.info("=== STATION-LIST CAPTURE (%d req, %d resp) ===",
+                    len(captured_station_list_reqs), len(captured_station_list_resps))
+        for req in captured_station_list_reqs:
+            logger.info("  [station-list REQUEST] %s %s", req["method"], req["url"])
+            for k, v in req["headers"].items():
+                logger.info("    header %s: %s", k, v)
+            if req.get("post_data"):
+                logger.info("    body: %s", req["post_data"])
+        for resp in captured_station_list_resps:
+            logger.info("  [station-list RESPONSE] HTTP %s | ct=%s",
+                        resp["status"], resp["content-type"])
+            logger.info("    body: %s", resp["body_preview"])
+
+        # ── DIAGNÓSTICO: document.cookie ────────────────────────────────────
+        try:
+            doc_cookie = page.evaluate("document.cookie")
+            cookie_names = [p.split("=")[0].strip() for p in doc_cookie.split(";") if "=" in p]
+            logger.info("document.cookie nombres: %s", cookie_names)
+            # ¿Está roarand accesible desde JS?
+            if "roarand" in cookie_names:
+                logger.info("✅ roarand ENCONTRADO en document.cookie")
+            else:
+                logger.warning("roarand NO encontrado en document.cookie")
+        except Exception as e:
+            logger.warning("Error leyendo document.cookie: %s", e)
+
+        # ── DIAGNÓSTICO: sessionStorage ──────────────────────────────────────
+        try:
+            ss_keys = page.evaluate("""
+                (() => {
+                    const keys = [];
+                    for (let i = 0; i < sessionStorage.length; i++) keys.push(sessionStorage.key(i));
+                    return keys;
+                })()
+            """)
+            logger.info("sessionStorage keys: %s", ss_keys)
+        except Exception as e:
+            logger.warning("Error leyendo sessionStorage: %s", e)
+
+        # ── DIAGNÓSTICO: window.roarand y similares ───────────────────────
+        try:
+            win_csrf = page.evaluate("""
+                (() => ({
+                    roarand:    typeof window.roarand    !== 'undefined' ? '(existe)' : null,
+                    csrfToken:  typeof window.csrfToken  !== 'undefined' ? '(existe)' : null,
+                    _csrf:      typeof window._csrf      !== 'undefined' ? '(existe)' : null,
+                }))()
+            """)
+            logger.info("window CSRF vars: %s", win_csrf)
+        except Exception as e:
+            logger.warning("Error leyendo window vars: %s", e)
+
+        # Extraer storage state completo
         storage_state = context.storage_state()
         n_cookies = len(storage_state.get("cookies", []))
         n_origins = len(storage_state.get("origins", []))
         logger.info("  %d cookies + %d orígenes localStorage extraídos", n_cookies, n_origins)
+        # Loguear nombres de todas las cookies (sin valores)
+        all_cookie_names = [c["name"] for c in storage_state.get("cookies", [])]
+        logger.info("  Todas las cookies (nombres): %s", all_cookie_names)
 
         browser.close()
         return storage_state

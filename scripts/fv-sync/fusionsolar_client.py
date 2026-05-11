@@ -469,10 +469,36 @@ class StorageStateClient(FusionSolarClient):
             if keys:
                 logger.info("  localStorage [%s]: %s", origin.get("origin","?"), keys)
 
+    # Prefixes que resuelven al dominio eu5 (auth/config/infra compartida).
+    # TODO: extender si se descubren más endpoints eu5 usados por el sync.
+    _EU5_PREFIXES = (
+        "/rest/pvms/web/demouser/",
+        "/rest/pvms/security/",
+        "/rest/pvms/web/publicapp/",
+        "/rest/pvms/web/server/",
+    )
+
+    def _url_for_endpoint(self, path: str) -> str:
+        """Devuelve la URL completa para un endpoint FusionSolar.
+
+        FusionSolar EU5 usa dos origins:
+          eu5.fusionsolar.huawei.com   → auth / config / infra compartida
+          uni003eu5.fusionsolar.huawei.com → datos de plantas (station, device, kpi, alarms)
+
+        Regla: los paths en _EU5_PREFIXES van a _api_base_url (eu5),
+               el resto va a base_url (uni003eu5).
+        Si el path ya es una URL completa, se devuelve tal cual.
+        """
+        if path.startswith("http"):
+            return path
+        for prefix in self._EU5_PREFIXES:
+            if path.startswith(prefix):
+                return self._api_base_url + path
+        return self.base_url + path
+
     def _api_headers(self) -> dict:
         """Headers que usa el SPA de FusionSolar en sus llamadas REST.
-        Capturados mediante diagnóstico page.on('request') — no adivinar.
-        La API real está en eu5.fusionsolar.huawei.com (no en uni003eu5).
+        Capturados mediante diagnóstico page.on('request').
         """
         return {
             "Content-Type":     "application/json",
@@ -487,8 +513,8 @@ class StorageStateClient(FusionSolarClient):
         Usa el api_base_url real (eu5.fusionsolar.huawei.com) capturado del SPA.
         Devuelve: OK | AUTH_REDIRECT | NON_JSON_RESPONSE | HTTP_ERROR | EXCEPTION
         """
-        # Usamos check-guest: es el primer GET que hace el SPA al iniciar (ligero, sin payload)
-        url = self._api_base_url + "/rest/pvms/web/demouser/v1/check-guest"
+        # check-guest está en eu5 (demouser = prefix EU5) — _url_for_endpoint lo resuelve
+        url = self._url_for_endpoint("/rest/pvms/web/demouser/v1/check-guest")
         logger.info("check_session → GET %s", url)
         try:
             resp = self._context.request.get(
@@ -564,6 +590,17 @@ class StorageStateClient(FusionSolarClient):
         self._roarand    = None     # token CSRF (cookie roarand leída post-navegación)
         self._page = context.new_page()
 
+        # ── Captura de requests del SPA para diagnóstico ────────────────────
+        _captured_spa_requests: list[dict] = []
+        def _on_spa_request(request):
+            url = request.url
+            if "/rest/pvms/" in url or "/rest/fo/" in url:
+                _captured_spa_requests.append({
+                    "method": request.method,
+                    "url":    url,
+                })
+        self._page.on("request", _on_spa_request)
+
         # Navegar a la raíz del portal. Con el storage state cargado el servidor
         # debería ir directamente a /uniportal/... sin pasar por el login.
         # NO usamos una URL hardcodeada de nologin.html (podría no existir).
@@ -602,6 +639,11 @@ class StorageStateClient(FusionSolarClient):
             logger.warning("networkidle timeout — esperando 4s adicionales")
             self._page.wait_for_timeout(4_000)
 
+        # ── DIAGNÓSTICO: requests del SPA capturadas en headless ───────────
+        logger.info("=== REQUESTS SPA en headless (%d) ===", len(_captured_spa_requests))
+        for r in _captured_spa_requests:
+            logger.info("  [SPA] %s %s", r["method"], r["url"])
+
         # Leer roarand del cookie jar del contexto (seteado por el servidor al cargar el portal)
         self._roarand = None
         for cookie in self._context.cookies():
@@ -639,7 +681,7 @@ class StorageStateClient(FusionSolarClient):
         Lanza FusionSolarAuthError o FusionSolarResponseError.
         """
         import json as _json
-        url = path if path.startswith("http") else self._api_base_url + path
+        url = self._url_for_endpoint(path)
         m   = method.upper()
 
         # Diagnóstico
