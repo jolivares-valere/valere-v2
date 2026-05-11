@@ -318,9 +318,12 @@ class WebAuthClient(FusionSolarClient):
         elif isinstance(raw, list):
             stations = raw
 
-        # Cachear datos por station_code para reutilizar en get_station_kpi
+        # Cachear datos por station_code para reutilizar en get_station_kpi.
+        # FusionSolar EU5 usa "dn" (ej: "NE=137403508"); EU/global puede usar
+        # "stationCode" o "stationDn". Indexamos las tres variantes para que
+        # get_station_kpi haga match independientemente de qué clave llega.
         for st in stations:
-            code = st.get("stationCode") or st.get("stationDn", "")
+            code = st.get("stationCode") or st.get("stationDn") or st.get("dn", "")
             if code:
                 self._station_cache[code] = st
 
@@ -330,12 +333,19 @@ class WebAuthClient(FusionSolarClient):
     def get_station_kpi(self, station_code: str) -> dict:
         """
         KPIs en tiempo real. Si station_code está en la caché de station_list
-        (que ya incluye currentPower / dayPower), devuelve esos datos directamente
-        sin llamada extra. Si no, consulta el endpoint de KPI total.
+        (que ya incluye currentPower / dayPower u otras variantes EU5), devuelve
+        esos datos directamente sin llamada extra. Si no, consulta el endpoint de
+        KPI total (que devuelve totales globales de la cuenta, no por planta).
         """
         cached = self._station_cache.get(station_code, {})
-        # La respuesta de station-list incluye currentPower y dayPower directamente
-        if cached.get("currentPower") is not None or cached.get("dayPower") is not None:
+        # FusionSolar EU5: las claves de potencia/energía pueden variar.
+        # Comprobamos todas las variantes conocidas antes de caer al fallback.
+        has_realtime = any(
+            cached.get(k) is not None
+            for k in ("currentPower", "dayPower", "realTimePower",
+                      "activePower", "dailyEnergy", "dayEnergy")
+        )
+        if has_realtime:
             return cached
 
         # Fallback: endpoint de KPI total (no por planta, sino global)

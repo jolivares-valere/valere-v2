@@ -253,7 +253,8 @@ export function useTodasLasPlantas() {
         .select(`
           *,
           empresa:empresas(id, nombre),
-          kpi_realtime:fv_kpi_realtime(*)
+          kpi_realtime:fv_kpi_realtime(*),
+          cups:cups(id, codigo_cups)
         `)
         .order('empresa_id')
         .order('nombre')
@@ -263,10 +264,19 @@ export function useTodasLasPlantas() {
         throw error
       }
 
-      return (data ?? []).map((row: any) => ({
-        ...row,
-        kpi_realtime: row.kpi_realtime?.[0] ?? row.kpi_realtime ?? null,
-      }))
+      return (data ?? []).map((row: any) => {
+        const kpi = row.kpi_realtime?.[0] ?? row.kpi_realtime ?? null
+        return {
+          ...row,
+          kpi_realtime: kpi,
+          // Normalizar campos que PlantasTab espera pero que tienen nombre distinto en BD:
+          // fv_planta no tiene ultima_sync → usamos actualizado_en del KPI
+          ultima_sync: kpi?.actualizado_en ?? row.actualizado_en ?? null,
+          // fv_planta tiene cups_id (FK) en vez del array cups_asociados de las fixtures
+          // El join cups devuelve el objeto con codigo_cups real
+          cups_asociados: row.cups?.codigo_cups ? [row.cups.codigo_cups] : [],
+        }
+      })
     },
   })
 }

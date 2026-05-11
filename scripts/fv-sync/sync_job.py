@@ -486,9 +486,16 @@ def sync_credencial(
         stations = client.get_station_list()
         logger.info("  %d plantas encontradas", len(stations))
 
-        # Loguear claves del primer station para diagnóstico de campo
+        # Loguear claves y valores numéricos del primer station para diagnóstico
         if stations:
-            logger.info("  [DIAG] keys primer station: %s", list(stations[0].keys()))
+            s0 = stations[0]
+            logger.info("  [DIAG] keys primer station: %s", list(s0.keys()))
+            # Mostrar valores de campos que podrían ser KPIs (numéricos o cadenas numéricas)
+            kpi_candidates = {k: v for k, v in s0.items()
+                              if v is not None and k not in ("dn", "stationCode", "stationDn",
+                                                              "stationName", "plantName", "country",
+                                                              "gridConnectedDay", "buildDate")}
+            logger.info("  [DIAG] valores station[0]: %s", kpi_candidates)
 
         for st in stations:
             # FusionSolar EU5 usa "dn" (ej: "NE=137403508"), no stationCode/stationDn
@@ -556,15 +563,38 @@ def sync_credencial(
             # Columnas reales de fv_kpi_realtime (verificadas 2026-05-11):
             # potencia_actual_kw, energia_hoy_kwh, energia_mes_kwh,
             # energia_total_kwh, ingresos_hoy_eur, actualizado_en
-            # FusionSolar usa: currentPower, dailyEnergy (str), monthEnergy (str), cumulativeEnergy
+            # FusionSolar EU5 puede usar claves distintas a la API global.
+            # El log [DIAG-KPI] muestra las claves reales en cada run.
             try:
                 kpi = client.get_station_kpi(station_code)
+                logger.info("  [DIAG-KPI] %s → keys: %s", station_code, list(kpi.keys()))
+                # Intentar leer la potencia con todas las variantes conocidas de EU5/global
+                potencia_kw = float(
+                    kpi.get("currentPower")
+                    or kpi.get("realTimePower")
+                    or kpi.get("activePower")
+                    or kpi.get("inverterPower")
+                    or 0
+                )
+                energia_hoy = float(
+                    kpi.get("dailyEnergy")
+                    or kpi.get("dayEnergy")
+                    or kpi.get("dayPower")
+                    or 0
+                )
+                energia_mes = float(kpi.get("monthEnergy") or kpi.get("monthPower") or 0)
+                energia_total = float(
+                    kpi.get("cumulativeEnergy")
+                    or kpi.get("totalEnergy")
+                    or kpi.get("totalPower")
+                    or 0
+                )
                 sb.table("fv_kpi_realtime").upsert({
                     "planta_id":          planta_id,
-                    "potencia_actual_kw":  float(kpi.get("currentPower") or kpi.get("inverterPower") or 0),
-                    "energia_hoy_kwh":     float(kpi.get("dailyEnergy") or kpi.get("dayPower") or kpi.get("dayEnergy") or 0),
-                    "energia_mes_kwh":     float(kpi.get("monthEnergy") or 0),
-                    "energia_total_kwh":   float(kpi.get("cumulativeEnergy") or kpi.get("totalEnergy") or 0),
+                    "potencia_actual_kw":  potencia_kw,
+                    "energia_hoy_kwh":     energia_hoy,
+                    "energia_mes_kwh":     energia_mes,
+                    "energia_total_kwh":   energia_total,
                     "ingresos_hoy_eur":    0,  # FusionSolar no devuelve ingresos en EUR
                     "actualizado_en":      datetime.now(timezone.utc).isoformat(),
                 }, on_conflict="planta_id").execute()
