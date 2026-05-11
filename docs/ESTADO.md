@@ -1,10 +1,25 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-10 por Cowork — Sesión FV alta manual credenciales: split-table security + Edge Function cifrado + Python adaptado. Pendiente ventana de despliegue coordinado.**
+> **Última actualización: 2026-05-11 por Cowork — Sesión CI/diagnóstico: fix workflow YAML truncado (c70d44b), reparación 6 archivos truncados, Run #97 confirma Python OK + AUTH_REDIRECT FusionSolar. Módulo FV commiteado en feature/fv-operational-redesign (7c64604). Pendiente ventana de despliegue coordinado.**
 >
-> ## ⏳ CAMBIO COORDINADO FV — PENDIENTE DESPLIEGUE (2026-05-10)
+> ## ✅ SESIÓN 2026-05-11 — CI FIX + DIAGNÓSTICO FV SYNC + COMMIT MÓDULO FV
 >
-> **Todo listo en rama `feature/fv-operational-redesign`. NO aplicar por separado.**
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `.github/workflows/fv-sync.yml` | Step "Ejecutar sincronización" estaba truncado en línea 63 (solo `name:`). Completado con `working-directory`, `env` (4 secrets) y `run: python sync_job.py`. | `c70d44b` → main |
+> | `src/features/seguimiento-fv/api.ts` | Eliminado fragmento duplicado líneas 496-512 (causa build error). Completadas truncaciones en `onSuccess`/`onError` + 3× `(supabase as any)` para columnas post-migración. | `3f095e1` → feature/demo-audit-mode |
+> | `src/App.tsx` | Completada truncación en route `/cartera-senior`. | idem |
+> | `src/components/layout/Sidebar.tsx` | Completadas etiquetas de cierre truncadas. | idem |
+> | `src/core/demo/fixtures.ts` | Recuperadas 221 líneas perdidas (FV_ALARMAS, CUPS, DATADIS, CAPTACION, FIXTURES export). | idem |
+> | `src/features/seguimiento-fv/components/PlantasTab.tsx` | Truncación + `title` → `aria-label` en icono Battery. | idem |
+> | `src/features/seguimiento-fv/components/ProduccionTab.tsx` | Truncación + formatter recharts tipado con `as [string, string]`. | idem |
+> | `feature/fv-operational-redesign` | 14 archivos del módulo FV completo (frontend + Edge Function + migración SQL + Python). | `7c64604` → new branch |
+>
+> **Run #97 resultado**: YAML fix confirmado (job ejecutó 44s vs fallo instantáneo anterior). AUTH_REDIRECT FusionSolar — cookies de sesión invalidadas server-side por Huawei. Fix: ejecutar `extract_cookies.py` localmente tras despliegue coordinado.
+>
+> ## ⏳ CAMBIO COORDINADO FV — PENDIENTE DESPLIEGUE (rama lista 2026-05-11)
+>
+> **Todo listo en rama `feature/fv-operational-redesign` (commit 7c64604). NO aplicar por separado.**
 >
 > Orden de despliegue cuando estés listo:
 > 1. Backup tablas `fv_credenciales` y `fv_planta` en Supabase Dashboard
@@ -47,10 +62,9 @@
 >
 > ## ⏳ PENDIENTES FV SYNC
 >
-> - Lanzar Run #95 desde GitHub Actions UI y verificar logs
-> - Si AUTH_REDIRECT → re-ejecutar `extract_cookies.py` localmente (ya usa storage_state() completo)
-> - Si AUTH_REDIRECT persiste en CI pero funciona localmente → considerar self-hosted runner o cron local Windows Task Scheduler
-> - Investigar si FusionSolar tiene API oficial para instaladores (evitaría scraping)
+> - ✅ CI fix: fv-sync.yml reparado (c70d44b). Run #97 confirma Python ejecuta y Supabase responde.
+> - ✅ Diagnóstico: AUTH_REDIRECT — sesión Huawei invalidada server-side. Cookie `roarand` (CSRF) ausente.
+> - ⏳ Despliegue coordinado completo (ver sección arriba) → extraer cookies frescas → Run manual real
 >
 > ## 📋 PENDIENTES CRM (previos, sin cambios hoy)
 >
