@@ -220,12 +220,15 @@ def _store_cookies(sb, cred_id: str, storage_state: dict, enc_key: str) -> None:
     expires_at = (__import__('datetime').datetime.now(__import__('datetime').timezone.utc) + __import__('datetime').timedelta(days=7)).isoformat()
     now_iso    = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
 
-    sb.table("fv_credenciales_secret").upsert({
-        "credencial_id":      cred_id,
+    # Usamos update() (no upsert) porque la fila en fv_credenciales_secret
+    # siempre existe antes de extract_cookies: la crea la Edge Function al
+    # registrar la credencial (con password_enc). Si la fila no existiera,
+    # extract_cookies no habría podido leer password_enc en _load_credentials_with_secrets.
+    sb.table("fv_credenciales_secret").update({
         "session_cookies":    state_enc,
         "cookies_expires_at": expires_at,
         "cookies_updated_at": now_iso,
-    }).execute()
+    }).eq("credencial_id", cred_id).execute()
 
     sb.table("fv_credenciales").update({
         "ultimo_error": None,
