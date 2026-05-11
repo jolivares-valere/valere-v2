@@ -415,13 +415,27 @@ class StorageStateClient(FusionSolarClient):
     """
 
     def __init__(self, base_url: str, storage_state: dict):
+        import re
+        from urllib.parse import urlparse
         self.base_url      = base_url.rstrip("/")
         self._storage      = storage_state   # dict con "cookies" + "origins"
         self._pw_ctx       = None
         self._pw           = None
         self._browser      = None
+        self._context      = None   # BrowserContext — para context.request
         self._page         = None
+        self._portal_url   = None   # URL final del portal (Referer en API calls)
+        self._roarand      = None   # no usado (SPA no envía roarand)
         self._station_cache: dict[str, dict] = {}
+
+        # API base URL: el SPA llama a eu5.fusionsolar.huawei.com/rest/...
+        # pero el portal está en uni003eu5.fusionsolar.huawei.com.
+        # Derivamos la API base quitando el prefijo "uniNNN" del subdominio.
+        parsed = urlparse(self.base_url)
+        api_host = re.sub(r'^uni\d+', '', parsed.hostname or '')
+        self._api_base_url = f"{parsed.scheme}://{api_host}" if api_host else self.base_url
+        if self._api_base_url != self.base_url:
+            logger.info("API base URL: %s (portal: %s)", self._api_base_url, self.base_url)
 
     # Reutilizamos constantes de WebAuthClient
     _STATION_LIST = WebAuthClient._STATION_LIST
@@ -455,49 +469,50 @@ class StorageStateClient(FusionSolarClient):
             if keys:
                 logger.info("  localStorage [%s]: %s", origin.get("origin","?"), keys)
 
+    def _api_headers(self) -> dict:
+        """Headers que usa el SPA de FusionSolar en sus llamadas REST.
+        Capturados mediante diagnóstico page.on('request') — no adivinar.
+        La API real está en eu5.fusionsolar.huawei.com (no en uni003eu5).
+        """
+        return {
+            "Content-Type":     "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer":          self._portal_url or f"{self.base_url}/uniportal/",
+            "Accept":           "application/json, */*",
+        }
+
     def check_session(self) -> str:
         """
-        Hace una llamada mínima para verificar si la sesión sigue activa.
-        Devuelve uno de: OK | AUTH_REDIRECT | NON_JSON_RESPONSE | HTTP_ERROR | EXCEPTION
+        Verifica si la sesión sigue activa usando un endpoint ligero.
+        Usa el api_base_url real (eu5.fusionsolar.huawei.com) capturado del SPA.
+        Devuelve: OK | AUTH_REDIRECT | NON_JSON_RESPONSE | HTTP_ERROR | EXCEPTION
         """
-        url = self.base_url + self._STATION_LIST
+        # Usamos check-guest: es el primer GET que hace el SPA al iniciar (ligero, sin payload)
+        url = self._api_base_url + "/rest/pvms/web/demouser/v1/check-guest"
+        logger.info("check_session → GET %s", url)
         try:
-            result = self._page.evaluate(
-                """([url]) =>
-                    fetch(url, {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({pageNo:1, pageSize:1, locale:"es_ES"}),
-                    }).then(async r => {
-                        const finalUrl = r.url;
-                        const ct = r.headers.get("content-type") || "";
-                        if (finalUrl.includes("login") || finalUrl.includes("unisso")) {
-                            return {status: "AUTH_REDIRECT", url: finalUrl};
-                        }
-                        if (!ct.includes("json")) {
-                            const txt = await r.text();
-                            return {status: "NON_JSON_RESPONSE", code: r.status,
-                                    preview: txt.substring(0, 200)};
-                        }
-                        if (!r.ok) {
-                            return {status: "HTTP_ERROR", code: r.status};
-                        }
-                        return {status: "OK"};
-                    })
-                """,
-                [url],
+            resp = self._context.request.get(
+                url,
+                headers=self._api_headers(),
             )
-            status = result.get("status", "EXCEPTION")
-            if status == "AUTH_REDIRECT":
-                logger.warning("check_session → AUTH_REDIRECT a %s", result.get("url"))
-            elif status == "NON_JSON_RESPONSE":
-                logger.warning("check_session → NON_JSON HTTP %s | preview: %s",
-                               result.get("code"), result.get("preview",""))
-            elif status == "HTTP_ERROR":
-                logger.warning("check_session → HTTP_ERROR %s", result.get("code"))
-            else:
-                logger.info("check_session → %s", status)
-            return status
+            final_url = resp.url
+            ct = resp.headers.get("content-type", "")
+            status_code = resp.status
+
+            if "login" in final_url or "unisso" in final_url:
+                logger.warning("check_session → AUTH_REDIRECT a %s", final_url)
+                return "AUTH_REDIRECT"
+            if "json" not in ct:
+                preview = resp.text()[:200]
+                logger.warning("check_session → NON_JSON HTTP %s | ct=%s | preview: %s",
+                               status_code, ct, preview)
+                return "NON_JSON_RESPONSE"
+            if not resp.ok:
+                logger.warning("check_session → HTTP_ERROR %s", status_code)
+                return "HTTP_ERROR"
+
+            logger.info("check_session → OK (HTTP %s)", status_code)
+            return "OK"
         except Exception as e:
             logger.error("check_session → EXCEPTION: %s", e)
             return "EXCEPTION"
@@ -544,6 +559,9 @@ class StorageStateClient(FusionSolarClient):
                 "Chrome/120.0.0.0 Safari/537.36"
             ),
         )
+        self._context   = context   # guardamos para usar context.request en _fetch
+        self._portal_url = None     # URL del portal tras navegación (Referer)
+        self._roarand    = None     # token CSRF (cookie roarand leída post-navegación)
         self._page = context.new_page()
 
         # Navegar a la raíz del portal. Con el storage state cargado el servidor
@@ -573,8 +591,30 @@ class StorageStateClient(FusionSolarClient):
             )
 
         logger.info("StorageStateClient: portal OK. URL: %s", current_url)
+        self._portal_url = current_url   # usado como Referer en context.request
 
-        # Verificación rápida de sesión via fetch antes de proceder
+        # Esperar a que el SPA inicialice. El servidor setea roarand CSRF tras el
+        # page load — necesitamos networkidle para que el cookie aparezca en el jar.
+        try:
+            self._page.wait_for_load_state("networkidle", timeout=15_000)
+            logger.info("StorageStateClient: networkidle OK")
+        except Exception:
+            logger.warning("networkidle timeout — esperando 4s adicionales")
+            self._page.wait_for_timeout(4_000)
+
+        # Leer roarand del cookie jar del contexto (seteado por el servidor al cargar el portal)
+        self._roarand = None
+        for cookie in self._context.cookies():
+            if cookie.get("name") == "roarand":
+                self._roarand = cookie["value"]
+                break
+        if self._roarand:
+            logger.info("roarand leído del contexto post-navegación ✅")
+        else:
+            logger.warning("roarand no encontrado en cookies post-navegación — "
+                           "los POSTs a la API pueden ser rechazados con AUTH_REDIRECT")
+
+        # Verificación rápida de sesión via context.request (ya con SPA inicializado)
         session_status = self.check_session()
         if session_status == "AUTH_REDIRECT":
             raise FusionSolarAuthError(
@@ -584,81 +624,79 @@ class StorageStateClient(FusionSolarClient):
         if session_status in ("NON_JSON_RESPONSE", "HTTP_ERROR"):
             logger.warning("check_session=%s — continuando (puede ser transitorio)", session_status)
 
-        # Pequeña pausa para que el SPA inicialice
-        try:
-            self._page.wait_for_load_state("networkidle", timeout=10_000)
-        except Exception:
-            self._page.wait_for_timeout(2_000)
-
-    # ── Fetch con diagnóstico detallado ─────────────────────
+    # ── Fetch via Playwright context.request (estrategia principal) ────────
+    # Usa el cliente HTTP nativo de Playwright en lugar de page.evaluate(fetch()).
+    # Ventajas sobre page.evaluate:
+    #   - No sujeto a CSP/CORS ni a service workers del SPA
+    #   - Usa las cookies del contexto (incluidas HttpOnly: JSESSIONID, roarand…)
+    #   - Fingerprint TLS = Chrome (CloudWAF de Huawei lo acepta)
+    #   - No requiere que el SPA esté inicializado
 
     def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
         """
-        Ejecuta fetch() en el contexto del browser Chromium.
-        Detecta explícitamente redirects a login, respuestas no-JSON y errores HTTP.
-        Lanza FusionSolarAuthError o FusionSolarResponseError según el caso.
+        Petición HTTP usando context.request (Playwright APIRequestContext).
+        Detecta redirects a login, respuestas no-JSON y errores HTTP.
+        Lanza FusionSolarAuthError o FusionSolarResponseError.
         """
-        url = path if path.startswith("http") else self.base_url + path
-        result = self._page.evaluate(
-            """([method, url, payload]) =>
-                fetch(url, {
-                    method,
-                    headers: {"Content-Type": "application/json"},
-                    body: (method !== "GET" && payload !== null)
-                          ? JSON.stringify(payload)
-                          : undefined,
-                }).then(async r => {
-                    const finalUrl  = r.url || "";
-                    const ct        = r.headers.get("content-type") || "";
-                    const status    = r.status;
+        import json as _json
+        url = path if path.startswith("http") else self._api_base_url + path
+        m   = method.upper()
 
-                    // Detectar redirect a login (el fetch del browser sigue redirects)
-                    if (finalUrl.includes("login.action") || finalUrl.includes("unisso")) {
-                        return {__error: "AUTH_REDIRECT", url: finalUrl, status};
-                    }
+        # Diagnóstico
+        logger.debug("_fetch %s %s (payload=%s)", m, url, payload is not None)
 
-                    // Respuesta no-JSON
-                    if (!ct.includes("json")) {
-                        const body = await r.text();
-                        return {__error: "NON_JSON", status, ct,
-                                preview: body.substring(0, 300)};
-                    }
-
-                    // Error HTTP pero con JSON (FusionSolar devuelve errores como JSON)
-                    if (!r.ok) {
-                        const body = await r.json().catch(() => ({}));
-                        return {__error: "HTTP_ERROR", status, body};
-                    }
-
-                    return r.json();
-                })
-            """,
-            [method.upper(), url, payload],
-        )
-
-        # Procesar respuestas de error devueltas como dict con __error
-        if isinstance(result, dict) and "__error" in result:
-            err = result["__error"]
-            if err == "AUTH_REDIRECT":
-                raise FusionSolarAuthError(
-                    reason="API redirigida a login (sesión expirada o rechazada)",
-                    redirect_url=result.get("url", ""),
-                    endpoint=url,
+        try:
+            if m == "GET":
+                resp = self._context.request.get(
+                    url,
+                    headers=self._api_headers(),
                 )
-            if err == "NON_JSON":
-                raise FusionSolarResponseError(
-                    status=result.get("status", 0),
-                    body_preview=result.get("preview", ""),
-                    endpoint=url,
+            else:
+                resp = self._context.request.post(
+                    url,
+                    headers=self._api_headers(),
+                    data=_json.dumps(payload) if payload is not None else "{}",
                 )
-            if err == "HTTP_ERROR":
-                raise FusionSolarResponseError(
-                    status=result.get("status", 0),
-                    body_preview=str(result.get("body", "")),
-                    endpoint=url,
-                )
+        except Exception as e:
+            logger.error("_fetch %s %s — context.request excepción: %s", m, url, e)
+            raise FusionSolarResponseError(status=0, body_preview=str(e), endpoint=url)
 
-        return result
+        final_url   = resp.url
+        ct          = resp.headers.get("content-type", "")
+        status_code = resp.status
+
+        logger.debug("_fetch %s %s → HTTP %s ct=%s finalUrl=%s",
+                     m, url, status_code, ct, final_url)
+
+        # Redirect a login → sesión expirada
+        if "login" in final_url or "unisso" in final_url:
+            raise FusionSolarAuthError(
+                reason="API redirigida a login (sesión expirada o rechazada)",
+                redirect_url=final_url,
+                endpoint=url,
+            )
+
+        # Respuesta no-JSON
+        if "json" not in ct:
+            preview = resp.text()[:300]
+            logger.warning("_fetch NON_JSON HTTP %s | ct=%s | preview: %s",
+                           status_code, ct, preview)
+            raise FusionSolarResponseError(
+                status=status_code, body_preview=preview, endpoint=url,
+            )
+
+        # Error HTTP con JSON (FusionSolar devuelve errores estructurados)
+        if not resp.ok:
+            try:
+                body = resp.json()
+            except Exception:
+                body = {}
+            logger.warning("_fetch HTTP_ERROR %s | body: %s", status_code, str(body)[:200])
+            raise FusionSolarResponseError(
+                status=status_code, body_preview=str(body)[:200], endpoint=url,
+            )
+
+        return resp.json()
 
     def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
         try:
