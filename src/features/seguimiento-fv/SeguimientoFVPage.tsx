@@ -4,6 +4,7 @@ import {
   AlertTriangle, KeyRound, UserX, FileText, FlaskConical,
 } from 'lucide-react'
 import { useTodasLasPlantas } from './api'
+import AlarmasTab        from './components/AlarmasTab'
 import {
   FIXTURE_PLANTAS, FIXTURE_PLANTAS_SIN_ASIGNAR, FIXTURE_KPI_DIARIO,
   FIXTURE_COMPARATIVA, FIXTURE_INCIDENCIAS, FIXTURE_CREDENCIALES, FIXTURE_INFORMES,
@@ -19,7 +20,7 @@ import InformesTab       from './components/InformesTab'
 
 type TabId =
   | 'resumen' | 'plantas' | 'produccion' | 'excedentes'
-  | 'incidencias' | 'credenciales' | 'sin-asignar' | 'informes'
+  | 'alarmas-fv' | 'incidencias' | 'credenciales' | 'sin-asignar' | 'informes'
 
 interface Tab {
   id: TabId
@@ -50,9 +51,10 @@ export default function SeguimientoFVPage() {
   const tabs: Tab[] = [
     { id: 'resumen',      label: 'Resumen',              Icon: LayoutDashboard },
     { id: 'plantas',      label: 'Plantas',               Icon: MapPin,         badge: plantas.length },
-    { id: 'produccion',   label: 'Producción',            Icon: BarChart2 },
+    { id: 'produccion',   label: 'Produccion',            Icon: BarChart2 },
     { id: 'excedentes',   label: 'Excedentes / Datadis',  Icon: ArrowLeftRight, badge: nCriticos  || undefined, badgeColor: 'bg-red-500' },
-    { id: 'incidencias',  label: 'Incidencias',           Icon: AlertTriangle,  badge: nIncidencias || undefined, badgeColor: 'bg-red-500' },
+    { id: 'alarmas-fv',   label: 'Alarmas FV',            Icon: AlertTriangle,  badgeColor: 'bg-red-500' },
+    { id: 'incidencias',  label: 'Incidencias CRM',       Icon: AlertTriangle,  badge: nIncidencias || undefined, badgeColor: 'bg-orange-500' },
     { id: 'credenciales', label: 'Credenciales',          Icon: KeyRound },
     { id: 'sin-asignar',  label: 'Sin asignar',           Icon: UserX,          badge: nSinAsignar || undefined, badgeColor: 'bg-slate-500' },
     { id: 'informes',     label: 'Informes',              Icon: FileText },
@@ -72,14 +74,14 @@ export default function SeguimientoFVPage() {
                 <h1 className="text-xl font-display font-bold text-valere-blue-dark">
                   Seguimiento Plantas FV
                 </h1>
-                <p className="text-xs text-slate-500">Control operativo · producción · excedentes · Datadis</p>
+                <p className="text-xs text-slate-500">Control operativo · produccion · excedentes · Datadis</p>
               </div>
             </div>
 
             {usarFixtures && (
               <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-700">
                 <FlaskConical className="w-3.5 h-3.5" />
-                Datos de demostración
+                Datos de demostracion
               </span>
             )}
           </div>
@@ -126,6 +128,7 @@ export default function SeguimientoFVPage() {
             {tabActual === 'plantas'      && <PlantasTab      plantas={plantas} />}
             {tabActual === 'produccion'   && <ProduccionTab   plantas={plantas} kpiDiario={kpiDiario} />}
             {tabActual === 'excedentes'   && <ExcedentesTab   comparativa={comparativa} />}
+            {tabActual === 'alarmas-fv'   && <AlarmasTab />}
             {tabActual === 'incidencias'  && <IncidenciasTab  incidencias={incidencias} />}
             {tabActual === 'credenciales' && (
               <CredencialesTab

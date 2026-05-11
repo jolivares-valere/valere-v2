@@ -207,6 +207,42 @@ export function useSyncLogEmpresa(empresaId: string | undefined, limit = 5) {
   })
 }
 
+/** Todas las alarmas activas (vista global — join con planta + empresa) */
+export function useTodasLasAlarmas() {
+  return useQuery({
+    queryKey: ['fv_alarma', 'todas'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('fv_alarma')
+        .select(`
+          *,
+          planta:fv_planta(
+            id, nombre, nombre_interno, station_code, capacidad_kwp,
+            empresa:empresas(id, nombre)
+          )
+        `)
+        .order('iniciada_en', { ascending: false })
+        .limit(200)
+
+      if (error) {
+        logError(error, 'useTodasLasAlarmas')
+        throw error
+      }
+      return (data ?? []) as (FVAlarma & {
+        planta: {
+          id: string
+          nombre: string
+          nombre_interno: string | null
+          station_code: string
+          capacidad_kwp: number | null
+          empresa: { id: string; nombre: string } | null
+        } | null
+      })[]
+    },
+  })
+}
+
 /** Todas las plantas (vista global para el módulo de seguimiento) */
 export function useTodasLasPlantas() {
   return useQuery({
@@ -465,6 +501,38 @@ export interface AsignarPlantaInput {
   plantaId:      string
   empresaId:     string
   cupsId?:       string | null
+  nombreInterno?: string | null
+  syncEnabled?:  boolean
+}
+
+export function useAsignarPlantaEmpresa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (values: AsignarPlantaInput) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('fv_planta')
+        .update({
+          empresa_id:    values.empresaId,
+          cups_id:       values.cupsId ?? null,
+          nombre_interno: values.nombreInterno ?? null,
+          sync_enabled:  values.syncEnabled ?? true,
+        })
+        .eq('id', values.plantaId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Planta asignada al cliente correctamente')
+      qc.invalidateQueries({ queryKey: ['fv_planta'] })
+      qc.invalidateQueries({ queryKey: ['fv_credenciales'] })
+    },
+    onError: (err: Error) => {
+      logError(err, 'useAsignarPlantaEmpresa')
+      toast.error('Error al asignar la planta')
+    },
+  })
+}
+:       string | null
   nombreInterno?: string | null
   syncEnabled?:  boolean
 }
