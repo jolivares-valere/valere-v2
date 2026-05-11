@@ -1,6 +1,17 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-11 por Cowork — Sesión CI/diagnóstico: fix workflow YAML truncado (c70d44b), reparación 6 archivos truncados, Run #97 confirma Python OK + AUTH_REDIRECT FusionSolar. Módulo FV commiteado en feature/fv-operational-redesign (7c64604). Pendiente ventana de despliegue coordinado.**
+> **Última actualización: 2026-05-11 por Cowork — SYNC REAL CONSEGUIDO: 7 plantas FV reales en Supabase. Fix SQL `fv_upsert_planta` (ambigüedad RETURNS TABLE), fix `fv_alarma` columna `iniciada_en`. Commit 518da18 → feature/fv-operational-redesign.**
+>
+> ## ✅ SESIÓN 2026-05-11 — SYNC FV REAL + FIXES SQL + ALARMAS
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | Supabase `fv_upsert_planta` | DROP + recreación con `RETURNS TABLE(planta_id, planta_empresa_id, planta_is_new)` — elimina ambigüedad entre output columns y columnas de `fv_planta`. UPDATE usa alias `fp`. | via MCP Supabase |
+> | `scripts/fv-sync/sync_job.py` | Lee `res.data[0]["planta_id"]` (nuevo nombre RETURNS TABLE). Upsert `fv_alarma` usa `iniciada_en` (real) en vez de `detectada_en` (inexistente). Añadidos `alarm_id` y `dispositivo`. | `518da18` → feature/fv-operational-redesign |
+>
+> **Resultado verificado en Supabase**: `fv_planta=7, fv_kpi_realtime=7, fv_kpi_diario=7, fv_sync_log=92+`. Sync limpio: `1/1 OK — 7 plantas, 0 alarmas en 17.4s`.
+>
+> **Flujo de refresco de cookies**: las cookies FusionSolar duran ~7 días. Cuando expiren, ejecutar `python extract_cookies.py` (abre browser visible, hace login, guarda en `fv_credenciales_secret`).
 >
 > ## ✅ SESIÓN 2026-05-11 — CI FIX + DIAGNÓSTICO FV SYNC + COMMIT MÓDULO FV
 >
