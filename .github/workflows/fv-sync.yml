@@ -6,9 +6,13 @@ on:
   schedule:
     - cron: "0 * * * *"
 
-  # Lanzamiento manual desde GitHub Actions UI
+  # Lanzamiento manual desde GitHub Actions UI o desde el CRM (via Edge Function trigger-fv-sync)
   workflow_dispatch:
     inputs:
+      credencial_id:
+        description: "UUID de credencial FV (vacío = todas)"
+        required: false
+        default: ""
       empresa_id:
         description: "UUID de empresa (vacío = todas)"
         required: false
@@ -69,6 +73,9 @@ jobs:
           RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
         run: |
           ARGS=""
+          if [ -n "${{ github.event.inputs.credencial_id }}" ]; then
+            ARGS="$ARGS --credencial ${{ github.event.inputs.credencial_id }}"
+          fi
           if [ -n "${{ github.event.inputs.empresa_id }}" ]; then
             ARGS="$ARGS --empresa ${{ github.event.inputs.empresa_id }}"
           fi

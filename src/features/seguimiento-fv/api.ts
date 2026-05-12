@@ -285,6 +285,8 @@ export function useTodasLasPlantas() {
 // Tipos para el flujo de alta manual
 // ─────────────────────────────────────────────────────────
 
+export type FVEstadoSesion = 'activa' | 'por_caducar' | 'caducada' | 'error' | 'desconocida'
+
 export interface FVCredencial {
   id: string
   plataforma: string
@@ -294,9 +296,13 @@ export interface FVCredencial {
   activo: boolean
   tipo: string | null
   descripcion: string | null
+  /** Campo heredado — ahora usar ultimo_ok_at */
   ultima_sync: string | null
+  ultimo_ok_at: string | null
   cookies_expires_at: string | null
   ultimo_error: string | null
+  /** Estado calculado por sync_job al final de cada sincronización */
+  estado_sesion: FVEstadoSesion
   // password_enc NUNCA se selecciona desde frontend
 }
 
@@ -539,6 +545,64 @@ export function useAsignarPlantaEmpresa() {
     onError: (err: Error) => {
       logError(err, 'useAsignarPlantaEmpresa')
       toast.error('Error al asignar la planta')
+    },
+  })
+}
+
+// ─────────────────────────────────────────────────────────
+// Mutations — sincronización manual desde CRM
+// ─────────────────────────────────────────────────────────
+
+interface TriggerSyncInput {
+  credencialId?: string   // si se omite → sincroniza todas las credenciales activas
+  empresaId?:   string
+  dryRun?:      boolean
+}
+
+/**
+ * Dispara el workflow GitHub Actions "fv-sync.yml" via Edge Function trigger-fv-sync.
+ * Solo funciona para usuarios master/admin.
+ * El sync tarda ~1-2 minutos en completarse (se ejecuta en GitHub Actions).
+ */
+export function useTriggerFVSync() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: TriggerSyncInput = {}) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No autenticado')
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trigger-fv-sync`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            credencial_id: input.credencialId,
+            empresa_id:    input.empresaId,
+            dry_run:       input.dryRun ?? false,
+          }),
+        }
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? `Error HTTP ${res.status}`)
+      }
+      return res.json() as Promise<{ ok: boolean; message: string; workflow_run_url: string }>
+    },
+    onSuccess: (data) => {
+      toast.success(data.message, { duration: 6000 })
+      // Invalidar credenciales ~90s despues (tiempo estimado del workflow)
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['fv_credenciales'] })
+        qc.invalidateQueries({ queryKey: ['fv_planta'] })
+      }, 90_000)
+    },
+    onError: (err: Error) => {
+      logError(err, 'useTriggerFVSync')
+      toast.error(`Error al lanzar sync: ${err.message}`)
     },
   })
 }

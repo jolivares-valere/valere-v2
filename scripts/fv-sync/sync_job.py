@@ -378,7 +378,10 @@ def sync_credencial(
         )
         logger.error("❌ cred=%s plataforma=%s: %s", cred_id, plataforma, msg)
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
 
     password_enc = secret.get("password_enc")
@@ -386,8 +389,18 @@ def sync_credencial(
         msg = "CONFIG_ERROR — fv_credenciales_secret existe pero password_enc está vacío."
         logger.error("❌ cred=%s plataforma=%s: %s", cred_id, plataforma, msg)
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
+
+    # Reflejar cookies_expires_at del secret → tabla pública (para que la UI lo vea)
+    cookies_expires_at_pub = secret.get("cookies_expires_at")
+    if not dry_run and cookies_expires_at_pub:
+        sb.table("fv_credenciales").update({
+            "cookies_expires_at": cookies_expires_at_pub,
+        }).eq("id", cred_id).execute()
 
     logger.info(
         "Sincronizando cred=%s empresa=%s (%s / %s)",
@@ -467,16 +480,22 @@ def sync_credencial(
         logger.error("❌ %s", msg)
         logger.error(
             "ACCIÓN REQUERIDA: las cookies de sesión han expirado o FusionSolar ha cerrado la sesión. "
-            "Ejecuta extract_cookies.py localmente y vuelve a lanzar el sync."
+            "Pulsa «Renovar sesión» en el CRM o ejecuta extract_cookies.py localmente."
         )
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "caducada",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
     except Exception as e:
         msg = f"UNEXPECTED_ERROR en login: {type(e).__name__}: {e}"
         logger.error("❌ %s", msg, exc_info=True)
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
 
     total_plantas = 0
@@ -650,15 +669,26 @@ def sync_credencial(
     except FusionSolarAuthError as e:
         msg = f"AUTH_REDIRECT durante sync: {e}"
         logger.error("ERROR %s", msg)
-        logger.error("La sesion expiro a mitad de sincronizacion. Ejecuta extract_cookies.py.")
+        logger.error(
+            "La sesión expiró a mitad de sincronización. "
+            "Pulsa «Renovar sesión» en el CRM o ejecuta extract_cookies.py."
+        )
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "caducada",
+            }).eq("id", cred_id).execute()
+        # IMPORTANTE: no sobreescribimos los KPIs existentes (return antes de cualquier
+        # escritura destructiva) — los datos buenos se conservan del sync anterior.
         return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
     except Exception as e:
         msg = f"UNEXPECTED_ERROR en sync loop: {type(e).__name__}: {e}"
         logger.error("ERROR %s", msg, exc_info=True)
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
     finally:
         try:
@@ -670,9 +700,31 @@ def sync_credencial(
     logger.info("  OK cred=%s: %d plantas, %d alarmas en %.1fs", cred_id, total_plantas, total_alarmas, elapsed)
 
     if not dry_run:
+        # Calcular estado_sesion basado en cuándo caducan las cookies
+        import datetime as _dt
+        now_utc = datetime.now(timezone.utc)
+        cexp = secret.get("cookies_expires_at")
+        if cexp:
+            try:
+                exp_dt = _dt.datetime.fromisoformat(cexp)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if exp_dt < now_utc:
+                    estado_sesion = "caducada"
+                elif exp_dt < now_utc + _dt.timedelta(hours=24):
+                    estado_sesion = "por_caducar"
+                else:
+                    estado_sesion = "activa"
+            except Exception:
+                estado_sesion = "activa"
+        else:
+            estado_sesion = "activa"
+
         sb.table("fv_credenciales").update({
-            "ultimo_error": None,
-            "ultimo_ok_at": datetime.now(timezone.utc).isoformat(),
+            "ultimo_error":       None,
+            "ultimo_ok_at":       now_utc.isoformat(),
+            "estado_sesion":      estado_sesion,
+            "cookies_expires_at": cexp,  # reflejo del campo secreto
         }).eq("id", cred_id).execute()
 
     return {"ok": True, "plantas": total_plantas, "alarmas": total_alarmas, "elapsed": elapsed}
@@ -682,7 +734,8 @@ def sync_credencial(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sincronizador FV")
-    parser.add_argument("--empresa",       help="UUID empresa")
+    parser.add_argument("--empresa",       help="UUID empresa (filtra por empresa_id en fv_credenciales)")
+    parser.add_argument("--credencial",    help="UUID credencial (sincroniza solo esta credencial)")
     parser.add_argument("--dry-run",       action="store_true")
     parser.add_argument("--check-secrets", action="store_true",
                         help="Diagnostico: verifica secretos en fv_credenciales_secret y sale")
@@ -704,6 +757,15 @@ def main() -> None:
         sys.exit(1 if fallos > 0 else 0)
 
     credenciales = load_fv_credentials_with_secrets(sb, empresa_filter=args.empresa)
+
+    # Filtro por credencial específica (dispatch manual desde CRM)
+    if args.credencial:
+        credenciales = [c for c in credenciales if c["id"] == args.credencial]
+        if not credenciales:
+            logger.error("Credencial %s no encontrada o no activa.", args.credencial)
+            sys.exit(1)
+        logger.info("Sincronización puntual: credencial=%s", args.credencial)
+
     logger.info("Credenciales activas: %d", len(credenciales))
 
     if not credenciales:
