@@ -1145,10 +1145,9 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
           {/* Nota legal */}
           <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
             <p className="text-[11px] text-amber-700">
-              <strong>Períodos estimados:</strong> la asignación P1–P6 se deriva de hora y día de la semana
-              según la matriz 3.0TD oficial, sin incluir festivos nacionales ni autonómicos.
-              Error estimado: {'<'}2%. Para facturación exacta se incorporará el calendario
-              oficial en la próxima versión.
+              <strong>Períodos estimados:</strong> asignación P1–P6 calculada según matriz CNMC Circular 3/2020,
+              incluyendo festivos nacionales y autonómicos de Andalucía.
+              Error residual posible por festivos locales no contemplados.
             </p>
           </div>
         </>
