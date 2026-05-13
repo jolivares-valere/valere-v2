@@ -1,8 +1,8 @@
-"""
+﻿"""
 sync_job.py — Orquestador principal de sincronización FV.
 
 Flujo:
-  1. Lee fv_credenciales activas de Supabase.
+  1. Lee fv_credenciales activas de Supabase (con JOIN a fv_credenciales_secret).
   2. Por cada credencial: login con Playwright, sincroniza plantas.
   3. Guarda en: fv_planta, fv_kpi_realtime, fv_kpi_diario, fv_alarma.
   4. Si hay plantas caídas o alarmas críticas/mayores → email a JOLIVARES via Resend.
@@ -14,6 +14,15 @@ Uso:
     python sync_job.py                    # Todos los clientes activos
     python sync_job.py --empresa <uuid>   # Solo una empresa
     python sync_job.py --dry-run          # Sin escritura en BD
+    python sync_job.py --check-secrets    # Diagnóstico: verifica que cada credencial
+                                          # tiene fila en fv_credenciales_secret
+
+CAMBIO COORDINADO (2026-05-10):
+    Los secretos (password_enc, session_cookies, cookies_expires_at) se leen de
+    fv_credenciales_secret, no de fv_credenciales. Este cambio DEBE desplegarse junto
+    con la migración SQL 20260510_fv_alta_manual_credenciales.sql y la Edge Function
+    fv-create-credential. NO ejecutar sync_job.py contra Supabase producción hasta que
+    la migración esté aplicada.
 
 Integración futura con incidencias CRM:
     TODO: INCIDENCIAS_CRM — cuando una alarma crítica/mayor persiste más de 24h,
@@ -30,6 +39,13 @@ import sys
 import time
 from collections import defaultdict
 from datetime import date, timedelta, timezone, datetime
+
+# Cargar .env automáticamente si existe (dev local; en GitHub Actions las vars vienen del entorno)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv no instalado — se usan las vars del entorno directamente
 
 from supabase import create_client, Client
 
@@ -63,10 +79,115 @@ def normalize_severity(raw) -> str:
 
 def normalize_status(raw) -> str:
     s = str(raw).lower()
-    if s in ("0", "normal", "ok", "running", "1"):            return "normal"
-    if s in ("2", "fault", "error", "defectuoso"):             return "defectuoso"
-    if s in ("3", "offline", "disconnected", "desconectado"):  return "desconectado"
+    if s in ("0", "normal", "ok", "running", "1", "connected", "on-grid"): return "normal"
+    if s in ("2", "fault", "error", "defectuoso", "faulty"):               return "defectuoso"
+    if s in ("3", "offline", "disconnected", "desconectado", "off-grid"):  return "desconectado"
     return "desconocido"
+
+
+# ─────────────────────────────────────────────────────────
+# Carga de credenciales con secretos (JOIN a tabla secreta)
+# ─────────────────────────────────────────────────────────
+
+def load_fv_credentials_with_secrets(
+    sb: Client,
+    empresa_filter: str | None = None,
+) -> list[dict]:
+    """
+    Carga credenciales activas de fv_credenciales incluyendo sus secretos
+    de fv_credenciales_secret mediante un JOIN de PostgREST.
+
+    Retorna una lista de dicts donde cada item incluye una clave '_secret'
+    con {password_enc, session_cookies, cookies_expires_at} o None si la
+    credencial no tiene fila en fv_credenciales_secret (configuración incompleta).
+
+    SEGURIDAD: este script usa service_role (SUPABASE_SERVICE_KEY), que bypassa
+    RLS y los REVOKE explícitos sobre 'authenticated'/'anon'. El role 'authenticated'
+    del frontend NUNCA puede leer fv_credenciales_secret.
+    No loguear el contenido de '_secret'.
+    """
+    q = (
+        sb.table("fv_credenciales")
+        .select(
+            "id, plataforma, nombre, username, region_url, activo, tipo, "
+            "descripcion, empresa_id, ultimo_ok_at, ultimo_error, "
+            "fv_credenciales_secret(password_enc, session_cookies, cookies_expires_at)"
+        )
+        .eq("activo", True)
+    )
+    if empresa_filter:
+        q = q.eq("empresa_id", empresa_filter)
+
+    rows = q.execute().data or []
+
+    result = []
+    for row in rows:
+        # PostgREST devuelve el objeto relacionado 1:1 bajo la clave del nombre de tabla.
+        # Es None si no hay fila en fv_credenciales_secret (credencial incompleta).
+        secret = row.pop("fv_credenciales_secret", None)
+        row["_secret"] = secret  # None o dict con password_enc, session_cookies, ...
+        result.append(row)
+
+    return result
+
+
+def check_secrets_diagnostic(sb: Client, empresa_filter: str | None = None) -> int:
+    """
+    Modo diagnóstico: verifica que cada credencial activa tiene fila en
+    fv_credenciales_secret y que password_enc no está vacío.
+
+    Retorna el número de credenciales con configuración incompleta (0 = todo OK).
+    """
+    logger.info("=== DIAGNÓSTICO DE SECRETOS FV ===")
+    credenciales = load_fv_credentials_with_secrets(sb, empresa_filter)
+
+    if not credenciales:
+        logger.warning("No hay credenciales activas.")
+        return 0
+
+    sin_secret   = []
+    sin_password = []
+    ok           = []
+
+    for cred in credenciales:
+        cred_id    = cred["id"]
+        plataforma = cred.get("plataforma", "?")
+        masked     = cred.get("username", "?")[:3] + "***"
+        secret     = cred.get("_secret")
+
+        if secret is None:
+            sin_secret.append(cred_id)
+            logger.error(
+                "❌ FALTA SECRET: cred=%s plataforma=%s username=%s — "
+                "sin fila en fv_credenciales_secret. "
+                "Crear credencial desde el CRM o ejecutar Edge Function fv-create-credential.",
+                cred_id, plataforma, masked,
+            )
+        elif not secret.get("password_enc"):
+            sin_password.append(cred_id)
+            logger.error(
+                "❌ PASSWORD VACÍO: cred=%s plataforma=%s username=%s — "
+                "fv_credenciales_secret existe pero password_enc está vacío.",
+                cred_id, plataforma, masked,
+            )
+        else:
+            tiene_cookies = bool(secret.get("session_cookies"))
+            expira        = (secret.get("cookies_expires_at") or "N/A")[:10]
+            logger.info(
+                "✅ OK: cred=%s plataforma=%s username=%s — "
+                "password_enc presente, cookies=%s (expiran %s)",
+                cred_id, plataforma, masked,
+                "sí" if tiene_cookies else "no", expira,
+            )
+            ok.append(cred_id)
+
+    total  = len(credenciales)
+    fallos = len(sin_secret) + len(sin_password)
+    logger.info(
+        "=== RESULTADO: %d/%d OK · %d sin secret · %d sin password ===",
+        len(ok), total, len(sin_secret), len(sin_password),
+    )
+    return fallos
 
 
 # ─────────────────────────────────────────────────────────
@@ -240,13 +361,47 @@ def sync_credencial(
     enc_key: str,
     resend_key: str | None,
     dry_run: bool = False,
+    backfill_days: int = 1,
 ) -> dict:
-    cred_id      = cred["id"]
-    empresa_id   = cred.get("empresa_id")   # None si credencial multi-cliente
-    plataforma   = cred["plataforma"]
-    username     = cred["username"]
-    password_enc = cred["password_enc"]
-    region_url   = cred.get("region_url") or "https://uni003eu5.fusionsolar.huawei.com"
+    cred_id    = cred["id"]
+    empresa_id = cred.get("empresa_id")   # None si credencial multi-cliente
+    plataforma = cred["plataforma"]
+    username   = cred["username"]
+    region_url = cred.get("region_url") or "https://uni003eu5.fusionsolar.huawei.com"
+
+    # ── Leer secretos desde _secret (cargados vía JOIN a fv_credenciales_secret) ──
+    # SEGURIDAD: _secret viene de service_role. No loguear su contenido.
+    secret = cred.get("_secret")
+    if secret is None:
+        msg = (
+            "CONFIG_ERROR — sin fila en fv_credenciales_secret. "
+            "Registra la credencial desde el CRM o ejecuta la Edge Function fv-create-credential."
+        )
+        logger.error("❌ cred=%s plataforma=%s: %s", cred_id, plataforma, msg)
+        if not dry_run:
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
+        return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
+
+    password_enc = secret.get("password_enc")
+    if not password_enc:
+        msg = "CONFIG_ERROR — fv_credenciales_secret existe pero password_enc está vacío."
+        logger.error("❌ cred=%s plataforma=%s: %s", cred_id, plataforma, msg)
+        if not dry_run:
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
+        return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
+
+    # Reflejar cookies_expires_at del secret → tabla pública (para que la UI lo vea)
+    cookies_expires_at_pub = secret.get("cookies_expires_at")
+    if not dry_run and cookies_expires_at_pub:
+        sb.table("fv_credenciales").update({
+            "cookies_expires_at": cookies_expires_at_pub,
+        }).eq("id", cred_id).execute()
 
     logger.info(
         "Sincronizando cred=%s empresa=%s (%s / %s)",
@@ -257,8 +412,10 @@ def sync_credencial(
     try:
         password = decrypt_password(password_enc, enc_key)
     except Exception as e:
-        msg = f"Error al descifrar: {e}"
-        logger.error(msg)
+        msg = f"DECRYPT_ERROR — no se pudo descifrar password: {type(e).__name__}"
+        logger.error("❌ cred=%s: %s", cred_id, msg)
+        if not dry_run:
+            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
 
     # ── Seleccionar modo de autenticación ───────────────────
@@ -270,8 +427,11 @@ def sync_credencial(
     # IMPORTANTE: httpx (CookieAuthClient anterior) NO funciona porque CloudWAF de
     # FusionSolar verifica el fingerprint TLS del cliente. Playwright reproduce el
     # fingerprint de Chrome; httpx no.
-    session_state_enc  = cred.get("session_cookies")   # columna reutilizada para storage state
-    cookies_expires_at = cred.get("cookies_expires_at")
+    #
+    # Los campos session_cookies y cookies_expires_at vienen de fv_credenciales_secret
+    # (no de fv_credenciales — esas columnas fueron eliminadas en la migración 2026-05-10).
+    session_state_enc  = secret.get("session_cookies")
+    cookies_expires_at = secret.get("cookies_expires_at")
     storage_state: dict | None = None
 
     if session_state_enc:
@@ -306,7 +466,10 @@ def sync_credencial(
                         n, cred_id, (cookies_expires_at or "N/A")[:10],
                     )
             except Exception as e:
-                logger.warning("Error al descifrar storage state: %s. Fallback a Playwright.", e)
+                logger.warning(
+                    "Error al descifrar storage state cred=%s: %s. Fallback a Playwright.",
+                    cred_id, type(e).__name__,
+                )
                 storage_state = None
 
     client: FusionSolarClient = make_client(plataforma, region_url, username, password, storage_state=storage_state)
@@ -318,16 +481,22 @@ def sync_credencial(
         logger.error("❌ %s", msg)
         logger.error(
             "ACCIÓN REQUERIDA: las cookies de sesión han expirado o FusionSolar ha cerrado la sesión. "
-            "Ejecuta extract_cookies.py localmente y vuelve a lanzar el sync."
+            "Pulsa «Renovar sesión» en el CRM o ejecuta extract_cookies.py localmente."
         )
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "caducada",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
     except Exception as e:
         msg = f"UNEXPECTED_ERROR en login: {type(e).__name__}: {e}"
         logger.error("❌ %s", msg, exc_info=True)
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": 0, "alarmas": 0, "msg": msg}
 
     total_plantas = 0
@@ -337,13 +506,39 @@ def sync_credencial(
         stations = client.get_station_list()
         logger.info("  %d plantas encontradas", len(stations))
 
+        # Loguear claves y valores numéricos del primer station para diagnóstico
+        if stations:
+            s0 = stations[0]
+            logger.info("  [DIAG] keys primer station: %s", list(s0.keys()))
+            # Mostrar valores de campos que podrían ser KPIs (numéricos o cadenas numéricas)
+            kpi_candidates = {k: v for k, v in s0.items()
+                              if v is not None and k not in ("dn", "stationCode", "stationDn",
+                                                              "stationName", "plantName", "country",
+                                                              "gridConnectedDay", "buildDate")}
+            logger.info("  [DIAG] valores station[0]: %s", kpi_candidates)
+
         for st in stations:
-            station_code = st.get("stationCode") or st.get("stationDn", "")
+            # FusionSolar EU5 usa "dn" (ej: "NE=137403508"), no stationCode/stationDn
+            station_code = (
+                st.get("stationCode")
+                or st.get("stationDn")
+                or st.get("dn", "")
+            )
             if not station_code:
+                logger.warning("  [SKIP] station sin station_code: %s", list(st.keys()))
                 continue
 
-            planta_estado = normalize_status(st.get("status", "desconocido"))
-            planta_nombre = st.get("stationName") or st.get("plantName", station_code)
+            # FusionSolar EU5 usa "plantStatus", no "status"
+            planta_estado = normalize_status(
+                st.get("status") or st.get("plantStatus", "desconocido")
+            )
+            # Nombre: probar varias claves posibles
+            planta_nombre = (
+                st.get("stationName")
+                or st.get("plantName")
+                or st.get("name")
+                or station_code
+            )
 
             # ── Upsert fv_planta (via función segura anti-duplicados) ──────
             if dry_run:
@@ -362,13 +557,19 @@ def sync_credencial(
                 "p_credencial_id": cred_id,
                 "p_nombre":        planta_nombre,
                 "p_pais":          st.get("country", "ES"),
-                "p_capacidad_kwp": st.get("installedCapacity") or st.get("capacity"),
+                # EU5: installedCapacity suele ser "0.0"; onlyInverterPower = suma kW inversores
+                # Usamos la mejor fuente disponible (todas en kW/kWp)
+                "p_capacidad_kwp": (
+                    st.get("installedCapacity") or st.get("capacity")
+                    or st.get("onlyInverterPower") or st.get("inverterPower")
+                    or None
+                ),
                 "p_tiene_bateria": bool(st.get("hasBattery") or st.get("batteryCapacity")),
                 "p_fecha_conexion":st.get("gridConnectedDay") or st.get("buildDate"),
                 "p_estado":        planta_estado,
                 "p_empresa_id":    empresa_id,
             }).execute()
-            planta_id = res.data[0]["id"] if res.data else None
+            planta_id = res.data[0]["planta_id"] if res.data else None
             if not planta_id:
                 logger.warning("  fv_upsert_planta sin resultado para %s", station_code)
                 total_plantas += 1
@@ -385,48 +586,108 @@ def sync_credencial(
                     alerta_planta_caida(planta_nombre, planta_estado, resend_key)
 
             # ── KPIs realtime ─────────────────────────────────
+            # Columnas reales de fv_kpi_realtime (verificadas 2026-05-11):
+            # potencia_actual_kw, energia_hoy_kwh, energia_mes_kwh,
+            # energia_total_kwh, ingresos_hoy_eur, actualizado_en
+            # FusionSolar EU5 puede usar claves distintas a la API global.
+            # El log [DIAG-KPI] muestra las claves reales en cada run.
             try:
                 kpi = client.get_station_kpi(station_code)
+                logger.info("  [DIAG-KPI] %s → keys: %s", station_code, list(kpi.keys()))
+                # Intentar leer la potencia con todas las variantes conocidas de EU5/global
+                potencia_kw = float(
+                    kpi.get("currentPower")
+                    or kpi.get("realTimePower")
+                    or kpi.get("activePower")
+                    or kpi.get("inverterPower")
+                    or 0
+                )
+                energia_hoy = float(
+                    kpi.get("dailyEnergy")
+                    or kpi.get("dayEnergy")
+                    or kpi.get("dayPower")
+                    or 0
+                )
+                energia_mes = float(kpi.get("monthEnergy") or kpi.get("monthPower") or 0)
+                energia_total = float(
+                    kpi.get("cumulativeEnergy")
+                    or kpi.get("totalEnergy")
+                    or kpi.get("totalPower")
+                    or 0
+                )
                 sb.table("fv_kpi_realtime").upsert({
                     "planta_id":          planta_id,
-                    "potencia_actual_kw":  kpi.get("currentPower") or kpi.get("activePower"),
-                    "energia_hoy_kwh":     kpi.get("dayPower") or kpi.get("dayEnergy"),
-                    "factor_rendimiento":  kpi.get("performanceRatio") or kpi.get("pr"),
-                    "ts":                  datetime.now(timezone.utc).isoformat(),
+                    "potencia_actual_kw":  potencia_kw,
+                    "energia_hoy_kwh":     energia_hoy,
+                    "energia_mes_kwh":     energia_mes,
+                    "energia_total_kwh":   energia_total,
+                    "ingresos_hoy_eur":    0,  # FusionSolar no devuelve ingresos en EUR
+                    "actualizado_en":      datetime.now(timezone.utc).isoformat(),
                 }, on_conflict="planta_id").execute()
             except Exception as e:
                 logger.warning("  KPI realtime error %s: %s", station_code, e)
 
             # ── KPIs diarios ──────────────────────────────────
-            try:
-                hoy_str = date.today().isoformat()
-                kpi_d = client.get_station_kpi_daily(station_code)
-                sb.table("fv_kpi_diario").upsert({
-                    "planta_id":       planta_id,
-                    "fecha":           hoy_str,
-                    "energia_kwh":     kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0,
-                    "potencia_max_kw": kpi_d.get("peakPower") or 0,
-                    "ingresos_eur":    kpi_d.get("income") or 0,
-                }, on_conflict="planta_id,fecha").execute()
-            except Exception as e:
-                logger.warning("  KPI diario error %s: %s", station_code, e)
+            # Hoy: usamos caché del station-list (sin llamada extra a FusionSolar).
+            # Días anteriores (backfill): llamamos get_daily_kpi(station_code, fecha).
+            # Precio estimado autoconsumo medio España (€/kWh) para ingresos_eur.
+            PRECIO_KWH_EST = 0.18
+            hoy = date.today()
+            # Día 0 = hoy (desde caché), días 1..N = llamada individual por fecha.
+            for dias_atras in range(max(1, backfill_days)):
+                fecha = hoy - timedelta(days=dias_atras)
+                # Pausa anti-rate-limit entre llamadas históricas (1s)
+                if dias_atras > 0:
+                    import time as _t; _t.sleep(1)
+                try:
+                    if dias_atras == 0:
+                        kpi_d = client.get_station_kpi(station_code)  # caché station-list
+                    else:
+                        kpi_d = client.get_daily_kpi(station_code, fecha)
+                    # Energía — guard contra NaN/overflow
+                    try:
+                        energia = float(kpi_d.get("dailyEnergy") or kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0)
+                        if not (0 <= energia <= 999_999):
+                            logger.warning("  energia_kwh fuera de rango (%.1f) %s %s — forzado a 0", energia, station_code, fecha)
+                            energia = 0.0
+                    except (TypeError, ValueError):
+                        energia = 0.0
+                    # Potencia máxima — guard contra NaN/overflow
+                    try:
+                        potencia_max = float(kpi_d.get("inverterPower") or kpi_d.get("peakPower") or 0)
+                        if not (0 <= potencia_max <= 99_999):
+                            logger.warning("  potencia_max_kw fuera de rango (%.1f) %s %s — forzado a 0", potencia_max, station_code, fecha)
+                            potencia_max = 0.0
+                    except (TypeError, ValueError):
+                        potencia_max = 0.0
+                    sb.table("fv_kpi_diario").upsert({
+                        "planta_id":       planta_id,
+                        "fecha":           fecha.isoformat(),
+                        "energia_kwh":     round(energia, 3),
+                        "potencia_max_kw": round(potencia_max, 3),
+                        "ingresos_eur":    round(energia * PRECIO_KWH_EST, 2),
+                    }, on_conflict="planta_id,fecha").execute()
+                    logger.info("  KPI diario OK %s %s → %.1f kWh", station_code, fecha, energia)
+                except Exception as e:
+                    logger.warning("  KPI diario error %s fecha=%s: %s", station_code, fecha, e)
 
-            # ── Alarmas activas ───────────────────────────────
+            # -- Alarmas activas
             try:
-                alarmas = client.get_station_alarms(station_code)
+                alarmas = client.get_alarms(station_code)
                 for al in alarmas:
                     severidad = normalize_severity(al.get("lev") or al.get("severity", "4"))
-                    desc = al.get("alarmName") or al.get("description", "Sin descripción")
+                    desc = al.get("alarmName") or al.get("description", "Sin descripcion")
                     sb.table("fv_alarma").upsert({
                         "planta_id":    planta_id,
+                        "alarm_id":     str(al.get("alarmId") or al.get("id", "")),
                         "codigo":       str(al.get("alarmId") or al.get("id", "")),
                         "severidad":    severidad,
                         "descripcion":  desc,
+                        "dispositivo":  al.get("devName") or al.get("deviceName") or "",
                         "activa":       True,
-                        "detectada_en": al.get("raiseTime") or datetime.now(timezone.utc).isoformat(),
+                        "iniciada_en":  al.get("raiseTime") or datetime.now(timezone.utc).isoformat(),
                     }, on_conflict="planta_id,codigo").execute()
                     total_alarmas += 1
-
                     if severidad in ("critica", "mayor"):
                         alerta_alarma_critica(planta_nombre, severidad, desc, resend_key)
             except Exception as e:
@@ -436,16 +697,27 @@ def sync_credencial(
 
     except FusionSolarAuthError as e:
         msg = f"AUTH_REDIRECT durante sync: {e}"
-        logger.error("❌ %s", msg)
-        logger.error("La sesión expiró a mitad de sincronización. Ejecuta extract_cookies.py.")
+        logger.error("ERROR %s", msg)
+        logger.error(
+            "La sesión expiró a mitad de sincronización. "
+            "Pulsa «Renovar sesión» en el CRM o ejecuta extract_cookies.py."
+        )
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "caducada",
+            }).eq("id", cred_id).execute()
+        # IMPORTANTE: no sobreescribimos los KPIs existentes (return antes de cualquier
+        # escritura destructiva) — los datos buenos se conservan del sync anterior.
         return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
     except Exception as e:
         msg = f"UNEXPECTED_ERROR en sync loop: {type(e).__name__}: {e}"
-        logger.error("❌ %s", msg, exc_info=True)
+        logger.error("ERROR %s", msg, exc_info=True)
         if not dry_run:
-            sb.table("fv_credenciales").update({"ultimo_error": msg}).eq("id", cred_id).execute()
+            sb.table("fv_credenciales").update({
+                "ultimo_error": msg,
+                "estado_sesion": "error",
+            }).eq("id", cred_id).execute()
         return {"ok": False, "plantas": total_plantas, "alarmas": total_alarmas, "msg": msg}
     finally:
         try:
@@ -454,99 +726,124 @@ def sync_credencial(
             pass
 
     elapsed = round(time.time() - t0, 1)
-    logger.info(
-        "  ✅ cred=%s: %d plantas, %d alarmas en %.1fs",
-        cred_id, total_plantas, total_alarmas, elapsed,
-    )
+    logger.info("  OK cred=%s: %d plantas, %d alarmas en %.1fs", cred_id, total_plantas, total_alarmas, elapsed)
 
     if not dry_run:
+        # Calcular estado_sesion basado en cuándo caducan las cookies
+        import datetime as _dt
+        now_utc = datetime.now(timezone.utc)
+        cexp = secret.get("cookies_expires_at")
+        if cexp:
+            try:
+                exp_dt = _dt.datetime.fromisoformat(cexp)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if exp_dt < now_utc:
+                    estado_sesion = "caducada"
+                elif exp_dt < now_utc + _dt.timedelta(hours=24):
+                    estado_sesion = "por_caducar"
+                else:
+                    estado_sesion = "activa"
+            except Exception:
+                estado_sesion = "activa"
+        else:
+            estado_sesion = "activa"
+
         sb.table("fv_credenciales").update({
-            "ultimo_error":          None,
-            "ultima_sincronizacion": datetime.now(timezone.utc).isoformat(),
+            "ultimo_error":       None,
+            "ultimo_ok_at":       now_utc.isoformat(),
+            "estado_sesion":      estado_sesion,
+            "cookies_expires_at": cexp,  # reflejo del campo secreto
         }).eq("id", cred_id).execute()
 
-    return {
-        "ok":     True,
-        "plantas": total_plantas,
-        "alarmas": total_alarmas,
-        "elapsed": elapsed,
-    }
+    return {"ok": True, "plantas": total_plantas, "alarmas": total_alarmas, "elapsed": elapsed}
 
 
-# ─────────────────────────────────────────────────────────
-# Punto de entrada principal
-# ─────────────────────────────────────────────────────────
+# -- Punto de entrada principal
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sincronizador FV → Supabase")
-    parser.add_argument("--empresa", help="UUID empresa (solo esa empresa)")
-    parser.add_argument("--dry-run", action="store_true", help="Sin escritura en BD")
+    parser = argparse.ArgumentParser(description="Sincronizador FV")
+    parser.add_argument("--empresa",       help="UUID empresa (filtra por empresa_id en fv_credenciales)")
+    parser.add_argument("--credencial",    help="UUID credencial (sincroniza solo esta credencial)")
+    parser.add_argument("--dry-run",       action="store_true")
+    parser.add_argument("--check-secrets", action="store_true",
+                        help="Diagnostico: verifica secretos en fv_credenciales_secret y sale")
+    parser.add_argument(
+        "--backfill-days",
+        type=int,
+        default=1,
+        help="Dias historicos a reconstruir (default=1, solo hoy)"
+    )
     args = parser.parse_args()
+    backfill_days = max(1, args.backfill_days)
 
     dry_run = args.dry_run
     if dry_run:
-        logger.info("🔴 DRY-RUN activado — no se escribirá nada en la BD")
+        logger.info("DRY-RUN activado")
 
-    # ── Variables de entorno ─────────────────────────────
     supabase_url = os.environ["SUPABASE_URL"]
     supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
     enc_key      = os.environ["FV_ENCRYPTION_KEY"]
     resend_key   = os.environ.get("RESEND_API_KEY")
 
-    sb: Client = create_client(supabase_url, supabase_key)
+    sb = create_client(supabase_url, supabase_key)
 
-    # ── Cargar credenciales activas ──────────────────────
-    q = sb.table("fv_credenciales").select("*").eq("activo", "true")
-    if args.empresa:
-        q = q.eq("empresa_id", args.empresa)
-    credenciales = q.execute().data or []
+    if args.check_secrets:
+        fallos = check_secrets_diagnostic(sb, empresa_filter=args.empresa)
+        sys.exit(1 if fallos > 0 else 0)
+
+    credenciales = load_fv_credentials_with_secrets(sb, empresa_filter=args.empresa)
+
+    # Filtro por credencial específica (dispatch manual desde CRM)
+    if args.credencial:
+        credenciales = [c for c in credenciales if c["id"] == args.credencial]
+        if not credenciales:
+            logger.error("Credencial %s no encontrada o no activa.", args.credencial)
+            sys.exit(1)
+        logger.info("Sincronización puntual: credencial=%s", args.credencial)
+
     logger.info("Credenciales activas: %d", len(credenciales))
 
     if not credenciales:
         logger.warning("No hay credenciales activas. Saliendo.")
         return
 
-    # ── Sincronizar cada credencial ──────────────────────
     resultados = []
     for cred in credenciales:
-        resultado = sync_credencial(sb, cred, enc_key, resend_key, dry_run=dry_run)
+        resultado = sync_credencial(
+            sb, cred, enc_key, resend_key,
+            dry_run=dry_run,
+            backfill_days=backfill_days,
+        )
         resultados.append(resultado)
 
     total_ok      = sum(1 for r in resultados if r["ok"])
     total_plantas = sum(r["plantas"] for r in resultados)
     total_alarmas = sum(r["alarmas"] for r in resultados)
 
-    # ── Resumen semanal (lunes) ──────────────────────────
     hoy = date.today()
-    if hoy.weekday() == 0:   # 0 = lunes
-        logger.info("📅 Lunes → generando resumen semanal…")
+    if hoy.weekday() == 0:
+        logger.info("Lunes: generando resumen semanal")
         generar_resumen_semanal(sb, dry_run=dry_run)
 
-    # ── Informe mensual (día 1) ──────────────────────────
     if hoy.day == 1:
-        logger.info("📊 Día 1 → generando borradores de informe mensual…")
+        logger.info("Dia 1: generando informe mensual borrador")
         generar_informe_mensual_borrador(sb, dry_run=dry_run)
 
-    # ── Log global de sincronización ────────────────────
+    logger.info("Sync completado: %d/%d OK -- %d plantas, %d alarmas",
+                total_ok, len(credenciales), total_plantas, total_alarmas)
+
     if not dry_run:
         sb.table("fv_sync_log").insert({
             "credenciales_ok":    total_ok,
             "credenciales_total": len(credenciales),
             "plantas_sync":       total_plantas,
+            "alarmas_sync":       total_alarmas,
             "alarmas_detectadas": total_alarmas,
+            "ok":                 total_ok == len(credenciales),
             "resultado":          "ok" if total_ok == len(credenciales) else "parcial",
-            "detalles":           json.dumps(resultados, default=str),
+            "iniciado_en":        datetime.now(timezone.utc).isoformat(),
         }).execute()
-
-    # ── Resumen final ────────────────────────────────────
-    estado = "✅ OK" if total_ok == len(credenciales) else f"⚠️ {total_ok}/{len(credenciales)} OK"
-    logger.info(
-        "Sync finalizado: %s | %d plantas | %d alarmas",
-        estado, total_plantas, total_alarmas,
-    )
-
-    if total_ok < len(credenciales):
-        sys.exit(1)
 
 
 if __name__ == "__main__":

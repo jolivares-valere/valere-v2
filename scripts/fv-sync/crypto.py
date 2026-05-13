@@ -38,14 +38,32 @@ def encrypt_password(plaintext: str, b64_key: str) -> str:
 
 def decrypt_password(enc_blob: str, b64_key: str) -> str:
     """
-    Descifra un blob '<nonce_b64>:<ciphertext_b64>' producido por encrypt_password.
+    Descifra un blob AES-256-GCM. Soporta dos formatos:
+
+    Formato A (Python legacy, producido por encrypt_password):
+        '<nonce_b64>:<ciphertext_b64>'
+
+    Formato B (Edge Function fv-create-credential):
+        'AES256GCM:v1:<iv_b64>:<ciphertext_b64>'
+
+    Ambos formatos usan la misma clave FV_ENCRYPTION_KEY y son
+    compatibles porque la primitiva subyacente es idéntica (AESGCM, nonce 12 bytes, tag 128 bits).
     """
     key = _load_key(b64_key)
-    parts = enc_blob.split(":", 1)
-    if len(parts) != 2:
-        raise ValueError("Formato de blob cifrado inválido; esperado 'nonce:ciphertext'")
-    nonce = base64.b64decode(parts[0])
-    ct = base64.b64decode(parts[1])
+    if enc_blob.startswith("AES256GCM:v1:"):
+        # Formato Edge Function: "AES256GCM:v1:<iv_b64>:<ct_b64>"
+        parts = enc_blob.split(":", 3)
+        if len(parts) != 4:
+            raise ValueError("Formato AES256GCM:v1 inválido; esperado 'AES256GCM:v1:iv:ct'")
+        nonce = base64.b64decode(parts[2])
+        ct    = base64.b64decode(parts[3])
+    else:
+        # Formato Python: "<nonce_b64>:<ct_b64>"
+        parts = enc_blob.split(":", 1)
+        if len(parts) != 2:
+            raise ValueError("Formato de blob cifrado inválido; esperado 'nonce:ciphertext'")
+        nonce = base64.b64decode(parts[0])
+        ct    = base64.b64decode(parts[1])
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(nonce, ct, None).decode("utf-8")
 

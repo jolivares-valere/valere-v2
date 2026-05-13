@@ -102,6 +102,22 @@ class FusionSolarClient(ABC):
     def close(self) -> None:
         """Libera recursos. Llamar siempre en un bloque finally."""
 
+    # ── Aliases de conveniencia ────────────────────────────────────────────
+    # sync_job.py usa estos nombres; delegan en los métodos abstractos.
+
+    def get_station_kpi_daily(self, station_code: str) -> dict:
+        """Alias de get_daily_kpi para hoy."""
+        from datetime import date
+        return self.get_daily_kpi(station_code, date.today())
+
+    def get_station_alarms(self, station_code: str) -> list[dict]:
+        """Alias de get_alarms."""
+        return self.get_alarms(station_code)
+
+    def logout(self) -> None:
+        """Alias de close() — compatibilidad con sync_job.py."""
+        self.close()
+
 
 # ─────────────────────────────────────────────────────────
 # Implementación con Playwright
@@ -302,9 +318,12 @@ class WebAuthClient(FusionSolarClient):
         elif isinstance(raw, list):
             stations = raw
 
-        # Cachear datos por station_code para reutilizar en get_station_kpi
+        # Cachear datos por station_code para reutilizar en get_station_kpi.
+        # FusionSolar EU5 usa "dn" (ej: "NE=137403508"); EU/global puede usar
+        # "stationCode" o "stationDn". Indexamos las tres variantes para que
+        # get_station_kpi haga match independientemente de qué clave llega.
         for st in stations:
-            code = st.get("stationCode") or st.get("stationDn", "")
+            code = st.get("stationCode") or st.get("stationDn") or st.get("dn", "")
             if code:
                 self._station_cache[code] = st
 
@@ -314,12 +333,19 @@ class WebAuthClient(FusionSolarClient):
     def get_station_kpi(self, station_code: str) -> dict:
         """
         KPIs en tiempo real. Si station_code está en la caché de station_list
-        (que ya incluye currentPower / dayPower), devuelve esos datos directamente
-        sin llamada extra. Si no, consulta el endpoint de KPI total.
+        (que ya incluye currentPower / dayPower u otras variantes EU5), devuelve
+        esos datos directamente sin llamada extra. Si no, consulta el endpoint de
+        KPI total (que devuelve totales globales de la cuenta, no por planta).
         """
         cached = self._station_cache.get(station_code, {})
-        # La respuesta de station-list incluye currentPower y dayPower directamente
-        if cached.get("currentPower") is not None or cached.get("dayPower") is not None:
+        # FusionSolar EU5: las claves de potencia/energía pueden variar.
+        # Comprobamos todas las variantes conocidas antes de caer al fallback.
+        has_realtime = any(
+            cached.get(k) is not None
+            for k in ("currentPower", "dayPower", "realTimePower",
+                      "activePower", "dailyEnergy", "dayEnergy")
+        )
+        if has_realtime:
             return cached
 
         # Fallback: endpoint de KPI total (no por planta, sino global)
@@ -360,13 +386,15 @@ class WebAuthClient(FusionSolarClient):
         return alarms
 
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
-        """Producción de un día concreto para una planta."""
+        """Producción de un día concreto para una planta.
+
+        EU5 usa "dn"+"queryTime"+"timeZone"; API global usa "stationCodes"+"collectTime".
+        """
         dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
         ts_ms = int(dt.timestamp() * 1000)
-        data  = self._safe_fetch("POST", self._DAILY_KPI, {
-            "stationCodes": station_code,
-            "collectTime":  ts_ms,
-        }, default={})
+        id_key  = "dn" if station_code.startswith("NE=") else "stationCodes"
+        payload = {id_key: station_code, "queryTime": ts_ms, "timeZone": 2}
+        data  = self._safe_fetch("POST", self._DAILY_KPI, payload, default={})
         raw = data.get("data", data)
         if isinstance(raw, list):
             return raw[0] if raw else {}
@@ -415,13 +443,27 @@ class StorageStateClient(FusionSolarClient):
     """
 
     def __init__(self, base_url: str, storage_state: dict):
+        import re
+        from urllib.parse import urlparse
         self.base_url      = base_url.rstrip("/")
         self._storage      = storage_state   # dict con "cookies" + "origins"
         self._pw_ctx       = None
         self._pw           = None
         self._browser      = None
+        self._context      = None   # BrowserContext — para context.request
         self._page         = None
+        self._portal_url   = None   # URL final del portal (Referer en API calls)
+        self._roarand      = None   # no usado (SPA no envía roarand)
         self._station_cache: dict[str, dict] = {}
+
+        # API base URL: el SPA llama a eu5.fusionsolar.huawei.com/rest/...
+        # pero el portal está en uni003eu5.fusionsolar.huawei.com.
+        # Derivamos la API base quitando el prefijo "uniNNN" del subdominio.
+        parsed = urlparse(self.base_url)
+        api_host = re.sub(r'^uni\d+', '', parsed.hostname or '')
+        self._api_base_url = f"{parsed.scheme}://{api_host}" if api_host else self.base_url
+        if self._api_base_url != self.base_url:
+            logger.info("API base URL: %s (portal: %s)", self._api_base_url, self.base_url)
 
     # Reutilizamos constantes de WebAuthClient
     _STATION_LIST = WebAuthClient._STATION_LIST
@@ -455,49 +497,87 @@ class StorageStateClient(FusionSolarClient):
             if keys:
                 logger.info("  localStorage [%s]: %s", origin.get("origin","?"), keys)
 
+    # Prefixes que resuelven al dominio eu5 (auth/config/infra compartida).
+    # TODO: extender si se descubren más endpoints eu5 usados por el sync.
+    _EU5_PREFIXES = (
+        "/rest/pvms/web/demouser/",
+        "/rest/pvms/security/",
+        "/rest/pvms/web/publicapp/",
+        "/rest/pvms/web/server/",
+    )
+
+    def _url_for_endpoint(self, path: str) -> str:
+        """Devuelve la URL completa para un endpoint FusionSolar.
+
+        FusionSolar EU5 usa dos origins:
+          eu5.fusionsolar.huawei.com   → auth / config / infra compartida
+          uni003eu5.fusionsolar.huawei.com → datos de plantas (station, device, kpi, alarms)
+
+        Regla: los paths en _EU5_PREFIXES van a _api_base_url (eu5),
+               el resto va a base_url (uni003eu5).
+        Si el path ya es una URL completa, se devuelve tal cual.
+        """
+        if path.startswith("http"):
+            return path
+        for prefix in self._EU5_PREFIXES:
+            if path.startswith(prefix):
+                return self._api_base_url + path
+        return self.base_url + path
+
+    def _api_headers(self) -> dict:
+        """Headers exactos que usa el SPA de FusionSolar en sus llamadas REST.
+        Capturados mediante page.on('request') en extract_cookies.py (2026-05-11).
+
+        Campos obligatorios descubiertos:
+          roarand              — token CSRF inyectado por el SPA como header (no cookie)
+          x-non-renewal-session — "true" en todos los POSTs del SPA
+          x-timezone-offset    — offset UTC en minutos (120 = UTC+2, Europa/Madrid verano)
+          accept               — "application/json, text/javascript, */*; q=0.01"
+        """
+        headers: dict = {
+            "Content-Type":           "application/json",
+            "X-Requested-With":       "XMLHttpRequest",
+            "X-Non-Renewal-Session":  "true",
+            "X-Timezone-Offset":      "120",
+            "Referer":                self._portal_url or f"{self.base_url}/uniportal/",
+            "Accept":                 "application/json, text/javascript, */*; q=0.01",
+        }
+        if self._roarand:
+            headers["roarand"] = self._roarand
+        return headers
+
     def check_session(self) -> str:
         """
-        Hace una llamada mínima para verificar si la sesión sigue activa.
-        Devuelve uno de: OK | AUTH_REDIRECT | NON_JSON_RESPONSE | HTTP_ERROR | EXCEPTION
+        Verifica si la sesión sigue activa usando un endpoint ligero.
+        Usa el api_base_url real (eu5.fusionsolar.huawei.com) capturado del SPA.
+        Devuelve: OK | AUTH_REDIRECT | NON_JSON_RESPONSE | HTTP_ERROR | EXCEPTION
         """
-        url = self.base_url + self._STATION_LIST
+        # check-guest está en eu5 (demouser = prefix EU5) — _url_for_endpoint lo resuelve
+        url = self._url_for_endpoint("/rest/pvms/web/demouser/v1/check-guest")
+        logger.info("check_session → GET %s", url)
         try:
-            result = self._page.evaluate(
-                """([url]) =>
-                    fetch(url, {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({pageNo:1, pageSize:1, locale:"es_ES"}),
-                    }).then(async r => {
-                        const finalUrl = r.url;
-                        const ct = r.headers.get("content-type") || "";
-                        if (finalUrl.includes("login") || finalUrl.includes("unisso")) {
-                            return {status: "AUTH_REDIRECT", url: finalUrl};
-                        }
-                        if (!ct.includes("json")) {
-                            const txt = await r.text();
-                            return {status: "NON_JSON_RESPONSE", code: r.status,
-                                    preview: txt.substring(0, 200)};
-                        }
-                        if (!r.ok) {
-                            return {status: "HTTP_ERROR", code: r.status};
-                        }
-                        return {status: "OK"};
-                    })
-                """,
-                [url],
+            resp = self._context.request.get(
+                url,
+                headers=self._api_headers(),
             )
-            status = result.get("status", "EXCEPTION")
-            if status == "AUTH_REDIRECT":
-                logger.warning("check_session → AUTH_REDIRECT a %s", result.get("url"))
-            elif status == "NON_JSON_RESPONSE":
-                logger.warning("check_session → NON_JSON HTTP %s | preview: %s",
-                               result.get("code"), result.get("preview",""))
-            elif status == "HTTP_ERROR":
-                logger.warning("check_session → HTTP_ERROR %s", result.get("code"))
-            else:
-                logger.info("check_session → %s", status)
-            return status
+            final_url = resp.url
+            ct = resp.headers.get("content-type", "")
+            status_code = resp.status
+
+            if "login" in final_url or "unisso" in final_url:
+                logger.warning("check_session → AUTH_REDIRECT a %s", final_url)
+                return "AUTH_REDIRECT"
+            if "json" not in ct:
+                preview = resp.text()[:200]
+                logger.warning("check_session → NON_JSON HTTP %s | ct=%s | preview: %s",
+                               status_code, ct, preview)
+                return "NON_JSON_RESPONSE"
+            if not resp.ok:
+                logger.warning("check_session → HTTP_ERROR %s", status_code)
+                return "HTTP_ERROR"
+
+            logger.info("check_session → OK (HTTP %s)", status_code)
+            return "OK"
         except Exception as e:
             logger.error("check_session → EXCEPTION: %s", e)
             return "EXCEPTION"
@@ -544,7 +624,32 @@ class StorageStateClient(FusionSolarClient):
                 "Chrome/120.0.0.0 Safari/537.36"
             ),
         )
+        self._context   = context   # guardamos para usar context.request en _fetch
+        self._portal_url = None     # URL del portal tras navegación (Referer)
+        self._roarand    = None     # token CSRF (cookie roarand leída post-navegación)
         self._page = context.new_page()
+
+        # ── Captura de requests del SPA para diagnóstico y extracción de roarand ──
+        # roarand es un token CSRF que FusionSolar inyecta como request header
+        # (no como cookie). El SPA lo obtiene del servidor tras el login y lo
+        # almacena en memoria JS — no es accesible via document.cookie ni window.
+        # Capturamos el valor de los headers de los requests reales del SPA.
+        _captured_spa_requests: list[dict] = []
+        _roarand_found: list[str] = []   # lista para poder mutar en closure
+
+        def _on_spa_request(request):
+            url = request.url
+            if "/rest/pvms/" in url or "/rest/fo/" in url:
+                headers = dict(request.headers)
+                _captured_spa_requests.append({
+                    "method": request.method,
+                    "url":    url,
+                })
+                rr = headers.get("roarand")
+                if rr and not _roarand_found:
+                    _roarand_found.append(rr)
+
+        self._page.on("request", _on_spa_request)
 
         # Navegar a la raíz del portal. Con el storage state cargado el servidor
         # debería ir directamente a /uniportal/... sin pasar por el login.
@@ -573,8 +678,35 @@ class StorageStateClient(FusionSolarClient):
             )
 
         logger.info("StorageStateClient: portal OK. URL: %s", current_url)
+        self._portal_url = current_url   # usado como Referer en context.request
 
-        # Verificación rápida de sesión via fetch antes de proceder
+        # Esperar a que el SPA inicialice. El servidor setea roarand CSRF tras el
+        # page load — necesitamos networkidle para que el cookie aparezca en el jar.
+        try:
+            self._page.wait_for_load_state("networkidle", timeout=15_000)
+            logger.info("StorageStateClient: networkidle OK")
+        except Exception:
+            logger.warning("networkidle timeout — esperando 4s adicionales")
+            self._page.wait_for_timeout(4_000)
+
+        # ── DIAGNÓSTICO: requests del SPA capturadas en headless ───────────
+        logger.info("=== REQUESTS SPA en headless (%d) ===", len(_captured_spa_requests))
+        for r in _captured_spa_requests:
+            logger.info("  [SPA] %s %s", r["method"], r["url"])
+
+        # Extraer roarand de los headers capturados del SPA.
+        # roarand NO está en cookies — el SPA lo gestiona como header CSRF en memoria.
+        if _roarand_found:
+            self._roarand = _roarand_found[0]
+            logger.info("roarand capturado del SPA ✅ (%s...)", self._roarand[:8])
+        else:
+            self._roarand = None
+            logger.warning(
+                "roarand NO capturado del SPA — el SPA no hizo ninguna llamada autenticada "
+                "durante la inicialización. Los POSTs podrían fallar."
+            )
+
+        # Verificación rápida de sesión via context.request (ya con SPA inicializado)
         session_status = self.check_session()
         if session_status == "AUTH_REDIRECT":
             raise FusionSolarAuthError(
@@ -584,81 +716,79 @@ class StorageStateClient(FusionSolarClient):
         if session_status in ("NON_JSON_RESPONSE", "HTTP_ERROR"):
             logger.warning("check_session=%s — continuando (puede ser transitorio)", session_status)
 
-        # Pequeña pausa para que el SPA inicialice
-        try:
-            self._page.wait_for_load_state("networkidle", timeout=10_000)
-        except Exception:
-            self._page.wait_for_timeout(2_000)
-
-    # ── Fetch con diagnóstico detallado ─────────────────────
+    # ── Fetch via Playwright context.request (estrategia principal) ────────
+    # Usa el cliente HTTP nativo de Playwright en lugar de page.evaluate(fetch()).
+    # Ventajas sobre page.evaluate:
+    #   - No sujeto a CSP/CORS ni a service workers del SPA
+    #   - Usa las cookies del contexto (incluidas HttpOnly: JSESSIONID, roarand…)
+    #   - Fingerprint TLS = Chrome (CloudWAF de Huawei lo acepta)
+    #   - No requiere que el SPA esté inicializado
 
     def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
         """
-        Ejecuta fetch() en el contexto del browser Chromium.
-        Detecta explícitamente redirects a login, respuestas no-JSON y errores HTTP.
-        Lanza FusionSolarAuthError o FusionSolarResponseError según el caso.
+        Petición HTTP usando context.request (Playwright APIRequestContext).
+        Detecta redirects a login, respuestas no-JSON y errores HTTP.
+        Lanza FusionSolarAuthError o FusionSolarResponseError.
         """
-        url = path if path.startswith("http") else self.base_url + path
-        result = self._page.evaluate(
-            """([method, url, payload]) =>
-                fetch(url, {
-                    method,
-                    headers: {"Content-Type": "application/json"},
-                    body: (method !== "GET" && payload !== null)
-                          ? JSON.stringify(payload)
-                          : undefined,
-                }).then(async r => {
-                    const finalUrl  = r.url || "";
-                    const ct        = r.headers.get("content-type") || "";
-                    const status    = r.status;
+        import json as _json
+        url = self._url_for_endpoint(path)
+        m   = method.upper()
 
-                    // Detectar redirect a login (el fetch del browser sigue redirects)
-                    if (finalUrl.includes("login.action") || finalUrl.includes("unisso")) {
-                        return {__error: "AUTH_REDIRECT", url: finalUrl, status};
-                    }
+        # Diagnóstico
+        logger.debug("_fetch %s %s (payload=%s)", m, url, payload is not None)
 
-                    // Respuesta no-JSON
-                    if (!ct.includes("json")) {
-                        const body = await r.text();
-                        return {__error: "NON_JSON", status, ct,
-                                preview: body.substring(0, 300)};
-                    }
-
-                    // Error HTTP pero con JSON (FusionSolar devuelve errores como JSON)
-                    if (!r.ok) {
-                        const body = await r.json().catch(() => ({}));
-                        return {__error: "HTTP_ERROR", status, body};
-                    }
-
-                    return r.json();
-                })
-            """,
-            [method.upper(), url, payload],
-        )
-
-        # Procesar respuestas de error devueltas como dict con __error
-        if isinstance(result, dict) and "__error" in result:
-            err = result["__error"]
-            if err == "AUTH_REDIRECT":
-                raise FusionSolarAuthError(
-                    reason="API redirigida a login (sesión expirada o rechazada)",
-                    redirect_url=result.get("url", ""),
-                    endpoint=url,
+        try:
+            if m == "GET":
+                resp = self._context.request.get(
+                    url,
+                    headers=self._api_headers(),
                 )
-            if err == "NON_JSON":
-                raise FusionSolarResponseError(
-                    status=result.get("status", 0),
-                    body_preview=result.get("preview", ""),
-                    endpoint=url,
+            else:
+                resp = self._context.request.post(
+                    url,
+                    headers=self._api_headers(),
+                    data=_json.dumps(payload) if payload is not None else "{}",
                 )
-            if err == "HTTP_ERROR":
-                raise FusionSolarResponseError(
-                    status=result.get("status", 0),
-                    body_preview=str(result.get("body", "")),
-                    endpoint=url,
-                )
+        except Exception as e:
+            logger.error("_fetch %s %s — context.request excepción: %s", m, url, e)
+            raise FusionSolarResponseError(status=0, body_preview=str(e), endpoint=url)
 
-        return result
+        final_url   = resp.url
+        ct          = resp.headers.get("content-type", "")
+        status_code = resp.status
+
+        logger.debug("_fetch %s %s → HTTP %s ct=%s finalUrl=%s",
+                     m, url, status_code, ct, final_url)
+
+        # Redirect a login → sesión expirada
+        if "login" in final_url or "unisso" in final_url:
+            raise FusionSolarAuthError(
+                reason="API redirigida a login (sesión expirada o rechazada)",
+                redirect_url=final_url,
+                endpoint=url,
+            )
+
+        # Respuesta no-JSON
+        if "json" not in ct:
+            preview = resp.text()[:300]
+            logger.warning("_fetch NON_JSON HTTP %s | ct=%s | preview: %s",
+                           status_code, ct, preview)
+            raise FusionSolarResponseError(
+                status=status_code, body_preview=preview, endpoint=url,
+            )
+
+        # Error HTTP con JSON (FusionSolar devuelve errores estructurados)
+        if not resp.ok:
+            try:
+                body = resp.json()
+            except Exception:
+                body = {}
+            logger.warning("_fetch HTTP_ERROR %s | body: %s", status_code, str(body)[:200])
+            raise FusionSolarResponseError(
+                status=status_code, body_preview=str(body)[:200], endpoint=url,
+            )
+
+        return resp.json()
 
     def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
         try:
@@ -670,8 +800,22 @@ class StorageStateClient(FusionSolarClient):
             return default if default is not None else {}
 
     def get_station_list(self) -> list[dict]:
+        # Body exacto capturado del SPA (2026-05-11):
+        # curPage (no pageNo), queryTime = medianoche del día actual en el portal,
+        # timeZone = 2 (UTC+2, Europa/Madrid verano).
+        # pageSize 100 para obtener todas las plantas en una sola llamada.
+        ts_ms = int(datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).timestamp() * 1000)
         data = self._fetch("POST", self._STATION_LIST, {
-            "pageNo": 1, "pageSize": 100, "locale": "es_ES",
+            "curPage":           1,
+            "pageSize":          100,
+            "gridConnectedTime": "",
+            "queryTime":         ts_ms,
+            "timeZone":          2,
+            "sortId":            "createTime",
+            "sortDir":           "DESC",
+            "locale":            "es_ES",
         })
         raw = data.get("data", data)
         stations: list[dict] = []
@@ -680,17 +824,32 @@ class StorageStateClient(FusionSolarClient):
         elif isinstance(raw, list):
             stations = raw
         for st in stations:
-            code = st.get("stationCode") or st.get("stationDn", "")
+            # EU5 usa "dn" (ej: "NE=137403508"); otras versiones usan stationCode/stationDn.
+            code = st.get("stationCode") or st.get("stationDn") or st.get("dn", "")
             if code:
                 self._station_cache[code] = st
         logger.debug("get_station_list: %d plantas", len(stations))
         return stations
 
     def get_station_kpi(self, station_code: str) -> dict:
+        """Devuelve KPIs de la planta desde la caché del station-list (sin llamada extra).
+        El station-list de EU5 ya incluye currentPower, dailyEnergy, etc. para cada planta.
+        Si la caché no tiene la planta (no debería ocurrir), cae al endpoint total-KPI
+        (que devuelve totales globales de la cuenta, no por planta).
+        """
         cached = self._station_cache.get(station_code, {})
-        if cached.get("currentPower") is not None or cached.get("dayPower") is not None:
+        # EU5 station-list incluye currentPower y dailyEnergy directamente
+        has_realtime = any(
+            cached.get(k) is not None
+            for k in ("currentPower", "dayPower", "realTimePower",
+                      "activePower", "dailyEnergy", "dayEnergy")
+        )
+        if has_realtime:
             return cached
+        # Fallback: endpoint total-KPI (devuelve suma global, no por planta)
         ts_ms = int(time.time() * 1000)
+        logger.warning("  get_station_kpi: %s no en caché → fallback total-KPI (valores globales)",
+                       station_code)
         return self._safe_fetch(
             "GET", f"{self._TOTAL_KPI}?queryTime={ts_ms}&timeZone=2"
         ).get("data", {})
@@ -718,15 +877,53 @@ class StorageStateClient(FusionSolarClient):
         return alarms
 
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
+        """Producción de un día concreto para una planta.
+
+        EU5 identifica las plantas con "dn" (ej: "NE=137403508") y usa
+        "queryTime"+"timeZone" en lugar de "stationCodes"+"collectTime"
+        de la API global FusionSolar.
+        Incluye retry con backoff para los 503 transitorios del endpoint.
+        """
+        import time as _time
         dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
         ts_ms = int(dt.timestamp() * 1000)
-        data  = self._safe_fetch("POST", self._DAILY_KPI, {
-            "stationCodes": station_code, "collectTime": ts_ms,
-        }, default={})
-        raw = data.get("data", data)
-        if isinstance(raw, list):
-            return raw[0] if raw else {}
-        return raw or {}
+
+        # EU5 usa "dn" como identificador (ej: "NE=137403508");
+        # la API global FusionSolar usa "stationCodes".
+        id_key  = "dn" if station_code.startswith("NE=") else "stationCodes"
+        payload = {
+            id_key:      station_code,
+            "queryTime": ts_ms,
+            "timeZone":  2,
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            if attempt > 0:
+                wait = 5 * attempt   # 5s, luego 10s
+                logger.info("  get_daily_kpi retry #%d (espera %ds) %s %s",
+                            attempt, wait, station_code, day)
+                _time.sleep(wait)
+            try:
+                data = self._fetch("POST", self._DAILY_KPI, payload)
+                raw  = data.get("data", data)
+                if isinstance(raw, list):
+                    return raw[0] if raw else {}
+                return raw or {}
+            except FusionSolarAuthError:
+                raise   # sesión expirada — no reintentar
+            except FusionSolarResponseError as e:
+                last_exc = e
+                logger.warning("  get_daily_kpi error HTTP (intento %d/3) %s %s: %s",
+                               attempt + 1, station_code, day, e)
+            except Exception as e:
+                last_exc = e
+                logger.warning("  get_daily_kpi error inesperado (intento %d/3) %s %s: %s",
+                               attempt + 1, station_code, day, e)
+
+        logger.warning("  get_daily_kpi: 3 intentos fallidos %s %s → {}. Último: %s",
+                       station_code, day, last_exc)
+        return {}
 
     def close(self) -> None:
         try:

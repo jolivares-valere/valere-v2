@@ -207,6 +207,42 @@ export function useSyncLogEmpresa(empresaId: string | undefined, limit = 5) {
   })
 }
 
+/** Todas las alarmas activas (vista global — join con planta + empresa) */
+export function useTodasLasAlarmas() {
+  return useQuery({
+    queryKey: ['fv_alarma', 'todas'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('fv_alarma')
+        .select(`
+          *,
+          planta:fv_planta(
+            id, nombre, nombre_interno, station_code, capacidad_kwp,
+            empresa:empresas(id, nombre)
+          )
+        `)
+        .order('iniciada_en', { ascending: false })
+        .limit(200)
+
+      if (error) {
+        logError(error, 'useTodasLasAlarmas')
+        throw error
+      }
+      return (data ?? []) as (FVAlarma & {
+        planta: {
+          id: string
+          nombre: string
+          nombre_interno: string | null
+          station_code: string
+          capacidad_kwp: number | null
+          empresa: { id: string; nombre: string } | null
+        } | null
+      })[]
+    },
+  })
+}
+
 /** Todas las plantas (vista global para el módulo de seguimiento) */
 export function useTodasLasPlantas() {
   return useQuery({
@@ -217,7 +253,8 @@ export function useTodasLasPlantas() {
         .select(`
           *,
           empresa:empresas(id, nombre),
-          kpi_realtime:fv_kpi_realtime(*)
+          kpi_realtime:fv_kpi_realtime(*),
+          cups:cups(id, codigo_cups)
         `)
         .order('empresa_id')
         .order('nombre')
@@ -227,10 +264,19 @@ export function useTodasLasPlantas() {
         throw error
       }
 
-      return (data ?? []).map((row: any) => ({
-        ...row,
-        kpi_realtime: row.kpi_realtime?.[0] ?? row.kpi_realtime ?? null,
-      }))
+      return (data ?? []).map((row: any) => {
+        const kpi = row.kpi_realtime?.[0] ?? row.kpi_realtime ?? null
+        return {
+          ...row,
+          kpi_realtime: kpi,
+          // Normalizar campos que PlantasTab espera pero que tienen nombre distinto en BD:
+          // fv_planta no tiene ultima_sync → usamos actualizado_en del KPI
+          ultima_sync: kpi?.actualizado_en ?? row.actualizado_en ?? null,
+          // fv_planta tiene cups_id (FK) en vez del array cups_asociados de las fixtures
+          // El join cups devuelve el objeto con codigo_cups real
+          cups_asociados: row.cups?.codigo_cups ? [row.cups.codigo_cups] : [],
+        }
+      })
     },
   })
 }
@@ -238,6 +284,8 @@ export function useTodasLasPlantas() {
 // ─────────────────────────────────────────────────────────
 // Tipos para el flujo de alta manual
 // ─────────────────────────────────────────────────────────
+
+export type FVEstadoSesion = 'activa' | 'por_caducar' | 'caducada' | 'error' | 'desconocida'
 
 export interface FVCredencial {
   id: string
@@ -248,9 +296,13 @@ export interface FVCredencial {
   activo: boolean
   tipo: string | null
   descripcion: string | null
+  /** Campo heredado — ahora usar ultimo_ok_at */
   ultima_sync: string | null
+  ultimo_ok_at: string | null
   cookies_expires_at: string | null
   ultimo_error: string | null
+  /** Estado calculado por sync_job al final de cada sincronización */
+  estado_sesion: FVEstadoSesion
   // password_enc NUNCA se selecciona desde frontend
 }
 
@@ -493,6 +545,64 @@ export function useAsignarPlantaEmpresa() {
     onError: (err: Error) => {
       logError(err, 'useAsignarPlantaEmpresa')
       toast.error('Error al asignar la planta')
+    },
+  })
+}
+
+// ─────────────────────────────────────────────────────────
+// Mutations — sincronización manual desde CRM
+// ─────────────────────────────────────────────────────────
+
+interface TriggerSyncInput {
+  credencialId?: string   // si se omite → sincroniza todas las credenciales activas
+  empresaId?:   string
+  dryRun?:      boolean
+}
+
+/**
+ * Dispara el workflow GitHub Actions "fv-sync.yml" via Edge Function trigger-fv-sync.
+ * Solo funciona para usuarios master/admin.
+ * El sync tarda ~1-2 minutos en completarse (se ejecuta en GitHub Actions).
+ */
+export function useTriggerFVSync() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: TriggerSyncInput = {}) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No autenticado')
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trigger-fv-sync`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            credencial_id: input.credencialId,
+            empresa_id:    input.empresaId,
+            dry_run:       input.dryRun ?? false,
+          }),
+        }
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? `Error HTTP ${res.status}`)
+      }
+      return res.json() as Promise<{ ok: boolean; message: string; workflow_run_url: string }>
+    },
+    onSuccess: (data) => {
+      toast.success(data.message, { duration: 6000 })
+      // Invalidar credenciales ~90s despues (tiempo estimado del workflow)
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['fv_credenciales'] })
+        qc.invalidateQueries({ queryKey: ['fv_planta'] })
+      }, 90_000)
+    },
+    onError: (err: Error) => {
+      logError(err, 'useTriggerFVSync')
+      toast.error(`Error al lanzar sync: ${err.message}`)
     },
   })
 }

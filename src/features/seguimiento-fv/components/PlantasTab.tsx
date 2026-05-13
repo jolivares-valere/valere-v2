@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Search, CheckCircle2, AlertTriangle, WifiOff, Battery, Sun } from 'lucide-react'
-import type { FxPlanta } from '../fixtures'
 
 function fmt(n: number | null | undefined, dec = 1, suffix = '') {
   if (n == null) return '—'
@@ -14,13 +13,15 @@ function fmtDate(s: string | null | undefined) {
 
 const ESTADO: Record<string, { label: string; color: string; dot: string; Icon: React.ElementType }> = {
   normal:       { label: 'Operativa',    color: 'bg-green-100 text-green-800',  dot: 'bg-green-500',  Icon: CheckCircle2 },
-  defectuoso:   { label: 'Avería',       color: 'bg-red-100 text-red-800',      dot: 'bg-red-500',    Icon: AlertTriangle },
-  desconectado: { label: 'Sin conexión', color: 'bg-slate-100 text-slate-600',  dot: 'bg-slate-400',  Icon: WifiOff },
+  defectuoso:   { label: 'Averia',       color: 'bg-red-100 text-red-800',      dot: 'bg-red-500',    Icon: AlertTriangle },
+  desconectado: { label: 'Sin conexion', color: 'bg-slate-100 text-slate-600',  dot: 'bg-slate-400',  Icon: WifiOff },
   desconocido:  { label: 'Desconocido',  color: 'bg-yellow-100 text-yellow-800',dot: 'bg-yellow-400', Icon: Sun },
 }
 
+// Acepta tanto fixtures como datos reales de Supabase (any[] normalizado)
 interface Props {
-  plantas: FxPlanta[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  plantas: any[]
 }
 
 export default function PlantasTab({ plantas }: Props) {
@@ -29,9 +30,9 @@ export default function PlantasTab({ plantas }: Props) {
 
   const plantasFiltradas = plantas.filter(p => {
     const matchS = !search
-      || p.nombre.toLowerCase().includes(search.toLowerCase())
+      || (p.nombre ?? '').toLowerCase().includes(search.toLowerCase())
       || (p.empresa?.nombre ?? '').toLowerCase().includes(search.toLowerCase())
-      || p.station_code.toLowerCase().includes(search.toLowerCase())
+      || (p.station_code ?? '').toLowerCase().includes(search.toLowerCase())
     const matchF = filtro === 'todos' || p.estado === filtro
     return matchS && matchF
   })
@@ -45,7 +46,7 @@ export default function PlantasTab({ plantas }: Props) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar planta, cliente o código…"
+            placeholder="Buscar planta, cliente o codigo..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-valere-blue/20"
@@ -74,8 +75,8 @@ export default function PlantasTab({ plantas }: Props) {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               {[
-                'Planta / código', 'Cliente', 'Capacidad', 'Estado',
-                'Potencia', 'Energía hoy', 'CUPS', 'Última sync',
+                'Planta / codigo', 'Cliente', 'Capacidad', 'Estado',
+                'Potencia', 'Energia hoy', 'CUPS', 'Ultima sync',
               ].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">
                   {h}
@@ -98,8 +99,8 @@ export default function PlantasTab({ plantas }: Props) {
                     <div className="flex items-center gap-2.5">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
                       <div>
-                        <p className="font-medium text-slate-800">{p.nombre}</p>
-                        <p className="text-xs text-slate-400 font-mono">{p.station_code}</p>
+                        <p className="font-medium text-slate-800">{p.nombre ?? '—'}</p>
+                        <p className="text-xs text-slate-400 font-mono">{p.station_code ?? '—'}</p>
                       </div>
                     </div>
                   </td>
@@ -109,7 +110,7 @@ export default function PlantasTab({ plantas }: Props) {
                   <td className="px-4 py-3 text-slate-600">
                     <div className="flex items-center gap-1">
                       {fmt(p.capacidad_kwp, 1, ' kWp')}
-                      {p.tiene_bateria && <Battery className="w-3.5 h-3.5 text-green-500" aria-label="Con batería" />}
+                      {!!p.tiene_bateria && <Battery className="w-3.5 h-3.5 text-green-500" aria-label="Con bateria" />}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -125,8 +126,8 @@ export default function PlantasTab({ plantas }: Props) {
                     {fmt(p.kpi_realtime?.energia_hoy_kwh, 1, ' kWh')}
                   </td>
                   <td className="px-4 py-3">
-                    {p.cups_asociados.length > 0 ? (
-                      <span className="font-mono text-xs text-slate-600">{p.cups_asociados[0]}</span>
+                    {(p.cups_asociados ?? [])[0] ? (
+                      <span className="font-mono text-xs text-slate-600">{(p.cups_asociados ?? [])[0]}</span>
                     ) : (
                       <span className="text-xs text-slate-300">Sin CUPS</span>
                     )}
