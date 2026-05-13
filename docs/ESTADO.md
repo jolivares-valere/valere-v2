@@ -10,11 +10,14 @@
 > | `src/features/datadis/SupplyDetailPage.tsx` | Refactor completo para usar DTOs canónicos. Nueva `ReactivaTab`: KPIs, gráfico de barras con Cell coloreado, tabla P1-P6, badge de penalización por umbral. Tab 5ª añadida al router de tabs. | `a0c8e8e` + `4ea3dcc` |
 > | `docs/DATADIS_BLUEPRINT_MODULO_CRM_VALERE.md` | Blueprint arquitectónico completo: DTOs, normalizers, tablas BD, dashboards, alertas, roadmap. | `b0626cb` |
 >
-> ### Estado módulo Datadis tras esta sesión
+> ### Estado módulo Datadis tras esta sesión — VALIDADO EN PRODUCCIÓN ✅
 > - ✅ Normalización centralizada: frontend nunca toca campos raw de Datadis
-> - ✅ Tab Reactiva funcional con badge de penalización (umbral 150 kVArh)
-> - ✅ TSC 0 errores en main (`4ea3dcc`)
+> - ✅ Tab Reactiva funcional: KPIs (2915 kVArh total, 14/14 meses), gráfico, tabla P1-P6, badges
+> - ✅ Tab Cierres: columna REACTIVA con valores reales (antes mostraba "---")
+> - ✅ Tab Contrato: "Indefinido" en fin de contrato (antes mostraba "---")
+> - ✅ TSC 0 errores; desplegado en https://valere-v2.pages.dev (`4ea3dcc`)
 > - ⏳ Tab Consumo: desglose mensual/anual P1-P6 (próxima sesión Datadis)
+> - ⏳ Curva Tipo 1/2: pendiente probar con CUPS de telemedida real
 > - ⏳ Mover normalización al Edge Function datadis-proxy (backend, futuro)
 >
 > ---
