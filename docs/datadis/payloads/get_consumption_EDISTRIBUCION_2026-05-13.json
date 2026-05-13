@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "endpoint": "get_consumption",
+    "cups": "ES0031104950142010SA0F",
+    "distributor": "2 (EDISTRIBUCIÓN)",
+    "tariff": "3.0TD",
+    "tipoPunto": 4,
+    "capturedAt": "2026-05-13",
+    "capturedBy": "Claude Browser inspection",
+    "totalPoints": 9760,
+    "monthsCovered": 14
+  },
+  "_responseShape": {
+    "ok": true,
+    "data": {
+      "response": {
+        "timeCurveList": "Array<ConsumoPoint>",
+        "mediumCurveList": null,
+        "mediumCurveAutoList": null
+      }
+    },
+    "from_cache": true,
+    "cached_at": "ISO8601"
+  },
+  "_pointShape": {
+    "cups": "ES0031104950142010SA0F",
+    "date": "2025/04/01",
+    "hour": "01:00",
+    "error": 0,
+    "period": "ANUAL",
+    "energyPoured": null,
+    "energyReactive": null,
+    "energyGenerated": null,
+    "metodoObtencion": "Real",
+    "obtainingMethod": 1,
+    "selfConsumptionEnergy": null,
+    "measureMagnitudeActive": 0.965
+  },
+  "_keyNotes": [
+    "measureMagnitudeActive es el kWh activo del intervalo — NO consumptionKWh",
+    "hour = hora de FIN del intervalo (01:00..24:00), no de inicio",
+    "period siempre = 'ANUAL' — NO sirve para P1-P6 (hay que derivarlo de date+hour)",
+    "metodoObtencion = 'Real' | 'Estimada' — campo español",
+    "energyPoured / energyReactive / energyGenerated / selfConsumptionEnergy = null en BT sin telemedida",
+    "timeCurveList para Tipo 4 (BT consulta). mediumCurveList solo para Tipo 1/2 (telemedida)"
+  ],
+  "_monthlyTotals": {
+    "2025/04": 2126.98,
+    "2025/05": 1977.99,
+    "2025/06": 3153.90,
+    "2025/07": 3063.93,
+    "2025/08": 2865.00,
+    "2025/09": 2691.97,
+    "2025/10": 1982.99,
+    "2025/11": 2077.00,
+    "2025/12": 1980.97
+  }
+}

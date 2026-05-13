@@ -7,6 +7,33 @@
 
 ---
 
+## Regla de oro — Protocolo de normalización
+
+> **Ningún endpoint Datadis se normaliza sin payload real capturado y documentado.**
+
+Orden obligatorio antes de implementar cualquier normalizador:
+
+1. Capturar payload real (Claude Browser o logs de proxy)
+2. Guardar ejemplo en `docs/datadis/payloads/<endpoint>_<distributor>_<date>.json`
+3. Escribir DTO raw basado en ese payload (campos exactos, no asumidos)
+4. Escribir normalizador
+5. Validar numéricamente contra los datos capturados
+6. Solo entonces: UI
+
+**Payloads capturados y verificados:**
+
+| Endpoint | Distribuidora | Archivo |
+|---|---|---|
+| `get_contractual` | EDISTRIBUCIÓN | — (pendiente documentar) |
+| `get_max_power` | EDISTRIBUCIÓN | — (pendiente documentar) |
+| `get_reactive` | EDISTRIBUCIÓN | — (pendiente documentar) |
+| `get_consumption` | EDISTRIBUCIÓN | `docs/datadis/payloads/get_consumption_EDISTRIBUCION_2026-05-13.json` |
+
+Por qué esta regla: `tsc --noEmit = 0` solo verifica que el código compila con los tipos declarados.
+No verifica que los campos existan en el payload real. El error puede estar en la premisa de datos, no en la sintaxis.
+
+---
+
 ## Lección crítica de la sesión 2026-05-13
 
 Antes de cualquier diseño de dashboards, hay que leer esta lección:

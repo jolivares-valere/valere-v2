@@ -234,66 +234,157 @@ export function extractTariff(supply: DatadisSupply, contract?: ContractDTO | nu
   return contract?.tariff ?? '3.0TD'
 }
 
-// ─── ConsumptionMonthlyDTO + normalizeConsumption ─────────────────────────────────────────────
+import { derivePeriod } from './periodos30TD'
+import type { TariffPeriod } from './periodos30TD'
 
-/**
- * DTO para consumo mensual agregado.
- *
- * Origen: datos horarios de get_consumption agregados por mes.
- * Nota: la descomposición P1–P6 mensual requiere el endpoint
- * get-consumption-between-dates-by-period (añadir al proxy en siguiente fase).
- */
-export interface ConsumptionMonthlyDTO {
-  /** Mes en formato YYYY-MM */
+// ─── ConsumoMonthlyAgg + ConsumoNormalized ──────────────────────────────────────────────────────────
+
+/** Agregado mensual con desglose de períodos estimados */
+export interface ConsumoMonthlyAgg {
   month: string
-  /** Consumo total del mes en kWh */
   totalKwh: number
-  /** Excedentes del mes en kWh (0 si no hay autoconsumo) */
-  surplusKwh: number
-  /** Número de registros horarios que componen este mes */
+  byPeriod: Record<TariffPeriod, number>
+  maxHourKwh: number
+  /** Calidad del dato en el mes */
+  source: 'Real' | 'Estimada' | 'Mixto'
   pointCount: number
 }
 
+/** Resultado completo de normalización de consumo horario */
+export interface ConsumoNormalized {
+  cups: string
+  monthly: ConsumoMonthlyAgg[]
+  totalKwh: number
+  monthsCovered: number
+  hasRealData: boolean
+  hasEstimatedData: boolean
+  rangeStart: string
+  rangeEnd: string
+  /** Máximo kWh en una sola hora */
+  maxHourKwh: number
+  maxHourDate: string
+  /** Período con más kWh acumulados en todo el rango */
+  dominantPeriod: TariffPeriod | null
+  /** 'estimated': derivado de hora/día/mes sin festivos (v1) */
+  periodConfidence: 'estimated'
+}
+
 /**
- * Agrega puntos horarios de get_consumption a nivel mensual.
+ * Normaliza la respuesta de get_consumption (curva horaria).
  *
- * El endpoint horario no devuelve P1–P6 — cada punto es un intervalo con
- * consumptionKWh total y, si el CUPS tiene autoconsumo, surplusEnergyKWh.
+ * Shape real de EDISTRIBUCIÓN:
+ *   raw = { response: { timeCurveList: [...], mediumCurveList: null, ... } }
  *
- * Soporta shapes: [...] y {response:[...]}.
+ * Cada punto:
+ *   { cups, date, hour, measureMagnitudeActive, metodoObtencion, ... }
+ *
+ * @param raw   - Dato crudo del proxy (data.data)
+ * @param opts  - { tariff: código de tarifa del contrato, default "3.0TD" }
  */
-export function normalizeConsumption(raw: unknown): ConsumptionMonthlyDTO[] {
-  if (!raw) return []
+export function normalizeConsumption(
+  raw: unknown,
+  opts: { tariff?: string } = {},
+): ConsumoNormalized | null {
+  if (!raw) return null
 
-  const arr = extractArray(raw)
-  if (!arr.length) return []
+  const r    = raw as Record<string, unknown>
+  const resp = r?.response as Record<string, unknown> | null | undefined
 
-  // Acumular por mes
-  const byMonth: Record<string, { totalKwh: number; surplusKwh: number; pointCount: number }> = {}
+  // Extraer timeCurveList
+  const list: unknown[] = Array.isArray(resp?.timeCurveList)
+    ? (resp!.timeCurveList as unknown[])
+    : []
 
-  for (const p of arr) {
+  if (!list.length) return null
+
+  const tariff = opts.tariff ?? '3.0TD'
+
+  const byMonth: Record<string, ConsumoMonthlyAgg> = {}
+  const periodTotals: Record<TariffPeriod, number> = { P1: 0, P2: 0, P3: 0, P4: 0, P5: 0, P6: 0 }
+
+  let cups        = ''
+  let totalKwh    = 0
+  let maxHourKwh  = 0
+  let maxHourDate = ''
+  let hasReal     = false
+  let hasEstimated = false
+
+  for (const p of list) {
     const item = p as Record<string, unknown>
-    const rawDate = String(item['date'] ?? item['fecha'] ?? '')
+
+    const rawDate = String(item['date'] ?? '')
+    const hour    = String(item['hour'] ?? item['time'] ?? '01:00')
+    const kwh     = Math.max(0, Number(item['measureMagnitudeActive'] ?? item['consumptionKWh'] ?? 0))
+    const srcRaw  = String(item['metodoObtencion'] ?? item['obtainMethod'] ?? 'Real')
+    const isReal  = srcRaw === 'Real' || srcRaw === '1'
+
     const month = toYearMonth(rawDate)
     if (!month) continue
 
-    const kwh    = Number(item['consumptionKWh']    ?? item['consumo']    ?? 0)
-    const surplus = Number(item['surplusEnergyKWh'] ?? item['excedente'] ?? 0)
+    cups      = String(item['cups'] ?? cups)
+    totalKwh += kwh
+
+    if (kwh > maxHourKwh) {
+      maxHourKwh  = kwh
+      maxHourDate = rawDate.replace(/\//g, '-') + ' ' + hour
+    }
+
+    if (isReal) hasReal = true
+    else        hasEstimated = true
+
+    const { period } = derivePeriod(rawDate, hour, tariff)
+    periodTotals[period] = (periodTotals[period] ?? 0) + kwh
 
     if (!byMonth[month]) {
-      byMonth[month] = { totalKwh: 0, surplusKwh: 0, pointCount: 0 }
+      byMonth[month] = {
+        month,
+        totalKwh:   0,
+        byPeriod:   { P1: 0, P2: 0, P3: 0, P4: 0, P5: 0, P6: 0 },
+        maxHourKwh: 0,
+        source:     'Real',
+        pointCount: 0,
+      }
     }
-    byMonth[month].totalKwh   += kwh
-    byMonth[month].surplusKwh += surplus
-    byMonth[month].pointCount += 1
+    const agg = byMonth[month]
+    agg.totalKwh        += kwh
+    agg.byPeriod[period] = (agg.byPeriod[period] ?? 0) + kwh
+    agg.pointCount      += 1
+    if (kwh > agg.maxHourKwh) agg.maxHourKwh = kwh
+
+    // Actualizar fuente del mes
+    if (agg.source === 'Real'    && !isReal) agg.source = 'Mixto'
+    if (agg.source === 'Estimada' && isReal) agg.source = 'Mixto'
+    if (agg.source === 'Real'    && !isReal && agg.pointCount === 1) agg.source = 'Estimada'
   }
 
-  return Object.entries(byMonth)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, v]) => ({
-      month,
-      totalKwh:   Math.round(v.totalKwh * 10) / 10,
-      surplusKwh: Math.round(v.surplusKwh * 10) / 10,
-      pointCount: v.pointCount,
+  const monthly = Object.values(byMonth)
+    .map(m => ({
+      ...m,
+      totalKwh:   Math.round(m.totalKwh   * 10) / 10,
+      maxHourKwh: Math.round(m.maxHourKwh * 1000) / 1000,
+      byPeriod:   Object.fromEntries(
+        Object.entries(m.byPeriod).map(([k, v]) => [k, Math.round(v * 10) / 10])
+      ) as ConsumoMonthlyAgg['byPeriod'],
     }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+
+  const sorted   = Object.entries(periodTotals).sort(([, a], [, b]) => b - a)
+  const dominant = sorted[0]?.[0] as TariffPeriod | undefined
+
+  const allMonths = monthly.map(m => m.month)
+
+  return {
+    cups,
+    monthly,
+    totalKwh:         Math.round(totalKwh * 10) / 10,
+    monthsCovered:    monthly.length,
+    hasRealData:      hasReal,
+    hasEstimatedData: hasEstimated,
+    rangeStart:       allMonths[0]  ?? '',
+    rangeEnd:         allMonths[allMonths.length - 1] ?? '',
+    maxHourKwh:       Math.round(maxHourKwh * 1000) / 1000,
+    maxHourDate,
+    dominantPeriod:   dominant ?? null,
+    periodConfidence: 'estimated',
+  }
 }

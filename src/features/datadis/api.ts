@@ -62,10 +62,26 @@ export interface DatadisContractualData {
 export interface DatadisConsumptionPoint {
   cups?: string
   date?: string
+  /** Hora de FIN del intervalo en formato DataDis: "01:00"..."24:00" */
+  hour?: string
+  /** @deprecated: no llega en EDISTRIBUCIÓN */
   time?: string
+  /** Campo real EDISTRIBUCIÓN: kWh activos del intervalo horario */
+  measureMagnitudeActive?: number
+  /** @deprecated alias antiguo — usar measureMagnitudeActive */
   consumptionKWh?: number
-  obtainMethod?: string
+  /** "Real" | "Estimada" — campo EDISTRIBUCIÓN */
+  metodoObtencion?: string
+  /** Alias inglés: 1=Real, 2=Estimada */
+  obtainMethod?: string | number
+  /** Excedentes autoconsumo (null si no aplica) */
+  energyPoured?: number | null
+  /** @deprecated alias antiguo */
   surplusEnergyKWh?: number
+  /** Reactiva del intervalo (null en BT sin telemedida) */
+  energyReactive?: number | null
+  /** Generación FV registrada (null si no aplica) */
+  energyGenerated?: number | null
   [key: string]: unknown
 }
 
