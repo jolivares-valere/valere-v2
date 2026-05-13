@@ -1,7 +1,26 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-14 — Datadis: Fix crítico P6 + festivos Circular 3/2020 CNMC (8f029d1). TSC 0 errores.**
+> **Última actualización: 2026-05-14 — Datadis: perf cache 6h + Hito 1 cerrado (b58f4e1). TSC 0 errores.**
 >
+> ## ✅ SESIÓN 2026-05-14 (3ª parte) — DATADIS: PERFORMANCE CACHE + HITO 1 CIERRE
+>
+> ### Fix rendimiento: cache 6h unificada (commit b58f4e1)
+> | Causa raíz | Fix |
+> |---|---|
+> | `CierresTab` pedia `get_reactive` con 12m y `ReactivaTab` con 13m → queryKeys distintas → 2 llamadas reales (37s + 47s) | Ambos ahora usan `getDateRange(24)` → misma queryKey → React Query deduplica |
+> | `ConsumoTab` incluia `fechaInicial/Final` variables en queryKey → re-fetch en cada selector 3/6/12/24m | Siempre pide 24m; `rangeMonths` filtra en cliente con `.slice(-rangeMonths)` |
+> | `CurveTab` idem con rangos 7d/30d/3m | Siempre pide 24m; filtro por cutoff date sobre puntos crudos |
+> | `staleTime: 10min` en hooks | `DATADIS_CACHE` con `staleTime: 6h`, `gcTime: 24h`, `refetchOnMount/Focus: false` |
+>
+> ### Hito 1 — CERRADO
+> - derivePeriod30TD: 35/35 tests + validación producción OK (nov/dic/ene/feb P6 dominante)
+> - Banner UI actualizado: "CNMC Circular 3/2020 + festivos Andalucía + error <0.3%"
+>
+> ### Pendientes Hito 2
+> - Factura teórica v1: tabla `datadis_supply_price_terms` + `calculateInvoiceEstimate()`
+> - Requiere: factura real CUPS para calibrar precios P1-P6 por temporada
+> ---
+
 > ## ✅ SESIÓN 2026-05-14 (2ª parte) — DATADIS: FIX CRÍTICO P6 + FESTIVOS CNMC
 >
 > | Artefacto | Cambio | Commit |
