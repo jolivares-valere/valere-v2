@@ -37,6 +37,7 @@ import logging
 import os
 import sys
 import time
+import uuid as _uuid_mod
 from collections import defaultdict
 from datetime import date, timedelta, timezone, datetime
 
@@ -352,6 +353,64 @@ def generar_informe_mensual_borrador(sb: Client, dry_run: bool = False) -> None:
 
 
 # ─────────────────────────────────────────────────────────
+# Auditoría: helper para insertar en fv_sync_audit
+# ─────────────────────────────────────────────────────────
+
+def _audit_record(
+    sb: "Client",
+    run_id: str,
+    credencial_id: str,
+    planta_id: str | None,
+    endpoint: str,
+    ok: bool,
+    error_tipo: str | None = None,
+    error_raw: str | None = None,
+    intentos: int = 1,
+    filas_insertadas: int = 0,
+    ms_elapsed: int | None = None,
+    fecha_dato: "date | None" = None,
+) -> None:
+    """Inserta un registro de auditoría en fv_sync_audit. No lanza excepciones."""
+    try:
+        row: dict = {
+            "run_id":          run_id,
+            "credencial_id":   credencial_id,
+            "planta_id":       planta_id,
+            "endpoint":        endpoint,
+            "ok":              ok,
+            "intentos":        intentos,
+            "filas_insertadas": filas_insertadas,
+        }
+        if error_tipo:
+            row["error_tipo"] = error_tipo
+        if error_raw:
+            row["error_raw"] = str(error_raw)[:500]   # limitar longitud
+        if ms_elapsed is not None:
+            row["ms_elapsed"] = ms_elapsed
+        if fecha_dato is not None:
+            row["fecha_dato"] = fecha_dato.isoformat()
+        sb.table("fv_sync_audit").insert(row).execute()
+    except Exception as e:
+        logger.warning("_audit_record error (no bloqueante): %s", e)
+
+
+def _classify_error(exc: Exception) -> str:
+    """Clasifica una excepción en una categoría de fv_error_category."""
+    msg = str(exc).lower()
+    if "auth_redirect" in msg or "auth" in msg or "login" in msg:
+        return "auth"
+    if "503" in msg or "rate" in msg or "throttl" in msg:
+        return "rate_limit"
+    if "overflow" in msg or "numeric" in msg or "out of range" in msg:
+        return "overflow"
+    if "timeout" in msg or "timed out" in msg:
+        return "timeout"
+    if "payload" in msg or "stationcodes" in msg or "collecttime" in msg:
+        return "payload"
+    return "unknown"
+
+
+# ─────────────────────────────────────────────────────────
 # Sincronización de una credencial
 # ─────────────────────────────────────────────────────────
 
@@ -363,6 +422,8 @@ def sync_credencial(
     dry_run: bool = False,
     backfill_days: int = 1,
 ) -> dict:
+    # run_id único por ejecución de credencial — agrupa todos sus registros de auditoría
+    run_id     = str(_uuid_mod.uuid4())
     cred_id    = cred["id"]
     empresa_id = cred.get("empresa_id")   # None si credencial multi-cliente
     plataforma = cred["plataforma"]
@@ -639,25 +700,33 @@ def sync_credencial(
                 # Pausa anti-rate-limit entre llamadas históricas (1s)
                 if dias_atras > 0:
                     import time as _t; _t.sleep(1)
+                _t0 = time.monotonic()
+                _audit_intentos = 1
                 try:
                     if dias_atras == 0:
                         kpi_d = client.get_station_kpi(station_code)  # caché station-list
                     else:
                         kpi_d = client.get_daily_kpi(station_code, fecha)
+                        # get_daily_kpi hace hasta 3 intentos internamente
+                        _audit_intentos = 3 if not kpi_d else 1
                     # Energía — guard contra NaN/overflow
+                    _overflow_energia = False
                     try:
                         energia = float(kpi_d.get("dailyEnergy") or kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0)
                         if not (0 <= energia <= 999_999):
                             logger.warning("  energia_kwh fuera de rango (%.1f) %s %s — forzado a 0", energia, station_code, fecha)
                             energia = 0.0
+                            _overflow_energia = True
                     except (TypeError, ValueError):
                         energia = 0.0
                     # Potencia máxima — guard contra NaN/overflow
+                    _overflow_potencia = False
                     try:
                         potencia_max = float(kpi_d.get("inverterPower") or kpi_d.get("peakPower") or 0)
                         if not (0 <= potencia_max <= 99_999):
                             logger.warning("  potencia_max_kw fuera de rango (%.1f) %s %s — forzado a 0", potencia_max, station_code, fecha)
                             potencia_max = 0.0
+                            _overflow_potencia = True
                     except (TypeError, ValueError):
                         potencia_max = 0.0
                     sb.table("fv_kpi_diario").upsert({
@@ -668,8 +737,27 @@ def sync_credencial(
                         "ingresos_eur":    round(energia * PRECIO_KWH_EST, 2),
                     }, on_conflict="planta_id,fecha").execute()
                     logger.info("  KPI diario OK %s %s → %.1f kWh", station_code, fecha, energia)
+                    # Auditoría: éxito (o éxito con overflow corregido)
+                    _ms = int((time.monotonic() - _t0) * 1000)
+                    _etipo = "overflow" if (_overflow_energia or _overflow_potencia) else None
+                    _is_empty = (energia == 0.0 and potencia_max == 0.0 and not (_overflow_energia or _overflow_potencia))
+                    if _is_empty:
+                        _etipo = "empty"
+                    _audit_record(
+                        sb, run_id, cred_id, planta_id, "daily_kpi",
+                        ok=True, error_tipo=_etipo,
+                        intentos=_audit_intentos, filas_insertadas=1,
+                        ms_elapsed=_ms, fecha_dato=fecha,
+                    )
                 except Exception as e:
                     logger.warning("  KPI diario error %s fecha=%s: %s", station_code, fecha, e)
+                    _ms = int((time.monotonic() - _t0) * 1000)
+                    _audit_record(
+                        sb, run_id, cred_id, planta_id, "daily_kpi",
+                        ok=False, error_tipo=_classify_error(e),
+                        error_raw=str(e), intentos=_audit_intentos,
+                        ms_elapsed=_ms, fecha_dato=fecha,
+                    )
 
             # -- Alarmas activas
             try:
