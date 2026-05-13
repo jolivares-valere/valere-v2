@@ -1,63 +1,33 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-13 por Cowork — Sesión FV hardening: fix EU5 daily_kpi (dn+queryTime), overflow guards HOTEL SIERRA LUZ, cron diario 07:00 UTC, concurrency group, fv_sync_audit scaffold. commit 45a7c3a. Branch: feature/fv-operational-redesign. PENDIENTE: merge a main + COMMIT_FV_AUDIT.ps1.**
+> **Última actualización: 2026-05-13 (cierre de sesión) — EU5 fix + overflow guards + fv_sync_audit + YAML fix + merge a main completado. main: 24653ce.**
 >
-> ## ✅ SESIÓN 2026-05-13 — FV HARDENING: EU5 FIX + OVERFLOW GUARDS + AUDIT SCAFFOLD
+> ## ✅ SESIÓN 2026-05-13 — FV HARDENING COMPLETO + AUDIT SCAFFOLD
 >
-> | Artefacto | Cambio | Commit |
+> | Artefacto | Cambio | Commit / Estado |
 > |---|---|---|
-> | `fusionsolar_client.py` | `get_daily_kpi` (WebAuthClient + StorageStateClient): detecta EU5 por `station_code.startswith("NE=")` → usa `dn`+`queryTime`+`timeZone:2` en vez de `stationCodes`+`collectTime`. StorageStateClient: retry x3 con backoff 5s/10s en FusionSolarResponseError (503 transitorios). | `45a7c3a` |
-> | `sync_job.py` | Backfill loop: guards `energia_kwh` (>999,999→0) y `potencia_max_kw` (>99,999→0) contra overflow (fix HOTEL SIERRA LUZ). `sleep(1)` entre llamadas históricas anti-rate-limit. | `45a7c3a` |
-> | `.github/workflows/fv-sync.yml` | Cron `0 * * * *` → `0 7 * * *` (24x/día → 1x/día 07:00 UTC). Añadido `concurrency.group: fv-sync` anti-solapamiento. | `45a7c3a` |
-> | `sync_job.py` | Helpers `_audit_record()` (no bloqueante) + `_classify_error()` (taxonomía 7 categorías). `run_id` UUID por ejecución. Backfill instrumentado con audit OK/FAIL. | **NO COMMIT — ejecutar COMMIT_FV_AUDIT.ps1** |
-> | `supabase/migrations/20260513_fv_sync_audit.sql` | ENUM `fv_error_category`, tabla `fv_sync_audit`, 4 índices, vista `fv_sync_health_latest` (DISTINCT ON), RLS admin/user. | **NO APLICADO en Supabase** |
+> | `fusionsolar_client.py` | EU5 fix: `get_daily_kpi` detecta `NE=` → usa `dn`+`queryTime`+`timeZone:2`. Retry x3 en StorageStateClient. | `45a7c3a` en main |
+> | `sync_job.py` | Overflow guards HOTEL SIERRA LUZ (`>99,999→0`). `sleep(1)` anti-rate-limit. | `45a7c3a` en main |
+> | `.github/workflows/fv-sync.yml` | Cron `0 7 * * *` (07:00 UTC). `concurrency.group`. Fix YAML inputs injection (inputs via `env:` vars). | `4a50df9` + `a5ad0b4` en main |
+> | `sync_job.py` | Helpers `_audit_record()` (no bloqueante) + `_classify_error()`. `run_id` UUID por ejecución. Backfill instrumentado. | `24653ce` en main ✅ |
+> | `supabase/migrations/20260513_fv_sync_audit.sql` | ENUM `fv_error_category`, tabla `fv_sync_audit`, 4 índices, vista `fv_sync_health_latest`, RLS via `empresas.comercial_id`. | Aplicado en prod ✅ |
+> | `supabase/migrations/20260422_fase28_6_rls_policies_cleanup.sql` | RLS granular notificaciones + limpieza policies custom_fields duplicadas. | Aplicado en prod ✅ |
+> | `docs/PLAN_INCIDENCIAS_CRM_CONEXION.md` | Plan completo para conectar IncidenciasTab a tabla `incidencias` real (~2h). | Documentado ✅ |
 >
-> ### Estado del workflow fv-sync tras esta sesión
-> - 2 intentos fallaron con `KeyError: 'password_enc'` — ambos corrieron desde `main` (código viejo), no desde `feature/fv-operational-redesign`
-> - **Causa**: scheduled crons de GitHub Actions siempre usan el branch por defecto (main)
-> - **Solución**: merge `feature/fv-operational-redesign` → `main` (script `MERGE_FEATURE_TO_MAIN.ps1` listo en `~/.claude/`)
+> ### Validación local EU5 (sesión 2026-05-13)
+> - EU5 fix validado localmente con `python sync_job.py`: `NE=135347362` KPI insertado OK
+> - Overflow guard capturó `-99999999.0` para HOTEL SIERRA LUZ → guardado como `0.0 kWh` ✅
+> - Merge `feature/fv-operational-redesign` → `main` completado: `24653ce` ✅
 >
-> ### Acción inmediata requerida (Juan) — ORDEN CRÍTICO
->
-> **PASO 1** — Commit docs (antes de todo):
-> ```
-> pwsh C:\Users\joliv\.claude\COMMIT_DOCS_2026-05-13.ps1
-> ```
->
-> **PASO 2** — Test manual desde el feature branch (NO desde main):
-> ```
-> GitHub Actions → Run workflow → Use workflow from: feature/fv-operational-redesign
-> ```
-> Verificar en el log del run:
-> - `Checking out the ref 'refs/heads/feature/fv-operational-redesign'` ← CRÍTICO
-> - `NE=135347362`
-> - `KPI diario OK ... 0.0 kWh`
-> - exit code 0
->
-> **PASO 3** — Solo si PASO 2 verde → merge a main:
-> ```
-> pwsh C:\Users\joliv\.claude\MERGE_FEATURE_TO_MAIN.ps1
-> ```
->
-> **PASO 4** — Aplicar SQL `fv_sync_audit` en Supabase Dashboard:
-> ```
-> supabase/migrations/20260513_fv_sync_audit.sql
-> ```
->
-> **PASO 5** — Commit instrumentación auditoría:
-> ```
-> pwsh C:\Users\joliv\.claude\COMMIT_FV_AUDIT.ps1
-> ```
->
-> **Pendientes FV actualizados:**
-> - ⏳ Ejecutar `MERGE_FEATURE_TO_MAIN.ps1` (BLOQUEANTE para todo lo demás)
-> - ⏳ Validar workflow: NE=135347362 + KPI diario OK + exit code 0
-> - ⏳ Ejecutar `COMMIT_FV_AUDIT.ps1` (commit sync_job.py con audit helpers)
-> - ⏳ Aplicar `20260513_fv_sync_audit.sql` en Supabase
+> ### Pendientes FV (próxima sesión)
+> - ⏳ CI auth portabilidad: cookies IP-tied → WebAuthClient fallback en CI (login desde runner)
 > - ⏳ Asignar 7 plantas reales a empresa+CUPS desde tab "Sin asignar"
-> - ⏳ Configurar `RESEND_API_KEY` en Supabase Edge Functions Secrets (alertas email alarmas críticas)
-> - ⏳ Configurar `GITHUB_PAT` en Supabase Edge Functions Secrets (botón Sincronizar desde CRM)
+> - ⏳ Configurar `RESEND_API_KEY` en Supabase Edge Functions Secrets
+> - ⏳ Configurar `GITHUB_PAT` en Supabase Edge Functions Secrets
 > - ⏳ Deploy Edge Function `trigger-fv-sync`
+> - ⏳ Conectar `IncidenciasTab` a tabla `incidencias` real (plan en `docs/PLAN_INCIDENCIAS_CRM_CONEXION.md`, ~2h)
+> - ⏳ Deploy Edge Function `chat-consultor`
+> - ⏳ Regenerar tipos Supabase (4 casts `supabase as any` restantes)
 >
 > ---
 >
