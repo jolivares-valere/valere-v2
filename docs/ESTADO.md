@@ -19,8 +19,14 @@
 > - Overflow guard capturó `-99999999.0` para HOTEL SIERRA LUZ → guardado como `0.0 kWh` ✅
 > - Merge `feature/fv-operational-redesign` → `main` completado: `24653ce` ✅
 >
+> ### Seguridad — Supabase Advisor (2026-05-13)
+> **Resuelto**: `rls_disabled_in_public` → 0 tablas sin RLS.
+> - `fv_credenciales_backup_20260511`, `fv_planta_backup_20260511`, `fv_sync_log_backup_20260511` → RLS ON sin policies (bloqueadas). Migración: `20260513_fix_rls_backup_tables.sql`
+> - `datadis_provincias` → RLS ON + lectura authenticated.
+> - ⏳ Pendiente DROP de las 3 tablas backup cuando se confirme que las migraciones del 11/05 están consolidadas.
+>
 > ### Pendientes FV (próxima sesión)
-> - ⏳ CI auth portabilidad: cookies IP-tied → WebAuthClient fallback en CI (login desde runner)
+> - ⏳ **[BLOQUEANTE]** CI auth fallback: `AUTH_REDIRECT → WebAuthClient → persistir storage_state → retry único`
 > - ⏳ Asignar 7 plantas reales a empresa+CUPS desde tab "Sin asignar"
 > - ⏳ Configurar `RESEND_API_KEY` en Supabase Edge Functions Secrets
 > - ⏳ Configurar `GITHUB_PAT` en Supabase Edge Functions Secrets
@@ -28,6 +34,7 @@
 > - ⏳ Conectar `IncidenciasTab` a tabla `incidencias` real (plan en `docs/PLAN_INCIDENCIAS_CRM_CONEXION.md`, ~2h)
 > - ⏳ Deploy Edge Function `chat-consultor`
 > - ⏳ Regenerar tipos Supabase (4 casts `supabase as any` restantes)
+> - ⏳ DROP tablas backup 20260511 (cuando confirmado que no se necesitan)
 >
 > ---
 >
