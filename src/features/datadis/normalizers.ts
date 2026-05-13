@@ -233,3 +233,67 @@ export function extractTariff(supply: DatadisSupply, contract?: ContractDTO | nu
   }
   return contract?.tariff ?? '3.0TD'
 }
+
+// ─── ConsumptionMonthlyDTO + normalizeConsumption ─────────────────────────────────────────────
+
+/**
+ * DTO para consumo mensual agregado.
+ *
+ * Origen: datos horarios de get_consumption agregados por mes.
+ * Nota: la descomposición P1–P6 mensual requiere el endpoint
+ * get-consumption-between-dates-by-period (añadir al proxy en siguiente fase).
+ */
+export interface ConsumptionMonthlyDTO {
+  /** Mes en formato YYYY-MM */
+  month: string
+  /** Consumo total del mes en kWh */
+  totalKwh: number
+  /** Excedentes del mes en kWh (0 si no hay autoconsumo) */
+  surplusKwh: number
+  /** Número de registros horarios que componen este mes */
+  pointCount: number
+}
+
+/**
+ * Agrega puntos horarios de get_consumption a nivel mensual.
+ *
+ * El endpoint horario no devuelve P1–P6 — cada punto es un intervalo con
+ * consumptionKWh total y, si el CUPS tiene autoconsumo, surplusEnergyKWh.
+ *
+ * Soporta shapes: [...] y {response:[...]}.
+ */
+export function normalizeConsumption(raw: unknown): ConsumptionMonthlyDTO[] {
+  if (!raw) return []
+
+  const arr = extractArray(raw)
+  if (!arr.length) return []
+
+  // Acumular por mes
+  const byMonth: Record<string, { totalKwh: number; surplusKwh: number; pointCount: number }> = {}
+
+  for (const p of arr) {
+    const item = p as Record<string, unknown>
+    const rawDate = String(item['date'] ?? item['fecha'] ?? '')
+    const month = toYearMonth(rawDate)
+    if (!month) continue
+
+    const kwh    = Number(item['consumptionKWh']    ?? item['consumo']    ?? 0)
+    const surplus = Number(item['surplusEnergyKWh'] ?? item['excedente'] ?? 0)
+
+    if (!byMonth[month]) {
+      byMonth[month] = { totalKwh: 0, surplusKwh: 0, pointCount: 0 }
+    }
+    byMonth[month].totalKwh   += kwh
+    byMonth[month].surplusKwh += surplus
+    byMonth[month].pointCount += 1
+  }
+
+  return Object.entries(byMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({
+      month,
+      totalKwh:   Math.round(v.totalKwh * 10) / 10,
+      surplusKwh: Math.round(v.surplusKwh * 10) / 10,
+      pointCount: v.pointCount,
+    }))
+}

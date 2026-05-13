@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  Activity, AlertTriangle, ArrowLeft, Building2, Calendar,
+  Activity, AlertTriangle, ArrowLeft, BarChart2, Building2, Calendar,
   CheckCircle2, ChevronDown, ChevronUp,
   Database, FileText, Info, Loader2, MapPin,
   TrendingUp, Wifi, WifiOff, Zap,
@@ -21,6 +21,7 @@ import {
   type DatadisConsumptionPoint,
 } from './api'
 import {
+  normalizeConsumption,
   normalizeContract,
   normalizeMaxPower,
   normalizeReactive,
@@ -832,7 +833,207 @@ function ReactivaTab({
   )
 }
 
-type Tab = 'info' | 'contrato' | 'curva' | 'cierres' | 'reactiva'
+// ─── Tab: Consumo ──────────────────────────────────────────────────────────────────────────────
+
+type ConsumoRange = '3m' | '6m' | '12m' | '24m'
+
+function ConsumoTab({
+  supply,
+}: {
+  supply: DatadisSupply
+}) {
+  const [range, setRange] = useState<ConsumoRange>('12m')
+
+  const monthsBack = range === '3m' ? 3 : range === '6m' ? 6 : range === '12m' ? 12 : 24
+
+  const { start, end } = useMemo(() => {
+    const now  = new Date()
+    const from = new Date(now)
+    from.setMonth(from.getMonth() - monthsBack)
+    const fmt = (d: Date) => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+    return { start: fmt(from), end: fmt(now) }
+  }, [monthsBack])
+
+  const cups     = supply.cups
+  const distCode = distributorCode(supply)
+  const province = extractProvince(supply)
+  const municipio = extractMunicipio(supply)
+  const tipoPunto = tipoPuntoCod(supply)
+  const tariff   = extractTariff(supply)
+
+  const { data, isLoading, isError, error } = useDatadisConsumption(
+    cups && distCode ? {
+      cups,
+      distributor:     distCode,
+      fechaInicial:    start,
+      fechaFinal:      end,
+      provinceCode:    province,
+      municipioCode:   municipio,
+      tarifaCode:      tariff !== '---' ? tariff : '3.0TD',
+      tipoPuntoMedida: tipoPunto,
+    } : null,
+  )
+
+  const monthly = useMemo(
+    () => normalizeConsumption(data),
+    [data],
+  )
+
+  const totalKwh    = monthly.reduce((s, m) => s + m.totalKwh, 0)
+  const totalSurplus = monthly.reduce((s, m) => s + m.surplusKwh, 0)
+  const avgKwh      = monthly.length ? totalKwh / monthly.length : 0
+  const maxMonth    = monthly.length
+    ? monthly.reduce((best, m) => m.totalKwh > best.totalKwh ? m : best)
+    : null
+  const hasSurplus  = totalSurplus > 0
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm">Cargando consumo...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center">
+        <WifiOff className="mx-auto mb-2 h-8 w-8 text-red-300" />
+        <p className="text-sm font-medium text-red-600">No se pudo cargar el consumo</p>
+        {error instanceof Error && (
+          <p className="mt-1 text-xs text-red-400">{error.message}</p>
+        )}
+      </div>
+    )
+  }
+
+  if (monthly.length === 0) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+        <Database className="mx-auto mb-3 h-10 w-10 text-slate-200" />
+        <p className="text-sm text-slate-500">Sin datos de consumo para el período seleccionado</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Solo disponible en suministros con telemedida o teleconsulta activa.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Selector de rango */}
+      <div className="flex items-center gap-2">
+        {(['3m', '6m', '12m', '24m'] as ConsumoRange[]).map(r => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setRange(r)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              range === r
+                ? 'bg-blue-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {r === '3m' ? '3 meses' : r === '6m' ? '6 meses' : r === '12m' ? '12 meses' : '24 meses'}
+          </button>
+        ))}
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {([
+          ['Total período', `${Math.round(totalKwh).toLocaleString('es-ES')} kWh`],
+          ['Media mensual',  `${Math.round(avgKwh).toLocaleString('es-ES')} kWh`],
+          ['Mes pico',       maxMonth ? `${Math.round(maxMonth.totalKwh).toLocaleString('es-ES')} kWh` : '---'],
+          ['Excedentes',     hasSurplus ? `${Math.round(totalSurplus).toLocaleString('es-ES')} kWh` : 'Sin datos'],
+        ] as [string, string][]).map(([label, val]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+            <p className="mt-1 text-lg font-bold text-slate-800">{val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Gráfico mensual */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+          Consumo mensual (kWh)
+        </h3>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={monthly} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 10, fill: '#94a3b8' }}
+              tickFormatter={v => String(v).slice(5)}
+            />
+            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} unit=" kWh" width={68} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+              formatter={(value: unknown) => [
+                `${Number(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 0 })} kWh`,
+                'Consumo',
+              ]}
+            />
+            <Bar dataKey="totalKwh" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            {hasSurplus && (
+              <Bar dataKey="surplusKwh" fill="#10b981" radius={[4, 4, 0, 0]} />
+            )}
+          </BarChart>
+        </ResponsiveContainer>
+        {hasSurplus && (
+          <div className="mt-2 flex items-center gap-4 justify-end">
+            <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <span className="inline-block h-2 w-4 rounded-sm bg-blue-500" /> Consumo
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <span className="inline-block h-2 w-4 rounded-sm bg-emerald-500" /> Excedente
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla mensual */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="px-4 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Mes</th>
+              <th className="px-4 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">Consumo (kWh)</th>
+              {hasSurplus && <th className="px-4 py-2 text-right font-semibold uppercase tracking-wide text-emerald-500">Excedente (kWh)</th>}
+              <th className="px-4 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">Registros</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...monthly].reverse().map(m => (
+              <tr key={m.month} className="border-t border-slate-100 hover:bg-slate-50">
+                <td className="px-4 py-2 font-mono text-slate-700">{m.month}</td>
+                <td className="px-4 py-2 text-right font-semibold text-slate-800">
+                  {m.totalKwh.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                </td>
+                {hasSurplus && (
+                  <td className="px-4 py-2 text-right text-emerald-600">
+                    {m.surplusKwh > 0 ? m.surplusKwh.toLocaleString('es-ES', { maximumFractionDigits: 0 }) : '—'}
+                  </td>
+                )}
+                <td className="px-4 py-2 text-right text-slate-400">{m.pointCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Nota */}
+      <p className="text-[11px] text-slate-400">
+        * Datos agregados de curva horaria. El desglose P1–P6 mensual estará disponible
+        en la próxima versión del módulo.
+      </p>
+    </div>
+  )
+}
+
+type Tab = 'info' | 'contrato' | 'curva' | 'cierres' | 'reactiva' | 'consumo'
 
 export default function SupplyDetailPage() {
   const { cups } = useParams<{ cups: string }>()
@@ -860,6 +1061,7 @@ export default function SupplyDetailPage() {
     { id: 'curva',    label: 'Curva',       icon: TrendingUp },
     { id: 'cierres',  label: 'Cierres',     icon: Calendar },
     { id: 'reactiva', label: 'Reactiva',    icon: Activity },
+    { id: 'consumo',  label: 'Consumo',     icon: BarChart2 },
   ]
 
   const tariff = supply ? sf(supply, 'tarifa', 'tariff', 'tarifaCode') : ''
@@ -962,6 +1164,7 @@ export default function SupplyDetailPage() {
             {tab === 'curva'    && <CurveTab supply={supply} />}
             {tab === 'cierres'  && <CierresTab supply={supply} contract={contract} />}
             {tab === 'reactiva' && <ReactivaTab supply={supply} />}
+            {tab === 'consumo'  && <ConsumoTab supply={supply} />}
           </div>
         </>
       )}
