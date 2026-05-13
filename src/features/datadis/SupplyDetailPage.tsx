@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart2, Building2, Calendar,
@@ -836,6 +836,8 @@ function ReactivaTab({
 // ─── Tab: Consumo ────────────────────────────────────────────────────────────────────────────
 
 type ConsumoRange = '3m' | '6m' | '12m' | '24m'
+type ConsumoMode  = 'mensual' | 'franja'
+type FranjaTipo   = 'todos' | 'lab' | 'fds'
 
 const PERIOD_FILL = {
   P1: '#ef4444', P2: '#f97316', P3: '#3b82f6',
@@ -850,6 +852,13 @@ const SOURCE_BADGE: Record<'Real' | 'Estimada' | 'Mixto', { label: string; cls: 
 
 function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: ContractDTO | null }) {
   const [range, setRange] = useState<ConsumoRange>('12m')
+  const [mode,  setMode]  = useState<ConsumoMode>('mensual')
+
+  // Franja state
+  const [franjaMonth,      setFranjaMonth]      = useState<string>('')
+  const [franjaHoraInicio, setFranjaHoraInicio] = useState<number>(8)
+  const [franjaHoraFin,    setFranjaHoraFin]    = useState<number>(14)
+  const [franjaTipoDia,    setFranjaTipoDia]    = useState<FranjaTipo>('todos')
 
   const monthsBack = range === '3m' ? 3 : range === '6m' ? 6 : range === '12m' ? 12 : 24
 
@@ -887,6 +896,53 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
     [data, tariff],
   )
 
+  // Auto-select last available month for Franja
+  useEffect(() => {
+    if (normalized?.monthly.length && !franjaMonth) {
+      setFranjaMonth(normalized.monthly[normalized.monthly.length - 1].month)
+    }
+  }, [normalized, franjaMonth])
+
+  // ── Franja computation ──────────────────────────────────────────────────
+  const franjaResult = useMemo(() => {
+    if (!normalized?.points || !franjaMonth) return null
+    const monthPoints = normalized.points.filter(p => p.month === franjaMonth)
+    const horaFin = Math.min(23, franjaHoraFin)
+    const filtered = monthPoints.filter(p => {
+      if (p.hour < franjaHoraInicio || p.hour > horaFin) return false
+      if (franjaTipoDia === 'lab') return !p.isWeekend
+      if (franjaTipoDia === 'fds') return  p.isWeekend
+      return true
+    })
+    const monthTotal  = monthPoints.reduce((s, p) => s + p.kwh, 0)
+    const totalFranja = filtered.reduce((s, p) => s + p.kwh, 0)
+
+    // Aggregate by date for the daily chart
+    const byDate: Record<string, number> = {}
+    for (const pt of filtered) {
+      byDate[pt.date] = (byDate[pt.date] ?? 0) + pt.kwh
+    }
+    const dateEntries = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b))
+    const peakEntry   = [...dateEntries].sort(([, a], [, b]) => b - a)[0]
+
+    // Aggregate by hour for peak hour
+    const byHour: Record<number, number> = {}
+    for (const pt of filtered) {
+      byHour[pt.hour] = (byHour[pt.hour] ?? 0) + pt.kwh
+    }
+    const hourEntries = Object.entries(byHour).sort(([, a], [, b]) => Number(b) - Number(a))
+    const peakHourKey = hourEntries[0]?.[0]
+
+    return {
+      totalFranja:  Math.round(totalFranja * 10) / 10,
+      pctMes:       monthTotal > 0 ? Math.round((totalFranja / monthTotal) * 1000) / 10 : 0,
+      peakDay:      peakEntry ? peakEntry[0].slice(8) : '---',
+      peakHour:     peakHourKey != null ? `${peakHourKey}:00 – ${Number(peakHourKey) + 1}:00` : '---',
+      chartData:    dateEntries.map(([date, kwh]) => ({ date: date.slice(8), kwh: Math.round(kwh * 10) / 10 })),
+      pointCount:   filtered.length,
+    }
+  }, [normalized, franjaMonth, franjaHoraInicio, franjaHoraFin, franjaTipoDia])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
@@ -920,152 +976,335 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
     )
   }
 
-  const { monthly, totalKwh, dominantPeriod, maxHourKwh, maxHourDate, periodConfidence } = normalized
+  const { monthly, totalKwh, dominantPeriod, maxHourKwh, periodConfidence } = normalized
   const avgKwh = monthly.length ? totalKwh / monthly.length : 0
 
   return (
     <div className="space-y-4">
-      {/* Selector de rango */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {(['3m', '6m', '12m', '24m'] as ConsumoRange[]).map(r => (
+      {/* Barra de controles superior */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Selector de rango (solo en modo mensual) */}
+        {mode === 'mensual' && (
+          <div className="flex items-center gap-1.5">
+            {(['3m', '6m', '12m', '24m'] as ConsumoRange[]).map(r => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRange(r)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  range === r
+                    ? 'bg-blue-600 text-white'
+                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {r === '3m' ? '3 meses' : r === '6m' ? '6 meses' : r === '12m' ? '12 meses' : '24 meses'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === 'mensual' && <span className="hidden h-5 w-px bg-slate-200 sm:block" />}
+
+        {/* Toggle de modo */}
+        <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+          {(['mensual', 'franja'] as ConsumoMode[]).map(m => (
             <button
-              key={r}
+              key={m}
               type="button"
-              onClick={() => setRange(r)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                range === r
-                  ? 'bg-blue-600 text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              onClick={() => setMode(m)}
+              className={`px-3 py-1.5 text-xs font-semibold transition ${
+                mode === m
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              {r === '3m' ? '3 meses' : r === '6m' ? '6 meses' : r === '12m' ? '12 meses' : '24 meses'}
+              {m === 'mensual' ? 'Vista mensual' : 'Modo franja \u23F1'}
             </button>
           ))}
         </div>
+
         {periodConfidence === 'estimated' && (
-          <span className="flex items-center gap-1 text-[10px] text-amber-600">
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-amber-600">
             <AlertTriangle className="h-3 w-3" />
             Períodos estimados
           </span>
         )}
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {([
-          ['Total período',   `${Math.round(totalKwh).toLocaleString('es-ES')} kWh`],
-          ['Media mensual',    `${Math.round(avgKwh).toLocaleString('es-ES')} kWh`],
-          ['Máx. hora',       `${maxHourKwh.toFixed(3)} kWh`],
-          ['Período dominante', dominantPeriod ?? '---'],
-        ] as [string, string][]).map(([label, val]) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="mt-1 text-lg font-bold text-slate-800">{val}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Gráfico barras apiladas P1–P6 */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">
-          Consumo mensual por período (kWh)
-        </h3>
-        <p className="mb-4 text-[10px] text-amber-600">
-          Desglose P1–P6 estimado a partir de hora y día de la semana (sin festivos).
-        </p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={monthly} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 10, fill: '#94a3b8' }}
-              tickFormatter={v => String(v).slice(5)}
-            />
-            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} unit=" kWh" width={68} />
-            <Tooltip
-              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
-              formatter={(value: unknown, name: unknown) => [
-                `${Number(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 0 })} kWh`,
-                String(name),
-              ]}
-            />
-            {(['P1','P2','P3','P4','P5','P6'] as const).map((p, i) => (
-              <Bar
-                key={p}
-                dataKey={`byPeriod.${p}`}
-                name={p}
-                stackId="a"
-                fill={PERIOD_FILL[p]}
-                radius={i === 5 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-              />
+      {/* MODO MENSUAL */}
+      {mode === 'mensual' && (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {([
+              ['Total período',    `${Math.round(totalKwh).toLocaleString('es-ES')} kWh`],
+              ['Media mensual',     `${Math.round(avgKwh).toLocaleString('es-ES')} kWh`],
+              ['Máx. hora',        `${maxHourKwh.toFixed(3)} kWh`],
+              ['Período dominante', dominantPeriod ?? '---'],
+            ] as [string, string][]).map(([label, val]) => (
+              <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                <p className="mt-1 text-lg font-bold text-slate-800">{val}</p>
+              </div>
             ))}
-          </BarChart>
-        </ResponsiveContainer>
-        {/* Leyenda */}
-        <div className="mt-3 flex flex-wrap gap-3 justify-end">
-          {(['P1','P2','P3','P4','P5','P6'] as const).map(p => (
-            <span key={p} className="flex items-center gap-1.5 text-[10px] text-slate-500">
-              <span className="inline-block h-2 w-4 rounded-sm" style={{ background: PERIOD_FILL[p] }} />
-              {p}
-            </span>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Tabla mensual */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Mes</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P1</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P2</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P3</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P4</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P5</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P6</th>
-              <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">Total</th>
-              <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-slate-400">Fuente</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...monthly].reverse().map(m => {
-              const sb = SOURCE_BADGE[m.source]
-              return (
-                <tr key={m.month} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-3 py-2 font-mono text-slate-700">{m.month}</td>
-                  {(['P1','P2','P3','P4','P5','P6'] as const).map(p => (
-                    <td key={p} className="px-3 py-2 text-right text-slate-600">
-                      {m.byPeriod[p] > 0
-                        ? m.byPeriod[p].toLocaleString('es-ES', { maximumFractionDigits: 0 })
-                        : <span className="text-slate-300">—</span>}
-                    </td>
-                  ))}
-                  <td className="px-3 py-2 text-right font-semibold text-slate-800">
-                    {m.totalKwh.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${sb.cls}`}>
-                      {sb.label}
-                    </span>
-                  </td>
+          {/* Gráfico barras apiladas P1-P6 */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">
+              Consumo mensual por período (kWh)
+            </h3>
+            <p className="mb-4 text-[10px] text-amber-600">
+              Desglose P1–P6 estimado a partir de hora y día de la semana (sin festivos).
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthly} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 10, fill: '#94a3b8' }}
+                  tickFormatter={v => String(v).slice(5)}
+                />
+                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} unit=" kWh" width={68} />
+                <Tooltip
+                  contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                  formatter={(value: unknown, name: unknown) => [
+                    `${Number(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 0 })} kWh`,
+                    String(name),
+                  ]}
+                />
+                {(['P1','P2','P3','P4','P5','P6'] as const).map((p, i) => (
+                  <Bar
+                    key={p}
+                    dataKey={`byPeriod.${p}`}
+                    name={p}
+                    stackId="a"
+                    fill={PERIOD_FILL[p]}
+                    radius={i === 5 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="mt-3 flex flex-wrap gap-3 justify-end">
+              {(['P1','P2','P3','P4','P5','P6'] as const).map(p => (
+                <span key={p} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                  <span className="inline-block h-2 w-4 rounded-sm" style={{ background: PERIOD_FILL[p] }} />
+                  {p}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Tabla mensual */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Mes</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P1</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P2</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P3</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P4</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P5</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">P6</th>
+                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">Total</th>
+                  <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-slate-400">Fuente</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {[...monthly].reverse().map(m => {
+                  const sb = SOURCE_BADGE[m.source]
+                  return (
+                    <tr key={m.month} className="border-t border-slate-100 hover:bg-slate-50">
+                      <td className="px-3 py-2 font-mono text-slate-700">{m.month}</td>
+                      {(['P1','P2','P3','P4','P5','P6'] as const).map(p => (
+                        <td key={p} className="px-3 py-2 text-right text-slate-600">
+                          {m.byPeriod[p] > 0
+                            ? m.byPeriod[p].toLocaleString('es-ES', { maximumFractionDigits: 0 })
+                            : <span className="text-slate-300">—</span>}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                        {m.totalKwh.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${sb.cls}`}>
+                          {sb.label}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
-      {/* Nota legal */}
-      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-        <p className="text-[11px] text-amber-700">
-          <strong>Períodos estimados:</strong> la asignación P1–P6 se deriva de hora y día de la semana
-          según la matriz 3.0TD oficial, sin incluir festivos nacionales ni autonómicos.
-          Error estimado: {'<'}2%. Para facturación exacta se incorporará el calendario
-          oficial en la próxima versión.
-        </p>
-      </div>
+          {/* Nota legal */}
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+            <p className="text-[11px] text-amber-700">
+              <strong>Períodos estimados:</strong> la asignación P1–P6 se deriva de hora y día de la semana
+              según la matriz 3.0TD oficial, sin incluir festivos nacionales ni autonómicos.
+              Error estimado: {'<'}2%. Para facturación exacta se incorporará el calendario
+              oficial en la próxima versión.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* MODO FRANJA */}
+      {mode === 'franja' && (
+        <>
+          {/* Controles de franja */}
+          <div className="rounded-xl border border-violet-100 bg-violet-50 p-4 space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-violet-500">Filtros de franja horaria</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              {/* Mes */}
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-500">Mes</label>
+                <select
+                  value={franjaMonth}
+                  onChange={e => setFranjaMonth(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-sm focus:border-violet-400 focus:outline-none"
+                >
+                  {[...monthly].reverse().map(m => (
+                    <option key={m.month} value={m.month}>{m.month}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Hora inicio */}
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                  Hora inicio — <span className="text-violet-600 font-mono">{franjaHoraInicio}:00</span>
+                </label>
+                <input
+                  type="range" min={0} max={22} step={1}
+                  value={franjaHoraInicio}
+                  onChange={e => {
+                    const v = Number(e.target.value)
+                    setFranjaHoraInicio(v)
+                    if (v >= franjaHoraFin) setFranjaHoraFin(Math.min(23, v + 1))
+                  }}
+                  className="w-full accent-violet-600"
+                />
+              </div>
+              {/* Hora fin */}
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                  Hora fin — <span className="text-violet-600 font-mono">{franjaHoraFin}:00</span>
+                </label>
+                <input
+                  type="range" min={1} max={23} step={1}
+                  value={franjaHoraFin}
+                  onChange={e => {
+                    const v = Number(e.target.value)
+                    setFranjaHoraFin(v)
+                    if (v <= franjaHoraInicio) setFranjaHoraInicio(Math.max(0, v - 1))
+                  }}
+                  className="w-full accent-violet-600"
+                />
+              </div>
+              {/* Tipo día */}
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-500">Tipo de día</label>
+                <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+                  {([['todos', 'Todos'], ['lab', 'Laborables'], ['fds', 'Fin sem.']] as [FranjaTipo, string][]).map(([val, lbl]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setFranjaTipoDia(val)}
+                      className={`flex-1 py-1.5 text-[10px] font-semibold transition ${
+                        franjaTipoDia === val ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-violet-400">
+              Mostrando {franjaHoraInicio}:00 – {franjaHoraFin}:00
+              {' '}({franjaHoraFin - franjaHoraInicio}h)
+              {' '}· {franjaTipoDia === 'todos' ? 'todos los días' : franjaTipoDia === 'lab' ? 'solo laborables' : 'solo fines de semana'}
+            </p>
+          </div>
+
+          {/* KPIs franja */}
+          {franjaResult && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {([
+                ['Total franja', `${franjaResult.totalFranja.toLocaleString('es-ES')} kWh`],
+                ['% del mes',    `${franjaResult.pctMes.toFixed(1)}\u00a0%`],
+                ['Día pico',     franjaResult.peakDay !== '---' ? `día ${franjaResult.peakDay}` : '---'],
+                ['Hora pico',    franjaResult.peakHour],
+              ] as [string, string][]).map(([label, val]) => (
+                <div key={label} className="rounded-xl border border-violet-100 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-400">{label}</p>
+                  <p className="mt-1 text-lg font-bold text-slate-800">{val}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Gráfico diario de la franja */}
+          {franjaResult && franjaResult.chartData.length > 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">
+                Consumo diario en franja — {franjaMonth}
+              </h3>
+              <p className="mb-4 text-[10px] text-violet-500">
+                {franjaResult.pointCount} intervalos · {franjaHoraInicio}:00–{franjaHoraFin}:00
+                {' '}· {franjaTipoDia === 'todos' ? 'todos los días' : franjaTipoDia === 'lab' ? 'laborables' : 'fines de semana'}
+              </p>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={franjaResult.chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 9, fill: '#94a3b8' }}
+                    interval={Math.max(0, Math.floor(franjaResult.chartData.length / 10) - 1)}
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} unit=" kWh" width={60} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                    formatter={(value: unknown) => [
+                      `${Number(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} kWh`,
+                      'Consumo franja',
+                    ]}
+                    labelFormatter={(label) => `Día ${label}`}
+                  />
+                  <Bar dataKey="kwh" fill="#7c3aed" radius={[4, 4, 0, 0]}>
+                    {franjaResult.chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.date === franjaResult.peakDay ? '#ef4444' : '#7c3aed'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="mt-2 text-[10px] text-slate-400 text-right">
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-2 w-4 rounded-sm bg-red-500" /> Día pico
+                </span>
+              </p>
+            </div>
+          ) : franjaResult && (
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
+              <p className="text-sm text-slate-400">Sin datos para la franja seleccionada</p>
+              <p className="mt-1 text-xs text-slate-300">Ajusta el rango horario o el tipo de día</p>
+            </div>
+          )}
+
+          {/* Nota estimación */}
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+            <p className="text-[11px] text-amber-700">
+              <strong>Períodos estimados:</strong> asignación de período y laborable/festivo basada en
+              matriz 3.0TD oficial sin festivos. Error {'<'}2%.
+            </p>
+          </div>
+        </>
+      )}
     </div>
   )
 }

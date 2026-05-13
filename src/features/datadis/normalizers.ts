@@ -239,6 +239,22 @@ import type { TariffPeriod } from './periodos30TD'
 
 // ─── ConsumoMonthlyAgg + ConsumoNormalized ──────────────────────────────────────────────────────────
 
+/** Punto horario individual conservado para drill-down y filtros */
+export interface ConsumoHourlyPoint {
+  /** YYYY-MM-DD */
+  date: string
+  /** Hora de inicio del intervalo (0–23) */
+  hour: number
+  /** YYYY-MM */
+  month: string
+  period: TariffPeriod
+  kwh: number
+  source: 'Real' | 'Estimada'
+  /** 0=Dom, 1=Lun... 6=Sáb */
+  dayOfWeek: number
+  isWeekend: boolean
+}
+
 /** Agregado mensual con desglose de períodos estimados */
 export interface ConsumoMonthlyAgg {
   month: string
@@ -267,6 +283,8 @@ export interface ConsumoNormalized {
   dominantPeriod: TariffPeriod | null
   /** 'estimated': derivado de hora/día/mes sin festivos (v1) */
   periodConfidence: 'estimated'
+  /** Puntos horarios individuales — base para drill-down y filtro franja */
+  points: ConsumoHourlyPoint[]
 }
 
 /**
@@ -302,6 +320,7 @@ export function normalizeConsumption(
   const byMonth: Record<string, ConsumoMonthlyAgg> = {}
   const periodTotals: Record<TariffPeriod, number> = { P1: 0, P2: 0, P3: 0, P4: 0, P5: 0, P6: 0 }
 
+  const hourlyPoints: ConsumoHourlyPoint[] = []
   let cups        = ''
   let totalKwh    = 0
   let maxHourKwh  = 0
@@ -351,6 +370,23 @@ export function normalizeConsumption(
     agg.pointCount      += 1
     if (kwh > agg.maxHourKwh) agg.maxHourKwh = kwh
 
+    // Conservar punto horario para drill-down
+    const endingHour = parseInt(hour.split(':')[0], 10)
+    const beginHour  = isNaN(endingHour) ? 0 : (endingHour === 24 ? 23 : endingHour - 1)
+    const dateNorm   = rawDate.replace(/\//g, '-')
+    const d          = new Date(`${dateNorm}T12:00:00`)
+    const dow        = isNaN(d.getTime()) ? 1 : d.getDay()
+    hourlyPoints.push({
+      date:      dateNorm,
+      hour:      beginHour,
+      month,
+      period,
+      kwh,
+      source:    isReal ? 'Real' : 'Estimada',
+      dayOfWeek: dow,
+      isWeekend: dow === 0 || dow === 6,
+    })
+
     // Actualizar fuente del mes
     if (agg.source === 'Real'    && !isReal) agg.source = 'Mixto'
     if (agg.source === 'Estimada' && isReal) agg.source = 'Mixto'
@@ -386,5 +422,6 @@ export function normalizeConsumption(
     maxHourDate,
     dominantPeriod:   dominant ?? null,
     periodConfidence: 'estimated',
+    points: hourlyPoints,
   }
 }
