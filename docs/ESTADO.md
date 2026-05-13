@@ -1,8 +1,25 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-13 (cierre de sesión) — EU5 fix + overflow guards + fv_sync_audit + YAML fix + merge a main completado. main: 24653ce.**
+> **Última actualización: 2026-05-13 (sesión 2ª) — Datadis: normalizers.ts + Tab Reactiva completa. TSC 0 errores. main: 4ea3dcc.**
 >
-> ## ✅ SESIÓN 2026-05-13 — FV HARDENING COMPLETO + AUDIT SCAFFOLD
+> ## ✅ SESIÓN 2026-05-13 (2ª parte) — DATADIS: NORMALIZERS + TAB REACTIVA
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `src/features/datadis/normalizers.ts` | Nueva capa de normalización: `ContractDTO`, `MaxPowerDTO`, `ReactiveDTO`. Funciones `normalizeContract`, `normalizeMaxPower`, `normalizeReactive`, `extractProvince`, `extractMunicipio`, `extractTariff`. Soporta shapes EDISTRIBUCIÓN (español) + otros portales (inglés). | `a0c8e8e` |
+> | `src/features/datadis/SupplyDetailPage.tsx` | Refactor completo para usar DTOs canónicos. Nueva `ReactivaTab`: KPIs, gráfico de barras con Cell coloreado, tabla P1-P6, badge de penalización por umbral. Tab 5ª añadida al router de tabs. | `a0c8e8e` + `4ea3dcc` |
+> | `docs/DATADIS_BLUEPRINT_MODULO_CRM_VALERE.md` | Blueprint arquitectónico completo: DTOs, normalizers, tablas BD, dashboards, alertas, roadmap. | `b0626cb` |
+>
+> ### Estado módulo Datadis tras esta sesión
+> - ✅ Normalización centralizada: frontend nunca toca campos raw de Datadis
+> - ✅ Tab Reactiva funcional con badge de penalización (umbral 150 kVArh)
+> - ✅ TSC 0 errores en main (`4ea3dcc`)
+> - ⏳ Tab Consumo: desglose mensual/anual P1-P6 (próxima sesión Datadis)
+> - ⏳ Mover normalización al Edge Function datadis-proxy (backend, futuro)
+>
+> ---
+>
+> ## ✅ SESIÓN 2026-05-13 (1ª parte) — FV HARDENING COMPLETO + AUDIT SCAFFOLD
 >
 > | Artefacto | Cambio | Commit / Estado |
 > |---|---|---|
