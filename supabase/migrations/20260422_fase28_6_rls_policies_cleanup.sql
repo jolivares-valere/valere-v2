@@ -1,5 +1,8 @@
 -- =====================================================================
 -- FASE 28.6 — Limpieza y endurecimiento RLS
+-- ESTADO: APLICADO MANUALMENTE vía MCP el 2026-05-13
+--   Registrado en supabase_migrations como 'fase28_6_rls_policies_cleanup'.
+--   NO re-ejecutar con supabase db push — ya está en producción.
 -- =====================================================================
 --
 -- Cierra dos pendientes identificados en auditorías previas:

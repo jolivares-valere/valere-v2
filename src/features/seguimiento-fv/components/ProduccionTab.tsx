@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { TrendingUp, Sun, Zap } from 'lucide-react'
-import type { FxPlanta, FxKpiDiario } from '../fixtures'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { TrendingUp, Sun, Zap, Euro } from 'lucide-react'
+import type { FVPlanta } from '../api'
+import { useKpiDiarioPorPlanta } from '../api'
 
 function fmt(n: number | null | undefined, dec = 1, suffix = '') {
   if (n == null) return '—'
@@ -9,28 +10,26 @@ function fmt(n: number | null | undefined, dec = 1, suffix = '') {
 }
 
 interface Props {
-  plantas:   FxPlanta[]
-  kpiDiario: Record<string, FxKpiDiario[]>
+  plantas: FVPlanta[]
 }
 
-export default function ProduccionTab({ plantas, kpiDiario }: Props) {
+export default function ProduccionTab({ plantas }: Props) {
   const [plantaId, setPlantaId] = useState<string>(plantas[0]?.id ?? '')
 
-  const planta   = plantas.find(p => p.id === plantaId)
-  const kpis     = kpiDiario[plantaId] ?? []
+  const { data: kpis = [], isLoading } = useKpiDiarioPorPlanta(plantaId || undefined, 30)
 
-  // Resumen mensual
-  const totalMes    = kpis.reduce((s, k) => s + k.energia_kwh, 0)
-  const excdMes     = kpis.reduce((s, k) => s + k.excedente_kwh, 0)
-  const autoconsMes = kpis.reduce((s, k) => s + k.autoconsumida_kwh, 0)
-  const maxDia      = Math.max(...kpis.map(k => k.energia_kwh))
-  const diasActivos = kpis.filter(k => k.energia_kwh > 0).length
+  const planta = plantas.find(p => p.id === plantaId)
 
-  // Datos para recharts (últimos 30 días, etiqueta corta)
+  // Resumen del período
+  const totalMes    = kpis.reduce((s, k) => s + (k.energia_kwh ?? 0), 0)
+  const ingresosMes = kpis.reduce((s, k) => s + (k.ingresos_eur ?? 0), 0)
+  const maxDia      = kpis.length > 0 ? Math.max(...kpis.map(k => k.energia_kwh ?? 0)) : 0
+  const diasActivos = kpis.filter(k => (k.energia_kwh ?? 0) > 0).length
+
+  // Datos para recharts
   const chartData = kpis.map(k => ({
-    fecha: k.fecha.slice(5), // MM-DD
-    Autoconsumo:  Math.round(k.autoconsumida_kwh * 10) / 10,
-    Excedente:    Math.round(k.excedente_kwh * 10) / 10,
+    fecha:      k.fecha.slice(5),
+    Generación: Math.round((k.energia_kwh ?? 0) * 10) / 10,
   }))
 
   return (
@@ -45,24 +44,25 @@ export default function ProduccionTab({ plantas, kpiDiario }: Props) {
           className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-valere-blue/20 bg-white"
         >
           {plantas.map(p => (
-            <option key={p.id} value={p.id}>{p.nombre} — {p.empresa?.nombre ?? 'Sin asignar'}</option>
+            <option key={p.id} value={p.id}>
+              {p.nombre} — {(p as unknown as { empresa?: { nombre: string } }).empresa?.nombre ?? 'Sin asignar'}
+            </option>
           ))}
         </select>
-        {planta?.estado !== 'normal' && (
+        {planta?.estado != null && planta.estado !== 'normal' && (
           <span className="px-2 py-1 bg-red-50 text-red-600 text-xs font-medium rounded-lg border border-red-200">
             ⚠ Planta con incidencia
           </span>
         )}
       </div>
 
-      {/* KPI cards del mes */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Generación total (mes)',  value: fmt(totalMes, 0, ' kWh'),    Icon: Sun,       color: 'text-amber-500' },
-          { label: 'Excedentes a red (mes)',  value: fmt(excdMes, 0, ' kWh'),     Icon: TrendingUp,color: 'text-blue-500' },
-          { label: 'Autoconsumo (mes)',       value: fmt(autoconsMes, 0, ' kWh'), Icon: Zap,       color: 'text-green-500' },
-          { label: 'Ratio autoconsumo',       value: totalMes > 0 ? fmt((autoconsMes / totalMes) * 100, 0, ' %') : '—', Icon: Zap, color: 'text-green-600' },
-          { label: 'Mejor día (30d)',         value: fmt(maxDia, 0, ' kWh'),      Icon: Sun,       color: 'text-orange-500' },
+          { label: 'Generación total (30d)', value: fmt(totalMes, 0, ' kWh'),    Icon: Sun,        color: 'text-amber-500' },
+          { label: 'Ingresos estimados',     value: fmt(ingresosMes, 2, ' €'),   Icon: Euro,       color: 'text-emerald-600' },
+          { label: 'Mejor día (30d)',         value: fmt(maxDia, 0, ' kWh'),      Icon: TrendingUp, color: 'text-blue-500' },
+          { label: 'Días activos (30d)',      value: `${diasActivos} días`,       Icon: Zap,        color: 'text-green-500' },
         ].map(({ label, value, Icon, color }) => (
           <div key={label} className="bg-white border border-slate-200 rounded-xl p-4">
             <Icon className={`w-4 h-4 ${color} mb-1.5`} />
@@ -79,9 +79,13 @@ export default function ProduccionTab({ plantas, kpiDiario }: Props) {
           <span className="text-xs text-slate-400">{diasActivos} días con generación</span>
         </div>
 
-        {kpis.length === 0 ? (
+        {isLoading ? (
+          <div className="h-52 flex items-center justify-center text-slate-400 text-sm animate-pulse">
+            Cargando datos…
+          </div>
+        ) : kpis.length === 0 ? (
           <div className="h-52 flex items-center justify-center text-slate-300 text-sm">
-            Sin datos de producción
+            Sin datos de producción — lanza un sync para obtener datos
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
@@ -105,15 +109,13 @@ export default function ProduccionTab({ plantas, kpiDiario }: Props) {
                 formatter={(v, name) => [`${v as number} kWh`, name as string] as [string, string]}
                 labelFormatter={l => `Día ${l}`}
               />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Autoconsumo" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Excedente"   stackId="a" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Generación" fill="#f59e0b" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
       </div>
 
-      {/* Tabla de detalle (últimos 7 días) */}
+      {/* Tabla de detalle */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100">
           <span className="font-semibold text-slate-800 text-sm">Detalle últimos 7 días</span>
@@ -121,7 +123,7 @@ export default function ProduccionTab({ plantas, kpiDiario }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50">
             <tr>
-              {['Fecha', 'Generación', 'Excedente', 'Autoconsumo', 'Ratio exc.', 'Potencia máx.', 'Ingresos est.'].map(h => (
+              {['Fecha', 'Generación', 'Ingresos est.'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wide">
                   {h}
                 </th>
@@ -129,19 +131,23 @@ export default function ProduccionTab({ plantas, kpiDiario }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {kpis.slice(-7).reverse().map(k => (
-              <tr key={k.fecha} className="hover:bg-slate-50">
-                <td className="px-4 py-2.5 font-medium text-slate-700">{k.fecha}</td>
-                <td className="px-4 py-2.5 text-slate-700">{fmt(k.energia_kwh, 1, ' kWh')}</td>
-                <td className="px-4 py-2.5 text-blue-600">{fmt(k.excedente_kwh, 1, ' kWh')}</td>
-                <td className="px-4 py-2.5 text-green-600">{fmt(k.autoconsumida_kwh, 1, ' kWh')}</td>
-                <td className="px-4 py-2.5 text-slate-600">
-                  {k.energia_kwh > 0 ? fmt((k.excedente_kwh / k.energia_kwh) * 100, 0, ' %') : '—'}
-                </td>
-                <td className="px-4 py-2.5 text-slate-600">{fmt(k.potencia_max_kw, 1, ' kW')}</td>
-                <td className="px-4 py-2.5 text-slate-600">{fmt(k.ingresos_eur, 2, ' €')}</td>
+            {isLoading ? (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-slate-400 text-sm animate-pulse">Cargando…</td>
               </tr>
-            ))}
+            ) : kpis.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-slate-300 text-sm">Sin datos</td>
+              </tr>
+            ) : (
+              [...kpis].reverse().slice(0, 7).map(k => (
+                <tr key={k.fecha} className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-medium text-slate-700">{k.fecha}</td>
+                  <td className="px-4 py-2.5 text-amber-600">{fmt(k.energia_kwh, 1, ' kWh')}</td>
+                  <td className="px-4 py-2.5 text-emerald-600">{fmt(k.ingresos_eur, 2, ' €')}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

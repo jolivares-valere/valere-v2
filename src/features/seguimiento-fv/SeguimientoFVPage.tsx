@@ -6,7 +6,7 @@ import {
 import { useTodasLasPlantas } from './api'
 import AlarmasTab        from './components/AlarmasTab'
 import {
-  FIXTURE_PLANTAS, FIXTURE_PLANTAS_SIN_ASIGNAR, FIXTURE_KPI_DIARIO,
+  FIXTURE_PLANTAS, FIXTURE_PLANTAS_SIN_ASIGNAR,
   FIXTURE_COMPARATIVA, FIXTURE_INCIDENCIAS, FIXTURE_CREDENCIALES, FIXTURE_INFORMES,
 } from './fixtures'
 import ResumenTab        from './components/ResumenTab'
@@ -39,7 +39,6 @@ export default function SeguimientoFVPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const plantas: any[]  = usarFixtures ? FIXTURE_PLANTAS          : (plantasReales ?? [])
   const sinAsignar      = usarFixtures ? FIXTURE_PLANTAS_SIN_ASIGNAR : (plantasReales ?? []).filter((p: any) => !p.empresa_id)
-  const kpiDiario       = FIXTURE_KPI_DIARIO
   const comparativa     = FIXTURE_COMPARATIVA
   const incidencias     = FIXTURE_INCIDENCIAS
   const informes        = FIXTURE_INFORMES
@@ -126,7 +125,7 @@ export default function SeguimientoFVPage() {
           <>
             {tabActual === 'resumen'      && <ResumenTab      plantas={plantas} incidencias={incidencias} comparativa={comparativa} credenciales={FIXTURE_CREDENCIALES} />}
             {tabActual === 'plantas'      && <PlantasTab      plantas={plantas} />}
-            {tabActual === 'produccion'   && <ProduccionTab   plantas={plantas} kpiDiario={kpiDiario} />}
+            {tabActual === 'produccion'   && <ProduccionTab   plantas={plantas} />}
             {tabActual === 'excedentes'   && <ExcedentesTab   comparativa={comparativa} />}
             {tabActual === 'alarmas-fv'   && <AlarmasTab />}
             {tabActual === 'incidencias'  && <IncidenciasTab  incidencias={incidencias} />}
