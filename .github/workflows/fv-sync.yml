@@ -22,6 +22,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: fv-sync
+  cancel-in-progress: false   # no cancelar un sync en curso si llega otro
+
 jobs:
   sync:
     name: Sincronizar plantas FV
@@ -71,15 +75,22 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           FV_ENCRYPTION_KEY:    ${{ secrets.FV_ENCRYPTION_KEY }}
           RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          # Inputs via env vars — NUNCA expandir ${{ inputs.xxx }} directamente
+          # en el bloque run: (se expande en tiempo de compilación YAML, antes
+          # de que el shell lo evalúe, causando inyección de valores inesperados).
+          INPUT_CREDENCIAL_ID:  ${{ inputs.credencial_id }}
+          INPUT_EMPRESA_ID:     ${{ inputs.empresa_id }}
+          INPUT_DRY_RUN:        ${{ inputs.dry_run }}
         run: |
           ARGS=""
-          if [ -n "${{ github.event.inputs.credencial_id }}" ]; then
-            ARGS="$ARGS --credencial ${{ github.event.inputs.credencial_id }}"
+          if [ -n "$INPUT_CREDENCIAL_ID" ]; then
+            ARGS="$ARGS --credencial $INPUT_CREDENCIAL_ID"
           fi
-          if [ -n "${{ github.event.inputs.empresa_id }}" ]; then
-            ARGS="$ARGS --empresa ${{ github.event.inputs.empresa_id }}"
+          if [ -n "$INPUT_EMPRESA_ID" ]; then
+            ARGS="$ARGS --empresa $INPUT_EMPRESA_ID"
           fi
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
+          echo "ARGS finales: $ARGS"
           python sync_job.py $ARGS
