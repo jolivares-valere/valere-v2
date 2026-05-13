@@ -1,6 +1,50 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-13 (sesión 3ª) — Datadis: ConsumoTab validado en prod (4bed1ed). 6 tabs operativas. TSC 0 errores.**
+> **Última actualización: 2026-05-14 — Datadis: Fix crítico P6 + festivos Circular 3/2020 CNMC (8f029d1). TSC 0 errores.**
+>
+> ## ✅ SESIÓN 2026-05-14 (2ª parte) — DATADIS: FIX CRÍTICO P6 + FESTIVOS CNMC
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `periodos30TD.ts` | Reescrito: P6 universal (fines de semana + festivos + 00:00-08:00 laborables). 4 temporadas CNMC correctas: Alta(ene,feb,jul,dic)/Media(mar,nov)/Media-Baja(jun,sep)/Baja(abr,may,ago,oct). Import isHolidayES. | `8f029d1` |
+> | `holidays-es.ts` | Nuevo: festivos nacionales 2024-2026 (BOE) + autonómicos Andalucía. `isHolidayES(dateISO, ccaa?)` + `ccaaFromProvinceCode(code)`. PROVINCE_TO_CCAA con 52 provincias. | `8f029d1` |
+> | `normalizers.ts` | `normalizeConsumption` acepta `{ tariff?, ccaa? }`. Pasa ccaa a cada llamada de `derivePeriod`. | `8f029d1` |
+> | `SupplyDetailPage.tsx` | ConsumoTab: `ccaaFromProvinceCode(province)` → pasa ccaa a normalizeConsumption. | `8f029d1` |
+> | `periodos30TD.test.ts` | Nuevo: 30 casos borde (festivos nacionales, autonómicos, fines de semana, madrugadas, períodos por temporada). | `8f029d1` |
+>
+> ### Bug corregido
+> Bug original: división binaria verano/invierno → P3 sustituía a P6 en invierno (meses oct-mar).
+> Impacto: nov/dic/ene/feb/mar mostraban P3 en lugar de P6 en el gráfico apilado — normativamente incorrecto.
+> Fix: P6 se evalúa primero, antes de temporada. Festivos nacionales y de Andalucía incluidos. Error residual < 0.3% (festivos locales no incluidos).
+>
+> ### ⏳ PENDIENTE VALIDACIÓN en producción
+> - Verificar que nov/dic/ene/feb muestran P6 como barra dominante (ya no P3)
+> - Ejecutar: `npx vitest run src/features/datadis/periodos30TD.test.ts --reporter=verbose`
+> - Solo tras validación se puede usar P1-P6 para factura teórica
+>
+> ---
+>
+> ## ✅ SESIÓN 2026-05-14 — DATADIS: MODO FRANJA HORARIA
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `SupplyDetailPage.tsx` | ConsumoTab: toggle Vista mensual / Modo franja. Franja: selector mes, sliders hora inicio/fin, filtro Todos/Lab/Fds, KPIs (total kWh, % mes, día pico, hora pico), gráfico diario con día pico en rojo | `f4e06cc` |
+> | `normalizers.ts` | `points: ConsumoHourlyPoint[]` añadido a `ConsumoNormalized` — array con todos los intervalos horarios para drill-down | `ce38120` |
+>
+> ### Funcionalidades Modo Franja
+> - Slider hora inicio (0–22) + hora fin (1–23) con auto-ajuste para evitar rangos inválidos
+> - Filtro tipo día: Todos / Laborables / Fin de semana (usa `isWeekend` del punto horario)
+> - 4 KPIs: total kWh franja, % del mes, día pico, hora pico
+> - Gráfico de barras diario filtrado; día pico resaltado en rojo con leyenda
+> - Auto-selección del último mes disponible al activar Modo Franja
+> - Toda la computación en memoria sobre `normalized.points[]` — 0 llamadas extra a la API
+>
+> ### Pendientes Datadis (próximas sesiones)
+> - ⏳ #35: Autoconsumo FV en normalizeConsumption() — BLOQUEADO esperando payload real de CUPS con energyPoured/energyGenerated informados
+> - ⏳ Factura teórica v1: Contrato + Consumo + Maxímetro + Reactiva → estimación económica (próxima feature grande)
+> - ⏳ Conectar IncidenciasTab a tabla `incidencias` real en Supabase
+>
+> ---
 >
 > ## ✅ SESIÓN 2026-05-13 (3ª parte) — DATADIS: TAB CONSUMO + PERÍODOS 3.0TD
 >
@@ -23,9 +67,9 @@
 > ### Estado módulo Datadis — VISOR OPERATIVO COMPLETO ✅
 > 6 tabs validadas en producción: Información · Contrato · Curva · Cierres · Reactiva · Consumo
 >
-> ### Pendientes Datadis (próximas sesiones)
+### Pendientes Datadis (estado 2026-05-14)
+> - ✅ #36: ConsumoTab Modo Franja — COMPLETADO (f4e06cc)
 > - ⏳ #35: Autoconsumo FV en normalizeConsumption() — esperar payload real de CUPS con energyPoured/energyGenerated informados
-> - ⏳ #36: ConsumoTab drill-down mensual→diario→horario + filtro franja horaria
 > - ⏳ Factura teórica v1: Contrato + Consumo + Maxímetro + Reactiva → estimación económica
 >
 > ---
