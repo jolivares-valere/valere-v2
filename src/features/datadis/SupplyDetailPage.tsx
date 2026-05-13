@@ -336,13 +336,9 @@ function CurveTab({
     )
   }
 
-  const monthsBack = range === '7d' ? 0 : range === '30d' ? 1 : 3
-
-  const dates = useMemo(() => {
-    const { start, end } = getDateRange(monthsBack)
-    return { start, end }
-  }, [monthsBack])
-
+  // 24m fijo — comparte cache con ConsumoTab, CierresTab y ReactivaTab.
+  // El selector 7d/30d/3m filtra en cliente sobre los puntos ya descargados.
+  const dates     = useMemo(() => getDateRange(24), [])
   const cups      = supply.cups
   const distCode  = distributorCode(supply)
   const province  = extractProvince(supply)
@@ -363,7 +359,17 @@ function CurveTab({
     creds,
   )
 
-  const chartData = useMemo(() => buildChartData(Array.isArray(data) ? data : []), [data])
+  const chartData = useMemo(() => {
+    const allPoints = Array.isArray(data) ? data : []
+    // Calcular cutoff segun range
+    const cutoff = new Date()
+    if (range === '7d')  cutoff.setDate(cutoff.getDate() - 7)
+    else if (range === '30d') cutoff.setDate(cutoff.getDate() - 30)
+    else cutoff.setMonth(cutoff.getMonth() - 3)
+    const cutoffStr = `${cutoff.getFullYear()}/${String(cutoff.getMonth() + 1).padStart(2, '0')}/${String(cutoff.getDate()).padStart(2, '0')}`
+    const filtered = allPoints.filter(p => !p.date || p.date >= cutoffStr)
+    return buildChartData(filtered)
+  }, [data, range])
   const totalKwh  = chartData.reduce((s, d) => s + d.kwh, 0)
   const maxKwh    = chartData.length ? Math.max(...chartData.map(d => d.kwh)) : 0
   const avgKwh    = chartData.length ? totalKwh / chartData.length : 0
@@ -480,7 +486,7 @@ function CierresTab({
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const dates    = useMemo(() => getDateRange(12), [])
+  const dates    = useMemo(() => getDateRange(24), []) // 24m fijo: comparte cache con ReactivaTab
   const cups     = supply.cups
   const distCode = distributorCode(supply)
   const province = extractProvince(supply)
@@ -657,7 +663,7 @@ function ReactivaTab({
   supply: DatadisSupply
   contract?: ContractDTO | null
 }) {
-  const dates     = useMemo(() => getDateRange(13), [])
+  const dates     = useMemo(() => getDateRange(24), []) // 24m fijo: comparte cache con CierresTab
   const cups      = supply.cups
   const distCode  = distributorCode(supply)
   const province  = extractProvince(supply)
@@ -862,16 +868,10 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
   const [franjaHoraFin,    setFranjaHoraFin]    = useState<number>(14)
   const [franjaTipoDia,    setFranjaTipoDia]    = useState<FranjaTipo>('todos')
 
-  const monthsBack = range === '3m' ? 3 : range === '6m' ? 6 : range === '12m' ? 12 : 24
-
-  const { start, end } = useMemo(() => {
-    const now  = new Date()
-    const from = new Date(now)
-    from.setMonth(from.getMonth() - monthsBack)
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
-    return { start: fmt(from), end: fmt(now) }
-  }, [monthsBack])
+  // Siempre pedimos 24m para compartir cache con CierresTab y ReactivaTab.
+  // El selector range filtra en cliente sobre los datos ya cargados.
+  const { start, end } = useMemo(() => getDateRange(24), [])
+  const rangeMonths    = range === '3m' ? 3 : range === '6m' ? 6 : range === '12m' ? 12 : 24
 
   const cups      = supply.cups
   const distCode  = distributorCode(supply)
@@ -979,8 +979,11 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
     )
   }
 
-  const { monthly, totalKwh, dominantPeriod, maxHourKwh, periodConfidence } = normalized
-  const avgKwh = monthly.length ? totalKwh / monthly.length : 0
+  // Filtro cliente: de los 24m descargados, mostrar solo los N últimos según el selector.
+  const { monthly: allMonthly, dominantPeriod, maxHourKwh, periodConfidence } = normalized
+  const monthly  = allMonthly.slice(-rangeMonths)
+  const totalKwh = monthly.reduce((s, m) => s + m.totalKwh, 0)
+  const avgKwh   = monthly.length ? totalKwh / monthly.length : 0
 
   return (
     <div className="space-y-4">
@@ -1434,7 +1437,7 @@ export default function SupplyDetailPage() {
             {tab === 'info'     && <InfoTab supply={supply} contract={contract} />}
             {tab === 'contrato' && (
               <ContractTab
-                isLoading={loadingContract}
+               isLoading={loadingContract}
                 isError={errorContract}
                 contract={contract}
               />

@@ -193,6 +193,18 @@ export function useDatadisContractual(
   })
 }
 
+// Tiempo de cache para datos DataDis: costosos de obtener (20-50s), cambian poco.
+// staleTime: 6h  — no se re-fetcha mientras el dato sea fresco.
+// gcTime:    24h — se mantiene en memoria aunque no haya suscriptores activos.
+// refetchOnMount/WindowFocus: false — evita doble-fetch al navegar entre tabs.
+const DATADIS_CACHE = {
+  staleTime:              6  * 60 * 60 * 1000,
+  gcTime:                 24 * 60 * 60 * 1000,
+  refetchOnMount:         false,
+  refetchOnWindowFocus:   false,
+  retry:                  1,
+} as const
+
 export function useDatadisConsumption(
   params: ConsumptionParams | null,
   creds?: DatadisCreds,
@@ -206,8 +218,7 @@ export function useDatadisConsumption(
     queryFn:  () =>
       callProxy<DatadisConsumptionPoint[]>('get_consumption', params as unknown as Record<string, unknown>, creds),
     enabled: !!params?.cups,
-    staleTime: 10 * 60 * 1000,
-    retry: 1,
+    ...DATADIS_CACHE,
   })
 }
 
@@ -224,8 +235,7 @@ export function useDatadisMaxPower(
     queryFn:  () =>
       callProxy<DatadisMaxPowerPoint[]>('get_max_power', params as unknown as Record<string, unknown>, creds),
     enabled: !!params?.cups,
-    staleTime: 10 * 60 * 1000,
-    retry: 1,
+    ...DATADIS_CACHE,
   })
 }
 
@@ -242,8 +252,7 @@ export function useDatadisReactive(
     queryFn:  () =>
       callProxy<DatadisReactivePoint[]>('get_reactive', params as unknown as Record<string, unknown>, creds),
     enabled: !!params?.cups,
-    staleTime: 10 * 60 * 1000,
-    retry: 1,
+    ...DATADIS_CACHE,
   })
 }
 
