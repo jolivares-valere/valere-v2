@@ -1,6 +1,34 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-13 (sesión 2ª) — Datadis: normalizers.ts + Tab Reactiva completa. TSC 0 errores. main: 4ea3dcc.**
+> **Última actualización: 2026-05-13 (sesión 3ª) — Datadis: ConsumoTab validado en prod (4bed1ed). 6 tabs operativas. TSC 0 errores.**
+>
+> ## ✅ SESIÓN 2026-05-13 (3ª parte) — DATADIS: TAB CONSUMO + PERÍODOS 3.0TD
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `periodos30TD.ts` | Nuevo: `derivePeriod()` pura, matriz 3.0TD verano/invierno, `PeriodConfidence='estimated'`, TODO festivos v2 | `4bed1ed` |
+> | `normalizers.ts` | `normalizeConsumption()` reescrito: lee `timeCurveList[].measureMagnitudeActive`, `metodoObtencion`. DTOs `ConsumoMonthlyAgg` + `ConsumoNormalized` con `byPeriod`, `dominantPeriod`, `periodConfidence` | `4bed1ed` |
+> | `api.ts` | `DatadisConsumptionPoint` actualizado con campos reales: `measureMagnitudeActive`, `metodoObtencion`, `energyPoured`, `energyGenerated`, `selfConsumptionEnergy` | `4bed1ed` |
+> | `SupplyDetailPage.tsx` | `ConsumoTab` reescrito: gráfico apilado P1-P6 estimado, tabla con badge Real/Estimada/Mixto, aviso ámbar, KPIs (total, media, máx hora, período dominante) | `4bed1ed` |
+> | `docs/datadis/payloads/` | Fixture `get_consumption_EDISTRIBUCION_2026-05-13.json` + regla de oro en blueprint: payload real antes de normalizer | `4bed1ed` |
+>
+> ### Validación producción ConsumoTab (2026-05-13)
+> - ✅ 13 meses visibles (2025-05 → 2026-05), total 28.071 kWh (coherente con payload real ≈28k)
+> - ✅ Gráfico apilado P1-P6 con leyenda; badge "Períodos estimados" visible
+> - ✅ Tabla con badges Real (12 filas) / Mixto (2025-10)
+> - ✅ Aviso: "matriz 3.0TD oficial, sin festivos, error <2%"
+> - ✅ Regresión: Información / Contrato / Curva / Cierres / Reactiva intactas
+> - ⚠️ MÁX. HORA: 24.667 kWh con 15kW contratados — posible pico con exceso de potencia, revisar en conciliación factura
+>
+> ### Estado módulo Datadis — VISOR OPERATIVO COMPLETO ✅
+> 6 tabs validadas en producción: Información · Contrato · Curva · Cierres · Reactiva · Consumo
+>
+> ### Pendientes Datadis (próximas sesiones)
+> - ⏳ #35: Autoconsumo FV en normalizeConsumption() — esperar payload real de CUPS con energyPoured/energyGenerated informados
+> - ⏳ #36: ConsumoTab drill-down mensual→diario→horario + filtro franja horaria
+> - ⏳ Factura teórica v1: Contrato + Consumo + Maxímetro + Reactiva → estimación económica
+>
+> ---
 >
 > ## ✅ SESIÓN 2026-05-13 (2ª parte) — DATADIS: NORMALIZERS + TAB REACTIVA
 >
