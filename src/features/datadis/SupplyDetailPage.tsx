@@ -16,9 +16,17 @@ import {
   useDatadisMaxPower,
   useDatadisReactive,
   type DatadisSupply,
-  type DatadisContractualData,
   type DatadisConsumptionPoint,
 } from './api'
+import {
+  normalizeContract,
+  normalizeMaxPower,
+  normalizeReactive,
+  extractProvince,
+  extractMunicipio,
+  extractTariff,
+  type ContractDTO,
+} from './normalizers'
 
 // ─── Colores periodo tarifario (P1..P6) ──────────────────────────────────────
 const PERIOD_COLORS = {
@@ -113,16 +121,16 @@ function getDateRange(monthsBack = 1) {
 
 // ─── Tab: Información ─────────────────────────────────────────────────────────
 
-function InfoTab({ supply, contract }: { supply: DatadisSupply; contract?: DatadisContractualData }) {
+function InfoTab({ supply, contract }: { supply: DatadisSupply; contract?: ContractDTO | null }) {
   const [showRaw, setShowRaw] = useState(false)
 
   // Algunos campos solo vienen en get_contractual (no en get_supplies)
-  const tarifa  = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
-    !== '---' ? sf(supply, 'tarifa', 'tariff', 'tarifaCode')
-    : String(contract?.['tarifaAccesoCode'] ?? contract?.['tarifaAcceso'] ?? contract?.accessFare ?? '---')
-  const tension = sf(supply, 'tension')
-    !== '---' ? sf(supply, 'tension')
-    : String(contract?.tension ?? contract?.['tension'] ?? '---')
+  const tarifa  = sf(supply, 'tarifa', 'tariff', 'tarifaCode') !== '---'
+    ? sf(supply, 'tarifa', 'tariff', 'tarifaCode')
+    : contract?.tariff ?? '---'
+  const tension = sf(supply, 'tension') !== '---'
+    ? sf(supply, 'tension')
+    : contract?.tension ?? '---'
 
   const fields: [string, string][] = [
     ['CUPS', supply.cups ?? '---'],
@@ -198,7 +206,7 @@ function ContractTab({
 }: {
   isLoading: boolean
   isError: boolean
-  contract: DatadisContractualData | undefined
+  contract: ContractDTO | null | undefined
 }) {
   if (isLoading) {
     return (
@@ -220,16 +228,14 @@ function ContractTab({
     )
   }
 
-  // Datadis EDISTRIBUCIÓN devuelve potencias como array 'potenciaContratada'
-  // Otros portales devuelven contractedPowerkWP1..6
-  const pot = contract['potenciaContratada'] as number[] | undefined
-  const potencias: [string, number | undefined][] = [
-    ['P1', pot?.[0] ?? contract.contractedPowerkWP1],
-    ['P2', pot?.[1] ?? contract.contractedPowerkWP2],
-    ['P3', pot?.[2] ?? contract.contractedPowerkWP3],
-    ['P4', pot?.[3] ?? contract.contractedPowerkWP4],
-    ['P5', pot?.[4] ?? contract.contractedPowerkWP5],
-    ['P6', pot?.[5] ?? contract.contractedPowerkWP6],
+  // Potencias desde el DTO normalizado (siempre array[6])
+  const potencias: [string, number][] = [
+    ['P1', contract?.powers[0] ?? 0],
+    ['P2', contract?.powers[1] ?? 0],
+    ['P3', contract?.powers[2] ?? 0],
+    ['P4', contract?.powers[3] ?? 0],
+    ['P5', contract?.powers[4] ?? 0],
+    ['P6', contract?.powers[5] ?? 0],
   ]
 
   return (
@@ -240,13 +246,12 @@ function ContractTab({
         </h3>
         <dl className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
           {([
-            // Datadis portal EdistribucIón devuelve campos en español; otros en inglés
-            ['Tarifa acceso', String(contract['tarifaAcceso'] ?? contract['tarifaAccesoCode'] ?? contract.accessFare ?? '---')],
-            ['Comercializadora', String(contract['comercializador'] ?? contract.marketer ?? '---')],
-            ['Distribuidor', String(contract['distribuidor'] ?? contract.distributor ?? '---')],
-            ['Tensión', String(contract['tension'] ?? contract.tension ?? '---')],
-            ['Inicio contrato', isoToDisplay(String(contract['fechaInicio'] ?? contract.startDate ?? ''))],
-            ['Fin contrato', isoToDisplay(String(contract['fechaFin'] ?? contract.endDate ?? ''))],
+            ['Tarifa acceso',   contract?.tariff     ?? '---'],
+            ['Comercializadora', contract?.marketer   ?? '---'],
+            ['Distribuidor',    contract?.distributor ?? '---'],
+            ['Tensión',         contract?.tension     ?? '---'],
+            ['Inicio contrato', isoToDisplay(contract?.startDate ?? '')],
+            ['Fin contrato',    contract?.endDate ? isoToDisplay(contract.endDate) : 'Indefinido'],
           ] as [string, string][]).map(([label, val]) => (
             <div key={label}>
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
@@ -275,7 +280,7 @@ function ContractTab({
                 {p}
               </span>
               <span className="mt-1 text-lg font-bold text-slate-800">
-                {kw != null ? kw.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) : '---'}
+                {kw > 0 ? kw.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) : <span className="text-slate-300 text-base">---</span>}
               </span>
               <span className="text-[10px] text-slate-400">kW</span>
             </div>
@@ -334,15 +339,11 @@ function CurveTab({
     return { start, end }
   }, [monthsBack])
 
-  const cups       = supply.cups
-  const distCode   = distributorCode(supply)
-  const province   = sf(supply, 'codProvincia', 'cod_provincia', 'provinceCode') !== '---'
-    ? sf(supply, 'codProvincia', 'cod_provincia', 'provinceCode')
-    : '41'
-  const municipio  = sf(supply, 'codMunicipio', 'cod_municipio', 'municipioCode') !== '---'
-    ? sf(supply, 'codMunicipio', 'cod_municipio', 'municipioCode')
-    : '041091'
-  const tariff     = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
+  const cups      = supply.cups
+  const distCode  = distributorCode(supply)
+  const province  = extractProvince(supply)
+  const municipio = extractMunicipio(supply)
+  const tariff    = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
 
   const { data, isLoading, isError, error } = useDatadisConsumption(
     cups && distCode ? {
@@ -470,26 +471,16 @@ function CierresTab({
   creds,
 }: {
   supply: DatadisSupply
-  contract?: DatadisContractualData
+  contract?: ContractDTO | null
   creds?: { username: string; password: string }
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const dates = useMemo(() => getDateRange(12), [])
-
-  const cups      = supply.cups
-  const distCode  = distributorCode(supply)
-  // EDISTRIBUCIÓN usa 'codigoProvincia'; otros usan 'codProvincia'/'cod_provincia'
-  const province  = sf(supply, 'codigoProvincia', 'codProvincia', 'cod_provincia') !== '---'
-    ? sf(supply, 'codigoProvincia', 'codProvincia', 'cod_provincia')
-    : '41'
-  // Tarifa puede venir del supply o del contrato (EDISTRIBUCIÓN la trae en contractual)
-  const tariff    = (() => {
-    const fromSupply = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
-    if (fromSupply !== '---') return fromSupply
-    const fromContract = String(contract?.['tarifaAccesoCode'] ?? contract?.['tarifaAcceso'] ?? contract?.accessFare ?? '')
-    return fromContract || '3.0TD'
-  })()
+  const dates    = useMemo(() => getDateRange(12), [])
+  const cups     = supply.cups
+  const distCode = distributorCode(supply)
+  const province = extractProvince(supply)
+  const tariff   = extractTariff(supply, contract)
 
   const { data: maxPower, isLoading: loadingMax, isError: errorMax } = useDatadisMaxPower(
     cups && distCode ? {
@@ -517,43 +508,30 @@ function CierresTab({
 
   const isLoading = loadingMax || loadingReact
 
+  // Normalizar respuestas — toda la lógica de shapes y aliases va en normalizers.ts
+  const maxPowerDTOs   = useMemo(() => normalizeMaxPower(maxPower),   [maxPower])
+  const reactiveDTOs   = useMemo(() => normalizeReactive(reactive),   [reactive])
+
+  // Agregar por mes/período para la tabla
   const maxByMonth = useMemo(() => {
     const result: Record<string, Record<string, number>> = {}
-    // Normalizar: el proxy puede devolver {response: [...]} o directamente un array
-    const raw = maxPower as any
-    const arr: any[] = Array.isArray(maxPower) ? maxPower
-      : Array.isArray(raw?.response) ? raw.response
-      : []
-    for (const p of arr) {
-      // EDISTRIBUCIÓN usa campos en español; otros portales en inglés
-      const dateStr = String(p['fechaMaximo'] ?? p.date ?? '')
-      const month = dateStr.slice(0, 7).replace(/\//g, '-')
-      if (!month) continue
-      if (!result[month]) result[month] = {}
-      const per = `P${p['periodo'] ?? p.period ?? 1}`
-      const kw = Number(p['maximoPotenciaDemandada'] ?? p.maxPower ?? 0)
-      result[month][per] = Math.max(result[month][per] ?? 0, kw)
+    for (const p of maxPowerDTOs) {
+      if (!result[p.month]) result[p.month] = {}
+      const per = `P${p.period}`
+      result[p.month][per] = Math.max(result[p.month][per] ?? 0, p.maxKw)
     }
     return result
-  }, [maxPower])
+  }, [maxPowerDTOs])
 
   const months = Object.keys(maxByMonth).sort().reverse()
 
   const reactiveByMonth = useMemo(() => {
     const result: Record<string, number> = {}
-    // EDISTRIBUCIÓN devuelve {response: {code, cups, energy: [...]}} — objeto, no array
-    const raw = reactive as any
-    const arr: any[] = Array.isArray(reactive) ? reactive
-      : Array.isArray(raw?.response?.energy) ? raw.response.energy
-      : Array.isArray(raw?.response) ? raw.response
-      : []
-    for (const p of arr) {
-      const month = String(p.date ?? '').slice(0, 7).replace(/\//g, '-')
-      if (!month) continue
-      result[month] = (result[month] ?? 0) + ((p.energyP1 ?? 0) + (p.energyP2 ?? 0) + (p.energyP3 ?? 0))
+    for (const p of reactiveDTOs) {
+      result[p.month] = (result[p.month] ?? 0) + p.totalKvarh
     }
     return result
-  }, [reactive])
+  }, [reactiveDTOs])
 
   if (isLoading) {
     return (
@@ -675,13 +653,12 @@ export default function SupplyDetailPage() {
     useDatadisContractual(
       supply && distCode ? { cups: supply.cups, distributor: distCode } : null,
     )
-  // El proxy puede devolver {response: [{...}]} o [{...}] — normalizamos ambos
-  const contractRaw = contractData as any
-  const contract: DatadisContractualData | undefined = Array.isArray(contractData)
-    ? contractData[0]
-    : Array.isArray(contractRaw?.response)
-      ? contractRaw.response[0]
-      : undefined
+  // Normalizar: el proxy puede devolver [{...}] o {response:[{...}]}
+  // normalizeContract() maneja todos los shapes y aliases de distribuidoras
+  const contract: ContractDTO | null = useMemo(
+    () => normalizeContract(contractData),
+    [contractData],
+  )
 
   const TABS: { id: Tab; label: string; icon: typeof Zap }[] = [
     { id: 'info',     label: 'Información', icon: Database },
