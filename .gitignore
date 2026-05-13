@@ -32,5 +32,10 @@ npm-debug.log*
 .parcel-cache/
 *.tsbuildinfo
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
 supabase/.temp/
 tsc_output.txt
