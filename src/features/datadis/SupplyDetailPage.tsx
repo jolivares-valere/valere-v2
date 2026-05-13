@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Building2, Calendar, ChevronDown, ChevronUp,
+  Activity, AlertTriangle, ArrowLeft, Building2, Calendar,
+  CheckCircle2, ChevronDown, ChevronUp,
   Database, FileText, Info, Loader2, MapPin,
   TrendingUp, Wifi, WifiOff, Zap,
 } from 'lucide-react'
 import {
   AreaChart, Area,
+  BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import {
@@ -635,140 +637,135 @@ function CierresTab({
   )
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+// ─── Tab: Reactiva ────────────────────────────────────────────────────────────
 
-type Tab = 'info' | 'contrato' | 'curva' | 'cierres'
+const PERIOD_COLORS_REACT = ['#ef4444', '#f97316', '#3b82f6', '#8b5cf6', '#10b981', '#6b7280']
 
-export default function SupplyDetailPage() {
-  const { cups } = useParams<{ cups: string }>()
-  const navigate  = useNavigate()
-  const [tab, setTab] = useState<Tab>('info')
+function reactivaBadge(totalKvarh: number): { label: string; color: string; icon: typeof CheckCircle2 } {
+  const abs = Math.abs(totalKvarh)
+  if (abs < 10)  return { label: 'Normal',              color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: CheckCircle2 }
+  if (abs < 150) return { label: 'Revisar',             color: 'text-amber-600   bg-amber-50   border-amber-200',   icon: AlertTriangle }
+  return              { label: 'Posible penalización', color: 'text-red-600     bg-red-50     border-red-200',     icon: AlertTriangle }
+}
 
-  const { data: suppliesData, isLoading: loadingSupplies } = useDatadisSupplies()
-  const supply: DatadisSupply | undefined = suppliesData?.response?.find(s => s.cups === cups)
+function ReactivaTab({
+  supply,
+  contract,
+}: {
+  supply: DatadisSupply
+  contract?: ContractDTO | null
+}) {
+  const dates     = useMemo(() => getDateRange(13), [])
+  const cups      = supply.cups
+  const distCode  = distributorCode(supply)
+  const province  = extractProvince(supply)
+  const tariff    = extractTariff(supply, contract)
 
-  const distCode = supply ? distributorCode(supply) : undefined
-
-  const { data: contractData, isLoading: loadingContract, isError: errorContract } =
-    useDatadisContractual(
-      supply && distCode ? { cups: supply.cups, distributor: distCode } : null,
-    )
-  // Normalizar: el proxy puede devolver [{...}] o {response:[{...}]}
-  // normalizeContract() maneja todos los shapes y aliases de distribuidoras
-  const contract: ContractDTO | null = useMemo(
-    () => normalizeContract(contractData),
-    [contractData],
+  const { data: reactive, isLoading, isError } = useDatadisReactive(
+    cups && distCode ? {
+      cups,
+      distributor:  distCode,
+      fechaInicial: dates.start,
+      fechaFinal:   dates.end,
+      provinceCode: province,
+      tarifaCode:   tariff,
+    } : null,
   )
 
-  const TABS: { id: Tab; label: string; icon: typeof Zap }[] = [
-    { id: 'info',     label: 'Información', icon: Database },
-    { id: 'contrato', label: 'Contrato',    icon: FileText },
-    { id: 'curva',    label: 'Curva',       icon: TrendingUp },
-    { id: 'cierres',  label: 'Cierres',     icon: Calendar },
-  ]
+  const dtos = useMemo(() => normalizeReactive(reactive), [reactive])
 
-  const tariff   = supply ? sf(supply, 'tarifa', 'tariff', 'tarifaCode') : ''
-  const munic    = supply ? sf(supply, 'municipio', 'municipality') : ''
-  const prov     = supply ? sf(supply, 'provincia', 'province') : ''
+  // KPIs resumen
+  const totalAbsKvarh = dtos.reduce((s, d) => s + Math.abs(d.totalKvarh), 0)
+  const mesesConReact = dtos.filter(d => Math.abs(d.totalKvarh) > 1).length
+  const maxMes = dtos.length > 0
+    ? dtos.reduce((max, d) => Math.abs(d.totalKvarh) > Math.abs(max.totalKvarh) ? d : max, dtos[0])
+    : null
+
+  // Datos para el gráfico de barras mensual
+  const chartData = [...dtos]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map(d => ({
+      mes:     d.month.slice(5),           // MM
+      month:   d.month,
+      kvarh:   Math.round(Math.abs(d.totalKvarh) * 10) / 10,
+      signo:   d.totalKvarh < 0 ? 'C' : 'I', // capacitiva / inductiva
+    }))
+
+  const badge = reactivaBadge(totalAbsKvarh)
+  const BadgeIcon = badge.icon
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm">Cargando energía reactiva...</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center">
+        <WifiOff className="mx-auto mb-2 h-8 w-8 text-red-300" />
+        <p className="text-sm font-medium text-red-600">No se pudo cargar la energía reactiva</p>
+        <p className="mt-1 text-xs text-red-400">Reintenta o comprueba que el punto tiene datos en Datadis.</p>
+      </div>
+    )
+  }
+
+  if (dtos.length === 0) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+        <Activity className="mx-auto mb-3 h-10 w-10 text-slate-200" />
+        <p className="text-sm text-slate-500">Sin datos de energía reactiva</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Solo disponible en suministros con tarifa 3.0TD o 6.1TD (normalmente {'>'}15 kW).
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <button
-          type="button"
-          onClick={() => navigate('/datadis')}
-          className="mb-3 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Volver al listado de suministros
-        </button>
-
-        {loadingSupplies ? (
-          <div className="flex items-center gap-2 text-slate-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Cargando suministro...</span>
-          </div>
-        ) : !supply ? (
-          <div className="flex items-center gap-2 text-red-500">
-            <WifiOff className="h-4 w-4" />
-            <span className="text-sm font-medium">Suministro no encontrado: {cups}</span>
-          </div>
-        ) : (
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="font-mono text-base font-bold text-slate-900">{cups}</h1>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    {tariff !== '---' && tariff && (
-                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
-                        {tariff}
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1 text-xs text-slate-500">
-                      <Building2 className="h-3 w-3" />
-                      {distributorLabel(supply)}
-                    </span>
-                    {(munic !== '---' || prov !== '---') && (
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
-                        <MapPin className="h-3 w-3" />
-                        {[munic, prov].filter(v => v && v !== '---').join(', ')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
-              <Wifi className="h-3.5 w-3.5" />
-              <span>Sincronizado con Datadis</span>
-            </div>
-          </div>
-        )}
+    <div className="space-y-4">
+      {/* Badge de estado */}
+      <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 ${badge.color}`}>
+        <BadgeIcon className="h-4 w-4 shrink-0" />
+        <div>
+          <span className="text-sm font-semibold">{badge.label}</span>
+          <span className="ml-2 text-xs opacity-75">
+            {badge.label === 'Normal'
+              ? 'Reactiva dentro de márgenes habituales.'
+              : badge.label === 'Revisar'
+              ? 'Revisar si hay penalización en la última factura.'
+              : 'Reactiva superior a 150 kVArh. Probable cargo en factura — considerar batería de condensadores.'}
+          </span>
+        </div>
       </div>
 
-      {!loadingSupplies && supply && (
-        <>
-          {/* Tabs */}
-          <div className="border-b border-slate-200 bg-white px-6">
-            <div className="flex gap-1">
-              {TABS.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTab(id)}
-                  className={`flex items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-semibold transition-colors ${
-                    tab === id
-                      ? 'border-blue-600 text-blue-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </button>
-              ))}
-            </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-3 gap-3">
+        {([
+          ['Total período', `${Math.round(totalAbsKvarh).toLocaleString('es-ES')} kVArh`],
+          ['Meses con reactiva', `${mesesConReact} / ${dtos.length}`],
+          ['Mes máximo', maxMes ? `${Math.abs(maxMes.totalKvarh).toLocaleString('es-ES', { maximumFractionDigits: 0 })} kVArh` : '---'],
+        ] as [string, string][]).map(([label, val]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+            <p className="mt-1 text-lg font-bold text-slate-800">{val}</p>
           </div>
+        ))}
+      </div>
 
-          {/* Contenido del tab */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            {tab === 'info'     && <InfoTab supply={supply} contract={contract} />}
-            {tab === 'contrato' && (
-              <ContractTab
-                isLoading={loadingContract}
-                isError={errorContract}
-                contract={contract}
-              />
-            )}
-            {tab === 'curva'    && <CurveTab supply={supply} />}
-            {tab === 'cierres'  && <CierresTab supply={supply} contract={contract} />}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
+      {/* Gráfico mensual */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+          kVArh totales por mes (valor absoluto)
+        </h3>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} unit=" kVArh" width={72} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+              formatter=
