@@ -301,7 +301,7 @@ export interface ConsumoNormalized {
  */
 export function normalizeConsumption(
   raw: unknown,
-  opts: { tariff?: string } = {},
+  opts: { tariff?: string; ccaa?: string } = {},
 ): ConsumoNormalized | null {
   if (!raw) return null
 
@@ -316,6 +316,7 @@ export function normalizeConsumption(
   if (!list.length) return null
 
   const tariff = opts.tariff ?? '3.0TD'
+  const ccaa   = opts.ccaa
 
   const byMonth: Record<string, ConsumoMonthlyAgg> = {}
   const periodTotals: Record<TariffPeriod, number> = { P1: 0, P2: 0, P3: 0, P4: 0, P5: 0, P6: 0 }
@@ -351,7 +352,7 @@ export function normalizeConsumption(
     if (isReal) hasReal = true
     else        hasEstimated = true
 
-    const { period } = derivePeriod(rawDate, hour, tariff)
+    const { period } = derivePeriod(rawDate, hour, tariff, ccaa)
     periodTotals[period] = (periodTotals[period] ?? 0) + kwh
 
     if (!byMonth[month]) {

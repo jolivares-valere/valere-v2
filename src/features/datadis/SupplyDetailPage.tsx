@@ -30,6 +30,7 @@ import {
   extractTariff,
   type ContractDTO,
 } from './normalizers'
+import { ccaaFromProvinceCode } from './holidays-es'
 
 // ─── Colores periodo tarifario (P1..P6) ──────────────────────────────────────
 const PERIOD_COLORS = {
@@ -661,6 +662,7 @@ function ReactivaTab({
   const distCode  = distributorCode(supply)
   const province  = extractProvince(supply)
   const tariff    = extractTariff(supply, contract)
+  const ccaa      = ccaaFromProvinceCode(province ?? '')
 
   const { data: reactive, isLoading, isError } = useDatadisReactive(
     cups && distCode ? {
@@ -877,6 +879,7 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
   const municipio = extractMunicipio(supply)
   const tipoPunto = tipoPuntoCod(supply)
   const tariff    = extractTariff(supply, contract)
+  const ccaa      = ccaaFromProvinceCode(province ?? '')
 
   const { data, isLoading, isError, error } = useDatadisConsumption(
     cups && distCode ? {
@@ -892,7 +895,7 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
   )
 
   const normalized = useMemo(
-    () => normalizeConsumption(data, { tariff: tariff !== '---' ? tariff : '3.0TD' }),
+    () => normalizeConsumption(data, { tariff: tariff !== '---' ? tariff : '3.0TD', ccaa }),
     [data, tariff],
   )
 
