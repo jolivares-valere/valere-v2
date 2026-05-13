@@ -1,6 +1,67 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-12 por Cowork — Sesión gestión de sesiones FV: estado_sesion, botón Sincronizar desde CRM, Edge Function trigger-fv-sync. commit 7f12dc5. TSC 0 errores. Branch: feature/fv-operational-redesign.**
+> **Última actualización: 2026-05-13 por Cowork — Sesión FV hardening: fix EU5 daily_kpi (dn+queryTime), overflow guards HOTEL SIERRA LUZ, cron diario 07:00 UTC, concurrency group, fv_sync_audit scaffold. commit 45a7c3a. Branch: feature/fv-operational-redesign. PENDIENTE: merge a main + COMMIT_FV_AUDIT.ps1.**
+>
+> ## ✅ SESIÓN 2026-05-13 — FV HARDENING: EU5 FIX + OVERFLOW GUARDS + AUDIT SCAFFOLD
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `fusionsolar_client.py` | `get_daily_kpi` (WebAuthClient + StorageStateClient): detecta EU5 por `station_code.startswith("NE=")` → usa `dn`+`queryTime`+`timeZone:2` en vez de `stationCodes`+`collectTime`. StorageStateClient: retry x3 con backoff 5s/10s en FusionSolarResponseError (503 transitorios). | `45a7c3a` |
+> | `sync_job.py` | Backfill loop: guards `energia_kwh` (>999,999→0) y `potencia_max_kw` (>99,999→0) contra overflow (fix HOTEL SIERRA LUZ). `sleep(1)` entre llamadas históricas anti-rate-limit. | `45a7c3a` |
+> | `.github/workflows/fv-sync.yml` | Cron `0 * * * *` → `0 7 * * *` (24x/día → 1x/día 07:00 UTC). Añadido `concurrency.group: fv-sync` anti-solapamiento. | `45a7c3a` |
+> | `sync_job.py` | Helpers `_audit_record()` (no bloqueante) + `_classify_error()` (taxonomía 7 categorías). `run_id` UUID por ejecución. Backfill instrumentado con audit OK/FAIL. | **NO COMMIT — ejecutar COMMIT_FV_AUDIT.ps1** |
+> | `supabase/migrations/20260513_fv_sync_audit.sql` | ENUM `fv_error_category`, tabla `fv_sync_audit`, 4 índices, vista `fv_sync_health_latest` (DISTINCT ON), RLS admin/user. | **NO APLICADO en Supabase** |
+>
+> ### Estado del workflow fv-sync tras esta sesión
+> - 2 intentos fallaron con `KeyError: 'password_enc'` — ambos corrieron desde `main` (código viejo), no desde `feature/fv-operational-redesign`
+> - **Causa**: scheduled crons de GitHub Actions siempre usan el branch por defecto (main)
+> - **Solución**: merge `feature/fv-operational-redesign` → `main` (script `MERGE_FEATURE_TO_MAIN.ps1` listo en `~/.claude/`)
+>
+> ### Acción inmediata requerida (Juan) — ORDEN CRÍTICO
+>
+> **PASO 1** — Commit docs (antes de todo):
+> ```
+> pwsh C:\Users\joliv\.claude\COMMIT_DOCS_2026-05-13.ps1
+> ```
+>
+> **PASO 2** — Test manual desde el feature branch (NO desde main):
+> ```
+> GitHub Actions → Run workflow → Use workflow from: feature/fv-operational-redesign
+> ```
+> Verificar en el log del run:
+> - `Checking out the ref 'refs/heads/feature/fv-operational-redesign'` ← CRÍTICO
+> - `NE=135347362`
+> - `KPI diario OK ... 0.0 kWh`
+> - exit code 0
+>
+> **PASO 3** — Solo si PASO 2 verde → merge a main:
+> ```
+> pwsh C:\Users\joliv\.claude\MERGE_FEATURE_TO_MAIN.ps1
+> ```
+>
+> **PASO 4** — Aplicar SQL `fv_sync_audit` en Supabase Dashboard:
+> ```
+> supabase/migrations/20260513_fv_sync_audit.sql
+> ```
+>
+> **PASO 5** — Commit instrumentación auditoría:
+> ```
+> pwsh C:\Users\joliv\.claude\COMMIT_FV_AUDIT.ps1
+> ```
+>
+> **Pendientes FV actualizados:**
+> - ⏳ Ejecutar `MERGE_FEATURE_TO_MAIN.ps1` (BLOQUEANTE para todo lo demás)
+> - ⏳ Validar workflow: NE=135347362 + KPI diario OK + exit code 0
+> - ⏳ Ejecutar `COMMIT_FV_AUDIT.ps1` (commit sync_job.py con audit helpers)
+> - ⏳ Aplicar `20260513_fv_sync_audit.sql` en Supabase
+> - ⏳ Asignar 7 plantas reales a empresa+CUPS desde tab "Sin asignar"
+> - ⏳ Configurar `RESEND_API_KEY` en Supabase Edge Functions Secrets (alertas email alarmas críticas)
+> - ⏳ Configurar `GITHUB_PAT` en Supabase Edge Functions Secrets (botón Sincronizar desde CRM)
+> - ⏳ Deploy Edge Function `trigger-fv-sync`
+>
+> ---
+>
+> ## ✅ SESIÓN 2026-05-12 — FV SESSION MANAGEMENT + SYNC MANUAL DESDE CRM
 >
 > ## ✅ SESIÓN 2026-05-12 — FV SESSION MANAGEMENT + SYNC MANUAL DESDE CRM
 >
@@ -139,7 +200,7 @@
 >
 > ## 📋 PENDIENTES CRM (previos, sin cambios hoy)
 >
-> - SQL fase28.6 pendiente de ejecutar en Supabase (`supabase/migrations/20260422_fase28_6_rls_policies_cleanup.sql`)
+> - ✅ SQL fase28.6 aplicado en Supabase 2026-05-13 vía MCP (`fase28_6_rls_policies_cleanup`). **Nota**: aplicado manualmente, NO mediante `supabase db push` — el archivo local `20260422_fase28_6_rls_policies_cleanup.sql` queda como referencia histórica pero ya NO debe re-ejecutarse.
 > - Deploy Edge Function `chat-consultor`
 > - Regenerar tipos Supabase (4 casts `supabase as any` restantes)
 
