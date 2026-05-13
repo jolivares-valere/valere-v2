@@ -466,9 +466,11 @@ function CurveTab({
 
 function CierresTab({
   supply,
+  contract,
   creds,
 }: {
   supply: DatadisSupply
+  contract?: DatadisContractualData
   creds?: { username: string; password: string }
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -477,10 +479,17 @@ function CierresTab({
 
   const cups      = supply.cups
   const distCode  = distributorCode(supply)
-  const province  = sf(supply, 'codProvincia', 'cod_provincia') !== '---'
-    ? sf(supply, 'codProvincia', 'cod_provincia')
+  // EDISTRIBUCIÓN usa 'codigoProvincia'; otros usan 'codProvincia'/'cod_provincia'
+  const province  = sf(supply, 'codigoProvincia', 'codProvincia', 'cod_provincia') !== '---'
+    ? sf(supply, 'codigoProvincia', 'codProvincia', 'cod_provincia')
     : '41'
-  const tariff    = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
+  // Tarifa puede venir del supply o del contrato (EDISTRIBUCIÓN la trae en contractual)
+  const tariff    = (() => {
+    const fromSupply = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
+    if (fromSupply !== '---') return fromSupply
+    const fromContract = String(contract?.['tarifaAccesoCode'] ?? contract?.['tarifaAcceso'] ?? contract?.accessFare ?? '')
+    return fromContract || '3.0TD'
+  })()
 
   const { data: maxPower, isLoading: loadingMax, isError: errorMax } = useDatadisMaxPower(
     cups && distCode ? {
@@ -510,13 +519,20 @@ function CierresTab({
 
   const maxByMonth = useMemo(() => {
     const result: Record<string, Record<string, number>> = {}
-    if (!Array.isArray(maxPower)) return result
-    for (const p of maxPower) {
-      const month = (p.date ?? '').slice(0, 7).replace(/\//g, '-')
+    // Normalizar: el proxy puede devolver {response: [...]} o directamente un array
+    const raw = maxPower as any
+    const arr: any[] = Array.isArray(maxPower) ? maxPower
+      : Array.isArray(raw?.response) ? raw.response
+      : []
+    for (const p of arr) {
+      // EDISTRIBUCIÓN usa campos en español; otros portales en inglés
+      const dateStr = String(p['fechaMaximo'] ?? p.date ?? '')
+      const month = dateStr.slice(0, 7).replace(/\//g, '-')
       if (!month) continue
       if (!result[month]) result[month] = {}
-      const per = `P${p.period ?? 1}`
-      result[month][per] = Math.max(result[month][per] ?? 0, p.maxPower ?? 0)
+      const per = `P${p['periodo'] ?? p.period ?? 1}`
+      const kw = Number(p['maximoPotenciaDemandada'] ?? p.maxPower ?? 0)
+      result[month][per] = Math.max(result[month][per] ?? 0, kw)
     }
     return result
   }, [maxPower])
@@ -525,9 +541,14 @@ function CierresTab({
 
   const reactiveByMonth = useMemo(() => {
     const result: Record<string, number> = {}
-    if (!Array.isArray(reactive)) return result
-    for (const p of reactive) {
-      const month = (p.date ?? '').slice(0, 7).replace(/\//g, '-')
+    // EDISTRIBUCIÓN devuelve {response: {code, cups, energy: [...]}} — objeto, no array
+    const raw = reactive as any
+    const arr: any[] = Array.isArray(reactive) ? reactive
+      : Array.isArray(raw?.response?.energy) ? raw.response.energy
+      : Array.isArray(raw?.response) ? raw.response
+      : []
+    for (const p of arr) {
+      const month = String(p.date ?? '').slice(0, 7).replace(/\//g, '-')
       if (!month) continue
       result[month] = (result[month] ?? 0) + ((p.energyP1 ?? 0) + (p.energyP2 ?? 0) + (p.energyP3 ?? 0))
     }
@@ -767,7 +788,7 @@ export default function SupplyDetailPage() {
               />
             )}
             {tab === 'curva'    && <CurveTab supply={supply} />}
-            {tab === 'cierres'  && <CierresTab supply={supply} />}
+            {tab === 'cierres'  && <CierresTab supply={supply} contract={contract} />}
           </div>
         </>
       )}
