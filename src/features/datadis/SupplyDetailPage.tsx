@@ -113,18 +113,26 @@ function getDateRange(monthsBack = 1) {
 
 // ─── Tab: Información ─────────────────────────────────────────────────────────
 
-function InfoTab({ supply }: { supply: DatadisSupply }) {
+function InfoTab({ supply, contract }: { supply: DatadisSupply; contract?: DatadisContractualData }) {
   const [showRaw, setShowRaw] = useState(false)
+
+  // Algunos campos solo vienen en get_contractual (no en get_supplies)
+  const tarifa  = sf(supply, 'tarifa', 'tariff', 'tarifaCode')
+    !== '---' ? sf(supply, 'tarifa', 'tariff', 'tarifaCode')
+    : String(contract?.['tarifaAccesoCode'] ?? contract?.['tarifaAcceso'] ?? contract?.accessFare ?? '---')
+  const tension = sf(supply, 'tension')
+    !== '---' ? sf(supply, 'tension')
+    : String(contract?.tension ?? contract?.['tension'] ?? '---')
 
   const fields: [string, string][] = [
     ['CUPS', supply.cups ?? '---'],
     ['Distribuidor', distributorLabel(supply)],
-    ['Tarifa', sf(supply, 'tarifa', 'tariff', 'tarifaCode')],
+    ['Tarifa', tarifa],
     ['Tipo de punto', tipoPuntoLabel(supply)],
     ['Municipio', sf(supply, 'municipio', 'descripcionMunicipio', 'municipality')],
     ['Provincia', sf(supply, 'provincia', 'descripcionProvincia', 'province')],
     ['Código postal', sf(supply, 'codigoPostal', 'codPostal', 'postalCode')],
-    ['Tensión', sf(supply, 'tension')],
+    ['Tensión', tension],
     ['Vigencia desde', isoToDisplay(sf(supply, 'fechaVigenciaDesde', 'validDateFrom'))],
     ['Vigencia hasta', isoToDisplay(sf(supply, 'fechaVigenciaHasta', 'validDateTo'))],
   ]
@@ -212,13 +220,16 @@ function ContractTab({
     )
   }
 
+  // Datadis EDISTRIBUCIÓN devuelve potencias como array 'potenciaContratada'
+  // Otros portales devuelven contractedPowerkWP1..6
+  const pot = contract['potenciaContratada'] as number[] | undefined
   const potencias: [string, number | undefined][] = [
-    ['P1', contract.contractedPowerkWP1],
-    ['P2', contract.contractedPowerkWP2],
-    ['P3', contract.contractedPowerkWP3],
-    ['P4', contract.contractedPowerkWP4],
-    ['P5', contract.contractedPowerkWP5],
-    ['P6', contract.contractedPowerkWP6],
+    ['P1', pot?.[0] ?? contract.contractedPowerkWP1],
+    ['P2', pot?.[1] ?? contract.contractedPowerkWP2],
+    ['P3', pot?.[2] ?? contract.contractedPowerkWP3],
+    ['P4', pot?.[3] ?? contract.contractedPowerkWP4],
+    ['P5', pot?.[4] ?? contract.contractedPowerkWP5],
+    ['P6', pot?.[5] ?? contract.contractedPowerkWP6],
   ]
 
   return (
@@ -229,12 +240,13 @@ function ContractTab({
         </h3>
         <dl className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
           {([
-            ['Tarifa acceso', contract.accessFare ?? (contract['accesFare'] as unknown as string) ?? (contract['accessFare'] as unknown as string) ?? '---'],
-            ['Comercializadora', contract.marketer ?? (contract['marketer'] as unknown as string) ?? '---'],
-            ['Distribuidor', contract.distributor ?? '---'],
-            ['Tensión', contract.tension ?? '---'],
-            ['Inicio contrato', isoToDisplay(contract.startDate ?? '')],
-            ['Fin contrato', isoToDisplay(contract.endDate ?? '')],
+            // Datadis portal EdistribucIón devuelve campos en español; otros en inglés
+            ['Tarifa acceso', String(contract['tarifaAcceso'] ?? contract['tarifaAccesoCode'] ?? contract.accessFare ?? '---')],
+            ['Comercializadora', String(contract['comercializador'] ?? contract.marketer ?? '---')],
+            ['Distribuidor', String(contract['distribuidor'] ?? contract.distributor ?? '---')],
+            ['Tensión', String(contract['tension'] ?? contract.tension ?? '---')],
+            ['Inicio contrato', isoToDisplay(String(contract['fechaInicio'] ?? contract.startDate ?? ''))],
+            ['Fin contrato', isoToDisplay(String(contract['fechaFin'] ?? contract.endDate ?? ''))],
           ] as [string, string][]).map(([label, val]) => (
             <div key={label}>
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
@@ -642,7 +654,13 @@ export default function SupplyDetailPage() {
     useDatadisContractual(
       supply && distCode ? { cups: supply.cups, distributor: distCode } : null,
     )
-  const contract = Array.isArray(contractData) ? contractData[0] : undefined
+  // El proxy puede devolver {response: [{...}]} o [{...}] — normalizamos ambos
+  const contractRaw = contractData as any
+  const contract: DatadisContractualData | undefined = Array.isArray(contractData)
+    ? contractData[0]
+    : Array.isArray(contractRaw?.response)
+      ? contractRaw.response[0]
+      : undefined
 
   const TABS: { id: Tab; label: string; icon: typeof Zap }[] = [
     { id: 'info',     label: 'Información', icon: Database },
@@ -740,7 +758,7 @@ export default function SupplyDetailPage() {
 
           {/* Contenido del tab */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
-            {tab === 'info'     && <InfoTab supply={supply} />}
+            {tab === 'info'     && <InfoTab supply={supply} contract={contract} />}
             {tab === 'contrato' && (
               <ContractTab
                 isLoading={loadingContract}
