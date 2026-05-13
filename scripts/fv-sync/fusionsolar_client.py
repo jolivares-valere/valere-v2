@@ -386,13 +386,15 @@ class WebAuthClient(FusionSolarClient):
         return alarms
 
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
-        """Producción de un día concreto para una planta."""
+        """Producción de un día concreto para una planta.
+
+        EU5 usa "dn"+"queryTime"+"timeZone"; API global usa "stationCodes"+"collectTime".
+        """
         dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
         ts_ms = int(dt.timestamp() * 1000)
-        data  = self._safe_fetch("POST", self._DAILY_KPI, {
-            "stationCodes": station_code,
-            "collectTime":  ts_ms,
-        }, default={})
+        id_key  = "dn" if station_code.startswith("NE=") else "stationCodes"
+        payload = {id_key: station_code, "queryTime": ts_ms, "timeZone": 2}
+        data  = self._safe_fetch("POST", self._DAILY_KPI, payload, default={})
         raw = data.get("data", data)
         if isinstance(raw, list):
             return raw[0] if raw else {}
@@ -875,15 +877,53 @@ class StorageStateClient(FusionSolarClient):
         return alarms
 
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
+        """Producción de un día concreto para una planta.
+
+        EU5 identifica las plantas con "dn" (ej: "NE=137403508") y usa
+        "queryTime"+"timeZone" en lugar de "stationCodes"+"collectTime"
+        de la API global FusionSolar.
+        Incluye retry con backoff para los 503 transitorios del endpoint.
+        """
+        import time as _time
         dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
         ts_ms = int(dt.timestamp() * 1000)
-        data  = self._safe_fetch("POST", self._DAILY_KPI, {
-            "stationCodes": station_code, "collectTime": ts_ms,
-        }, default={})
-        raw = data.get("data", data)
-        if isinstance(raw, list):
-            return raw[0] if raw else {}
-        return raw or {}
+
+        # EU5 usa "dn" como identificador (ej: "NE=137403508");
+        # la API global FusionSolar usa "stationCodes".
+        id_key  = "dn" if station_code.startswith("NE=") else "stationCodes"
+        payload = {
+            id_key:      station_code,
+            "queryTime": ts_ms,
+            "timeZone":  2,
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            if attempt > 0:
+                wait = 5 * attempt   # 5s, luego 10s
+                logger.info("  get_daily_kpi retry #%d (espera %ds) %s %s",
+                            attempt, wait, station_code, day)
+                _time.sleep(wait)
+            try:
+                data = self._fetch("POST", self._DAILY_KPI, payload)
+                raw  = data.get("data", data)
+                if isinstance(raw, list):
+                    return raw[0] if raw else {}
+                return raw or {}
+            except FusionSolarAuthError:
+                raise   # sesión expirada — no reintentar
+            except FusionSolarResponseError as e:
+                last_exc = e
+                logger.warning("  get_daily_kpi error HTTP (intento %d/3) %s %s: %s",
+                               attempt + 1, station_code, day, e)
+            except Exception as e:
+                last_exc = e
+                logger.warning("  get_daily_kpi error inesperado (intento %d/3) %s %s: %s",
+                               attempt + 1, station_code, day, e)
+
+        logger.warning("  get_daily_kpi: 3 intentos fallidos %s %s → {}. Último: %s",
+                       station_code, day, last_exc)
+        return {}
 
     def close(self) -> None:
         try:

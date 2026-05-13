@@ -1,10 +1,10 @@
 name: FV Sync — Sincronización plantas fotovoltaicas
 
 on:
-  # Cada hora en punto (datos casi en tiempo real)
-  # El cron nocturno de las 01:00 UTC también cierra el KPI diario del día anterior
+  # Una vez al día a las 07:00 UTC = 08:00 España (horario invierno) / 09:00 (horario verano)
+  # GitHub Actions usa UTC — no ajusta DST automáticamente.
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 7 * * *"
 
   # Lanzamiento manual desde GitHub Actions UI o desde el CRM (via Edge Function trigger-fv-sync)
   workflow_dispatch:

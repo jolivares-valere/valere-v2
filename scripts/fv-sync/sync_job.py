@@ -1,4 +1,4 @@
-"""
+﻿"""
 sync_job.py — Orquestador principal de sincronización FV.
 
 Flujo:
@@ -361,6 +361,7 @@ def sync_credencial(
     enc_key: str,
     resend_key: str | None,
     dry_run: bool = False,
+    backfill_days: int = 1,
 ) -> dict:
     cred_id    = cred["id"]
     empresa_id = cred.get("empresa_id")   # None si credencial multi-cliente
@@ -627,20 +628,48 @@ def sync_credencial(
                 logger.warning("  KPI realtime error %s: %s", station_code, e)
 
             # ── KPIs diarios ──────────────────────────────────
-            # Usamos los datos del station-list (ya disponibles en kpi) ya que
-            # get_station_kpi devuelve la caché del station-list que incluye dailyEnergy.
-            try:
-                hoy_str = date.today().isoformat()
-                kpi_d = client.get_station_kpi(station_code)  # usa caché station-list
-                sb.table("fv_kpi_diario").upsert({
-                    "planta_id":       planta_id,
-                    "fecha":           hoy_str,
-                    "energia_kwh":     float(kpi_d.get("dailyEnergy") or kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0),
-                    "potencia_max_kw": float(kpi_d.get("inverterPower") or kpi_d.get("peakPower") or 0),
-                    "ingresos_eur":    0,
-                }, on_conflict="planta_id,fecha").execute()
-            except Exception as e:
-                logger.warning("  KPI diario error %s: %s", station_code, e)
+            # Hoy: usamos caché del station-list (sin llamada extra a FusionSolar).
+            # Días anteriores (backfill): llamamos get_daily_kpi(station_code, fecha).
+            # Precio estimado autoconsumo medio España (€/kWh) para ingresos_eur.
+            PRECIO_KWH_EST = 0.18
+            hoy = date.today()
+            # Día 0 = hoy (desde caché), días 1..N = llamada individual por fecha.
+            for dias_atras in range(max(1, backfill_days)):
+                fecha = hoy - timedelta(days=dias_atras)
+                # Pausa anti-rate-limit entre llamadas históricas (1s)
+                if dias_atras > 0:
+                    import time as _t; _t.sleep(1)
+                try:
+                    if dias_atras == 0:
+                        kpi_d = client.get_station_kpi(station_code)  # caché station-list
+                    else:
+                        kpi_d = client.get_daily_kpi(station_code, fecha)
+                    # Energía — guard contra NaN/overflow
+                    try:
+                        energia = float(kpi_d.get("dailyEnergy") or kpi_d.get("dayPower") or kpi_d.get("dayEnergy") or 0)
+                        if not (0 <= energia <= 999_999):
+                            logger.warning("  energia_kwh fuera de rango (%.1f) %s %s — forzado a 0", energia, station_code, fecha)
+                            energia = 0.0
+                    except (TypeError, ValueError):
+                        energia = 0.0
+                    # Potencia máxima — guard contra NaN/overflow
+                    try:
+                        potencia_max = float(kpi_d.get("inverterPower") or kpi_d.get("peakPower") or 0)
+                        if not (0 <= potencia_max <= 99_999):
+                            logger.warning("  potencia_max_kw fuera de rango (%.1f) %s %s — forzado a 0", potencia_max, station_code, fecha)
+                            potencia_max = 0.0
+                    except (TypeError, ValueError):
+                        potencia_max = 0.0
+                    sb.table("fv_kpi_diario").upsert({
+                        "planta_id":       planta_id,
+                        "fecha":           fecha.isoformat(),
+                        "energia_kwh":     round(energia, 3),
+                        "potencia_max_kw": round(potencia_max, 3),
+                        "ingresos_eur":    round(energia * PRECIO_KWH_EST, 2),
+                    }, on_conflict="planta_id,fecha").execute()
+                    logger.info("  KPI diario OK %s %s → %.1f kWh", station_code, fecha, energia)
+                except Exception as e:
+                    logger.warning("  KPI diario error %s fecha=%s: %s", station_code, fecha, e)
 
             # -- Alarmas activas
             try:
@@ -739,7 +768,14 @@ def main() -> None:
     parser.add_argument("--dry-run",       action="store_true")
     parser.add_argument("--check-secrets", action="store_true",
                         help="Diagnostico: verifica secretos en fv_credenciales_secret y sale")
+    parser.add_argument(
+        "--backfill-days",
+        type=int,
+        default=1,
+        help="Dias historicos a reconstruir (default=1, solo hoy)"
+    )
     args = parser.parse_args()
+    backfill_days = max(1, args.backfill_days)
 
     dry_run = args.dry_run
     if dry_run:
@@ -774,7 +810,11 @@ def main() -> None:
 
     resultados = []
     for cred in credenciales:
-        resultado = sync_credencial(sb, cred, enc_key, resend_key, dry_run=dry_run)
+        resultado = sync_credencial(
+            sb, cred, enc_key, resend_key,
+            dry_run=dry_run,
+            backfill_days=backfill_days,
+        )
         resultados.append(resultado)
 
     total_ok      = sum(1 for r in resultados if r["ok"])
