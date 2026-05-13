@@ -768,4 +768,203 @@ function ReactivaTab({
             <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} unit=" kVArh" width={72} />
             <Tooltip
               contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
-              formatter=
+              formatter={(value: unknown) => [
+                `${Number(value || 0).toFixed(1)} kVArh`,
+                'Reactiva',
+              ]}
+            />
+            <Bar dataKey="kvarh" radius={[4, 4, 0, 0]}>
+              {chartData.map(entry => (
+                <Cell
+                  key={entry.month}
+                  fill={
+                    entry.kvarh < 10 ? '#22c55e'
+                    : entry.kvarh < 150 ? '#f59e0b'
+                    : '#ef4444'
+                  }
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Tabla mensual P1–P6 */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50">
+            <tr>
+              {['Mes', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'Total', 'Estado'].map(h => (
+                <th key={h} className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...dtos].sort((a, b) => b.month.localeCompare(a.month)).map(d => {
+              const rb = reactivaBadge(d.totalKvarh)
+              return (
+                <tr key={d.month} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-3 py-2 font-mono text-slate-700">{d.month}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">{d.energyP1.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">{d.energyP2.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">{d.energyP3.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">{d.energyP4.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">{d.energyP5.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">{d.energyP6.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-700">{Math.abs(d.totalKvarh).toFixed(1)}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${rb.color}`}>
+                      {rb.label}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Nota */}
+      <p className="text-[11px] text-slate-400">
+        * Penalización por reactiva cuando cosθ {'<'} 0,95. Umbral 150 kVArh orientativo.
+      </p>
+    </div>
+  )
+}
+
+type Tab = 'info' | 'contrato' | 'curva' | 'cierres' | 'reactiva'
+
+export default function SupplyDetailPage() {
+  const { cups } = useParams<{ cups: string }>()
+  const navigate  = useNavigate()
+  const [tab, setTab] = useState<Tab>('info')
+
+  const { data: suppliesData, isLoading: loadingSupplies } = useDatadisSupplies()
+  const supply: DatadisSupply | undefined = suppliesData?.response?.find(s => s.cups === cups)
+
+  const distCode = supply ? distributorCode(supply) : undefined
+
+  const { data: contractData, isLoading: loadingContract, isError: errorContract } =
+    useDatadisContractual(
+      supply && distCode ? { cups: supply.cups, distributor: distCode } : null,
+    )
+
+  const contract: ContractDTO | null = useMemo(
+    () => normalizeContract(contractData),
+    [contractData],
+  )
+
+  const TABS: { id: Tab; label: string; icon: typeof Zap }[] = [
+    { id: 'info',     label: 'Información', icon: Database },
+    { id: 'contrato', label: 'Contrato',    icon: FileText },
+    { id: 'curva',    label: 'Curva',       icon: TrendingUp },
+    { id: 'cierres',  label: 'Cierres',     icon: Calendar },
+    { id: 'reactiva', label: 'Reactiva',    icon: Activity },
+  ]
+
+  const tariff = supply ? sf(supply, 'tarifa', 'tariff', 'tarifaCode') : ''
+  const munic  = supply ? sf(supply, 'municipio', 'municipality') : ''
+  const prov   = supply ? sf(supply, 'provincia', 'province') : ''
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Header */}
+      <div className="border-b border-slate-200 bg-white px-6 py-4">
+        <button
+          type="button"
+          onClick={() => navigate('/datadis')}
+          className="mb-3 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Volver al listado de suministros
+        </button>
+
+        {loadingSupplies ? (
+          <div className="flex items-center gap-2 text-slate-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Cargando suministro...</span>
+          </div>
+        ) : !supply ? (
+          <div className="flex items-center gap-2 text-red-500">
+            <WifiOff className="h-4 w-4" />
+            <span className="text-sm font-medium">Suministro no encontrado: {cups}</span>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600">
+                  <Zap className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-mono text-base font-bold text-slate-900">{cups}</h1>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    {tariff !== '---' && tariff && (
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                        {tariff}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1 text-xs text-slate-500">
+                      <Building2 className="h-3 w-3" />
+                      {distributorLabel(supply)}
+                    </span>
+                    {(munic !== '---' || prov !== '---') && (
+                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                        <MapPin className="h-3 w-3" />
+                        {[munic, prov].filter(v => v && v !== '---').join(', ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+              <Wifi className="h-3.5 w-3.5" />
+              <span>Sincronizado con Datadis</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!loadingSupplies && supply && (
+        <>
+          {/* Tabs */}
+          <div className="border-b border-slate-200 bg-white px-6">
+            <div className="flex gap-1">
+              {TABS.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  className={`flex items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-semibold transition-colors ${
+                    tab === id
+                      ? 'border-blue-600 text-blue-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Contenido del tab */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {tab === 'info'     && <InfoTab supply={supply} contract={contract} />}
+            {tab === 'contrato' && (
+              <ContractTab
+                isLoading={loadingContract}
+                isError={errorContract}
+                contract={contract}
+              />
+            )}
+            {tab === 'curva'    && <CurveTab supply={supply} />}
+            {tab === 'cierres'  && <CierresTab supply={supply} contract={contract} />}
+            {tab === 'reactiva' && <ReactivaTab supply={supply} />}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
