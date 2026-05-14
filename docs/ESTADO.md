@@ -1,6 +1,44 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-14 — Hito 2: Factura Teórica v1 completa (60ab260). TSC 0 errores. Migration Supabase aplicada.**
+> **Última actualización: 2026-05-14 — FV histórico: diagnóstico WAF completo + fix no-write-0kWh (e018be1). Realtime FV operativo. Histórico WAF-bloqueado, skip limpio.**
+>
+> ## ✅ SESIÓN 2026-05-14 (5ª parte) — FV SYNC: DIAGNÓSTICO WAF 503 + FIXES
+>
+> ### Diagnóstico exhaustivo `day-real-kpi` HTTP 503 (conclusión definitiva)
+>
+> | Plan | Estrategia | Resultado |
+> |---|---|---|
+> | A | Hash nav `#/plantDetail/NE=137403508` via `page.goto()` | SPA redirige a `#/home/list`. 0 requests HTTP generados. 503 persiste. |
+> | B | `page.evaluate(fetch())` desde hash de detalle | 503 idéntico. WAF bloquea independientemente del cliente HTTP. |
+> | C | Prelim `device-list` via `context.request` antes de `day-real-kpi` | `device-list` también 503. El WAF bloquea TODOS los POST station-específicos fuera del SPA. |
+>
+> **Conclusión**: CloudWAF FusionSolar EU5 bloquea `day-real-kpi` Y `device-list` desde cualquier cliente headless que no haya navegado a la ruta SPA correcta del detalle de planta. La ruta correcta es desconocida (`#/plantDetail/<dn>` es inválida — el SPA la rechaza). El backfill automático de KPI histórico NO es viable con este endpoint desde automatización.
+>
+> ### Fixes aplicados
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `scripts/fv-sync/sync_job.py` | Guard WAF: si `get_daily_kpi()` devuelve `{}` (503 silencioso), **skip** — no escribe 0.0 kWh en `fv_kpi_diario`. Auditoría con `error_tipo="waf_503_skip"`. | `e018be1` |
+> | `scripts/fv-sync/fusionsolar_client.py` | `_navigate_to_station_detail()` simplificado a no-op con comentario diagnóstico completo. Elimina 3 planes fallidos. | `e018be1` |
+> | `fv_kpi_diario` (Supabase prod) | DELETE 17 filas contaminadas con 0.000 kWh para fechas históricas (2026-05-11/12/13, 7 plantas). Producción limpia. | SQL directo |
+>
+> ### Estado operativo FV tras esta sesión
+> - ✅ **Realtime**: `station-list` → `fv_kpi_realtime` + KPI de hoy → `fv_kpi_diario` (fecha actual). Funciona en cada sync.
+> - ✅ **Alarmas**: `fm/v1/statistic` → `fv_alarma`. Funciona.
+> - ❌ **Histórico automático**: `day-real-kpi` bloqueado WAF para fechas pasadas. No viable por automatización.
+> - ✅ **Datos históricos limpios**: 0.0 kWh falsos eliminados de BD.
+>
+> ### Estrategia para histórico FV
+> 1. **Acumulación diaria**: el sync corre cada día y guarda la producción de hoy. En 30 días habrá 30 días de histórico.
+> 2. **Backfill manual**: descargar CSV desde FusionSolar portal e importar via script SQL o herramienta admin.
+> 3. **Futura investigación**: capturar la URL correcta del SPA para la vista de detalle (requiere navegación headful manual con Playwright inspector).
+>
+> ### ⚠️ Pendientes heredados
+> - **SQL fase28.6**: `supabase/migrations/20260422_fase28_6_rls_policies_cleanup.sql` — pendiente ejecutar en Supabase prod
+> - **Regenerar tipos Supabase TypeScript**: incluir `datadis_supply_price_terms` para eliminar `(supabase as any)` cast
+> - **RESEND_API_KEY**: no configurado en local (warning en cada sync — no afecta a CI)
+>
+> ---
 >
 > ## ✅ SESIÓN 2026-05-14 (4ª parte) — HITO 2: FACTURA TEÓRICA V1
 >
