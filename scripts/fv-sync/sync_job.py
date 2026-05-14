@@ -1,4 +1,4 @@
-﻿"""
+"""
 sync_job.py — Orquestador principal de sincronización FV.
 
 Flujo:
@@ -16,6 +16,10 @@ Uso:
     python sync_job.py --dry-run          # Sin escritura en BD
     python sync_job.py --check-secrets    # Diagnóstico: verifica que cada credencial
                                           # tiene fila en fv_credenciales_secret
+
+    # Diagnóstico de backfill histórico (clasificar fallos 503):
+    python sync_job.py --credencial <uuid> --backfill-days 3 --verbose
+    python sync_job.py --credencial <uuid> --planta NE=137403508 --backfill-days 3 --verbose
 
 CAMBIO COORDINADO (2026-05-10):
     Los secretos (password_enc, session_cookies, cookies_expires_at) se leen de
@@ -421,6 +425,7 @@ def sync_credencial(
     resend_key: str | None,
     dry_run: bool = False,
     backfill_days: int = 1,
+    planta_filter: str | None = None,
 ) -> dict:
     # run_id único por ejecución de credencial — agrupa todos sus registros de auditoría
     run_id     = str(_uuid_mod.uuid4())
@@ -587,6 +592,11 @@ def sync_credencial(
             )
             if not station_code:
                 logger.warning("  [SKIP] station sin station_code: %s", list(st.keys()))
+                continue
+
+            # Filtro diagnóstico: limitar a una sola planta si se pasó --planta
+            if planta_filter and station_code != planta_filter:
+                logger.debug("  [SKIP] planta_filter activo: %s ≠ %s", station_code, planta_filter)
                 continue
 
             # FusionSolar EU5 usa "plantStatus", no "status"
@@ -853,7 +863,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Sincronizador FV")
     parser.add_argument("--empresa",       help="UUID empresa (filtra por empresa_id en fv_credenciales)")
     parser.add_argument("--credencial",    help="UUID credencial (sincroniza solo esta credencial)")
+    parser.add_argument("--planta",        help="Código de planta (ej: NE=137403508). Filtra solo esta planta durante backfill.")
     parser.add_argument("--dry-run",       action="store_true")
+    parser.add_argument("--verbose",       action="store_true",
+                        help="Activa nivel DEBUG en fusionsolar_client (muestra payload, body, timing de cada fetch)")
     parser.add_argument("--check-secrets", action="store_true",
                         help="Diagnostico: verifica secretos en fv_credenciales_secret y sale")
     parser.add_argument(
@@ -864,6 +877,12 @@ def main() -> None:
     )
     args = parser.parse_args()
     backfill_days = max(1, args.backfill_days)
+
+    # Verbose: activar DEBUG en el cliente FusionSolar para capturar payload/body exactos
+    if args.verbose:
+        logging.getLogger("fusionsolar_client").setLevel(logging.DEBUG)
+        logging.getLogger("fv_sync").setLevel(logging.DEBUG)
+        logger.info("VERBOSE activado — nivel DEBUG en fusionsolar_client y fv_sync")
 
     dry_run = args.dry_run
     if dry_run:
@@ -896,12 +915,17 @@ def main() -> None:
         logger.warning("No hay credenciales activas. Saliendo.")
         return
 
+    planta_filter = args.planta or None
+    if planta_filter:
+        logger.info("Filtro planta activo: solo procesará station_code=%s", planta_filter)
+
     resultados = []
     for cred in credenciales:
         resultado = sync_credencial(
             sb, cred, enc_key, resend_key,
             dry_run=dry_run,
             backfill_days=backfill_days,
+            planta_filter=planta_filter,
         )
         resultados.append(resultado)
 

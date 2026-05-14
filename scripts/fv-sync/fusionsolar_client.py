@@ -271,8 +271,17 @@ class WebAuthClient(FusionSolarClient):
         Ejecuta fetch() en el contexto de la página del portal.
         Las cookies (incluidas las HttpOnly) se envían automáticamente.
         Los datos se pasan como argumentos JS para evitar problemas de escape.
+
+        Diagnóstico: devuelve {ok, status, body} desde JS para capturar el body
+        de respuesta incluso en errores HTTP (503, 401, etc.). Python levanta
+        FusionSolarResponseError con el body real para facilitar la clasificación
+        del patrón de fallos en el backfill histórico.
         """
+        import json as _json
         url = path if path.startswith("http") else self.base_url + path
+        logger.debug("→ _fetch %s %s | payload=%s", method.upper(), url, payload)
+        t0 = time.time()
+
         result = self._page.evaluate(
             """([method, url, payload]) =>
                 fetch(url, {
@@ -281,14 +290,52 @@ class WebAuthClient(FusionSolarClient):
                     body: (method !== "GET" && payload !== null)
                           ? JSON.stringify(payload)
                           : undefined,
-                }).then(r => {
-                    if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
-                    return r.json();
+                }).then(async r => {
+                    const body = await r.text();
+                    return {ok: r.ok, status: r.status, body};
                 })
             """,
             [method.upper(), url, payload],
         )
-        return result
+
+        elapsed = time.time() - t0
+        status  = result.get("status", 0)
+        body    = result.get("body", "")
+        ok      = result.get("ok", False)
+
+        logger.debug("← _fetch %s %s | HTTP %d (%.2fs) | body[:300]=%s",
+                     method.upper(), url, status, elapsed, body[:300])
+
+        if not ok:
+            # WARNING visible incluso sin --debug para registrar todos los 503
+            logger.warning(
+                "DIAG _fetch HTTP %d %s %s (%.2fs) | body[:400]: %s",
+                status, method.upper(), url, elapsed, body[:400],
+            )
+            # Detectar redireccionamiento a login embebido en 200 (auth silenciosa)
+            if "/unisso/login.action" in body:
+                raise FusionSolarAuthError(
+                    "Respuesta redirige a login (sesión expirada)",
+                    redirect_url="/unisso/login.action",
+                    endpoint=path,
+                )
+            raise FusionSolarResponseError(status, body[:400], path)
+
+        # Comprobar también sesión expirada en respuestas 200 con HTML de login
+        if "/unisso/login.action" in body:
+            logger.warning("DIAG _fetch HTTP 200 pero body contiene /unisso/login.action → sesión expirada")
+            raise FusionSolarAuthError(
+                "HTTP 200 con redirect a login en body (sesión expirada)",
+                redirect_url="/unisso/login.action",
+                endpoint=path,
+            )
+
+        try:
+            return _json.loads(body)
+        except Exception as e:
+            logger.warning("DIAG _fetch HTTP %d respuesta no-JSON %s: %s | body[:200]=%s",
+                           status, path, e, body[:200])
+            raise FusionSolarResponseError(status, f"No-JSON: {body[:300]}", path)
 
     def _safe_fetch(self, method: str, path: str, payload: Any = None, default: Any = None) -> Any:
         """Igual que _fetch pero captura excepciones y devuelve default."""
@@ -897,85 +944,38 @@ class StorageStateClient(FusionSolarClient):
             "timeZone":  2,
         }
 
+        # DIAG: loguear payload exacto antes de cualquier intento
+        logger.info(
+            "DIAG get_daily_kpi %s %s | endpoint=%s | ts_ms=%d | payload=%s",
+            station_code, day, self._DAILY_KPI, ts_ms, payload,
+        )
+
         last_exc: Exception | None = None
         for attempt in range(3):
             if attempt > 0:
                 wait = 5 * attempt   # 5s, luego 10s
-                logger.info("  get_daily_kpi retry #%d (espera %ds) %s %s",
-                            attempt, wait, station_code, day)
+                logger.info(
+                    "DIAG get_daily_kpi retry #%d/%d (espera %ds) %s %s",
+                    attempt + 1, 3, wait, station_code, day,
+                )
                 _time.sleep(wait)
+
+            t_attempt = _time.time()
             try:
-                data = self._fetch("POST", self._DAILY_KPI, payload)
+                data    = self._fetch("POST", self._DAILY_KPI, payload)
+                elapsed = _time.time() - t_attempt
                 raw  = data.get("data", data)
                 if isinstance(raw, list):
-                    return raw[0] if raw else {}
-                return raw or {}
+                    result = raw[0] if raw else {}
+                else:
+                    result = raw or {}
+                logger.info(
+                    "DIAG get_daily_kpi OK (intento %d/3, %.2fs) %s %s | "
+                    "claves_respuesta=%s",
+                    attempt + 1, elapsed, station_code, day,
+                    list(result.keys())[:8] if result else "{}",
+                )
+                return result
             except FusionSolarAuthError:
-                raise   # sesión expirada — no reintentar
-            except FusionSolarResponseError as e:
-                last_exc = e
-                logger.warning("  get_daily_kpi error HTTP (intento %d/3) %s %s: %s",
-                               attempt + 1, station_code, day, e)
-            except Exception as e:
-                last_exc = e
-                logger.warning("  get_daily_kpi error inesperado (intento %d/3) %s %s: %s",
-                               attempt + 1, station_code, day, e)
-
-        logger.warning("  get_daily_kpi: 3 intentos fallidos %s %s → {}. Último: %s",
-                       station_code, day, last_exc)
-        return {}
-
-    def close(self) -> None:
-        try:
-            if self._browser:
-                self._browser.close()
-        except Exception as e:
-            logger.debug("browser.close() error: %s", e)
-        try:
-            if self._pw_ctx and self._pw:
-                self._pw_ctx.__exit__(None, None, None)
-        except Exception as e:
-            logger.debug("playwright.__exit__() error: %s", e)
-        self._browser = None
-        self._page    = None
-        self._pw      = None
-
-
-# ─────────────────────────────────────────────────────────
-# Factory
-# ─────────────────────────────────────────────────────────
-
-def make_client(
-    plataforma: str,
-    base_url: str,
-    username: str,
-    password: str,
-    storage_state: dict | None = None,
-) -> FusionSolarClient:
-    """
-    Crea el cliente correcto según la plataforma y el modo de autenticación.
-
-    Args:
-        plataforma:    "fusionsolar" (unico implementado)
-        base_url:      URL del portal (ej. https://uni003eu5.fusionsolar.huawei.com)
-        username:      Usuario del portal
-        password:      Contrasena en claro (ya descifrada)
-        storage_state: Storage state completo de Playwright (cookies + localStorage).
-                       Si se proporciona → StorageStateClient (Playwright headless sin login).
-                       Si None → WebAuthClient (Playwright login headless completo).
-
-    Nota: httpx (CookieAuthClient) no funciona con FusionSolar porque CloudWAF
-    verifica el fingerprint TLS del cliente. Playwright replica el fingerprint de
-    Chrome, httpx no. Por eso ambos modos usan Playwright.
-    """
-    if plataforma != "fusionsolar":
-        raise NotImplementedError(f"Plataforma '{plataforma}' no implementada aun")
-
-    if storage_state:
-        logger.info(
-            "make_client: usando StorageStateClient (storage state pre-extraido, sin login en CI)"
-        )
-        return StorageStateClient(base_url, storage_state)
-
-    logger.info("make_client: usando WebAuthClient (Playwright login headless)")
-    return WebAuthClient(base_url, username, password)
+                elapsed = _time.time() - t_attempt
+                logger.warn
