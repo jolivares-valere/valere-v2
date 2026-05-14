@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart2, Building2, Calendar,
   CheckCircle2, ChevronDown, ChevronUp,
-  Database, FileText, Info, Loader2, MapPin,
+  Database, FileText, Info, Loader2, MapPin, Receipt,
   TrendingUp, Wifi, WifiOff, Zap,
 } from 'lucide-react'
 import {
@@ -17,9 +17,15 @@ import {
   useDatadisConsumption,
   useDatadisMaxPower,
   useDatadisReactive,
+  useSupplyPriceTerms,
   type DatadisSupply,
   type DatadisConsumptionPoint,
 } from './api'
+import {
+  calculateInvoiceEstimate,
+  fmtEur,
+  type InvoiceEstimateResult,
+} from '../../core/energia/invoiceEstimate'
 import {
   normalizeConsumption,
   normalizeContract,
@@ -1314,7 +1320,361 @@ function ConsumoTab({ supply, contract }: { supply: DatadisSupply; contract?: Co
   )
 }
 
-type Tab = 'info' | 'contrato' | 'curva' | 'cierres' | 'reactiva' | 'consumo'
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab: Factura Teórica
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ALL_ESTIMATE_PERIODS = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'] as const
+type EstimatePeriod = typeof ALL_ESTIMATE_PERIODS[number]
+
+const FACTURA_PERIOD_COLORS: Record<EstimatePeriod, string> = {
+  P1: '#dc2626', P2: '#f97316', P3: '#eab308',
+  P4: '#22c55e', P5: '#3b82f6', P6: '#8b5cf6',
+}
+
+function FacturaTeoricoTab({ supply, contract }: { supply: DatadisSupply; contract?: ContractDTO | null }) {
+  const { data: priceTerm, isLoading: loadingPrices } = useSupplyPriceTerms(supply.cups)
+
+  // Mismos parámetros que ConsumoTab — React Query deduplica la petición (cache 6h)
+  const { start, end } = useMemo(() => getDateRange(24), [])
+  const cups      = supply.cups
+  const distCode  = distributorCode(supply)
+  const province  = extractProvince(supply)
+  const municipio = extractMunicipio(supply)
+  const tipoPunto = tipoPuntoCod(supply)
+  const tariff    = extractTariff(supply, contract)
+  const ccaa      = ccaaFromProvinceCode(province ?? '')
+
+  const { data: rawData, isLoading: loadingData } = useDatadisConsumption(
+    cups && distCode
+      ? { cups, distributor: distCode, fechaInicial: start, fechaFinal: end,
+          provinceCode: province, municipioCode: municipio,
+          tarifaCode: tariff !== '---' ? tariff : '3.0TD', tipoPuntoMedida: tipoPunto }
+      : null,
+  )
+
+  const normalized = useMemo(
+    () => normalizeConsumption(rawData, { tariff: tariff !== '---' ? tariff : '3.0TD', ccaa }),
+    [rawData, tariff, ccaa],
+  )
+
+  const months = useMemo(
+    () => [...(normalized?.monthly ?? [])].sort((a, b) => b.month.localeCompare(a.month)),
+    [normalized],
+  )
+
+  const [selectedMonth, setSelectedMonth] = useState<string>('')
+  useEffect(() => {
+    if (months.length && !selectedMonth) setSelectedMonth(months[0].month)
+  }, [months, selectedMonth])
+
+  const monthData = months.find(m => m.month === selectedMonth)
+
+  const dias = useMemo(() => {
+    if (!selectedMonth) return 31
+    const [y, m] = selectedMonth.split('-').map(Number)
+    return new Date(y, m, 0).getDate()
+  }, [selectedMonth])
+
+  const potenciaKW = useMemo(() => ({
+    P1: contract?.powers[0] ?? 0,
+    P2: contract?.powers[1] ?? 0,
+    P3: contract?.powers[2] ?? 0,
+    P4: contract?.powers[3] ?? 0,
+    P5: contract?.powers[4] ?? 0,
+    P6: contract?.powers[5] ?? 0,
+  }), [contract])
+
+  const result = useMemo<InvoiceEstimateResult | null>(() => {
+    if (!priceTerm || !monthData) return null
+    return calculateInvoiceEstimate({
+      priceTerms: priceTerm,
+      consumoKWh: monthData.byPeriod as Record<EstimatePeriod, number>,
+      potenciaKW,
+      dias,
+    })
+  }, [priceTerm, monthData, potenciaKW, dias])
+
+  const isLoading = loadingPrices || loadingData
+
+  if (isLoading) return (
+    <div className="space-y-3">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="h-9 animate-pulse rounded bg-slate-100" />
+      ))}
+    </div>
+  )
+
+  if (!priceTerm) return (
+    <div className="flex flex-col items-center py-12 text-center">
+      <Receipt className="mb-3 h-10 w-10 text-slate-300" />
+      <p className="font-medium text-slate-700 text-sm">Sin precios contractuales configurados</p>
+      <p className="mt-1 text-xs text-slate-400">
+        Este CUPS no tiene tarifa en <code className="text-xs bg-slate-100 px-1 rounded">datadis_supply_price_terms</code>.<br />
+        Ejecuta la migration SQL del Hito 2 en Supabase para añadir los precios.
+      </p>
+    </div>
+  )
+
+  if (!months.length) return (
+    <div className="flex flex-col items-center py-12 text-center">
+      <BarChart2 className="mb-3 h-10 w-10 text-slate-300" />
+      <p className="text-sm text-slate-500">Sin datos de consumo disponibles para calcular.</p>
+    </div>
+  )
+
+  const confianzaClass =
+    result?.confianza === 'completa' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+    result?.confianza === 'parcial'  ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                       'bg-red-50 text-red-700 border-red-200'
+  const confianzaLabel =
+    result?.confianza === 'completa' ? '✓ Estimación completa' :
+    result?.confianza === 'parcial'  ? '⚠ Estimación parcial' :
+                                       '✗ Datos insuficientes'
+
+  return (
+    <div className="space-y-4">
+      {/* Selector de mes + badge confianza */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-600">Mes:</label>
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+            className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 shadow-sm"
+          >
+            {months.map(m => (
+              <option key={m.month} value={m.month}>
+                {new Date(m.month + '-15').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                {' '}·{' '}
+                {m.totalKwh.toLocaleString('es-ES', { maximumFractionDigits: 0 })} kWh
+              </option>
+            ))}
+          </select>
+        </div>
+        {result && (
+          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${confianzaClass}`}>
+            {confianzaLabel}
+          </span>
+        )}
+        <span className="text-xs text-slate-400">
+          {priceTerm.comercializadora ?? priceTerm.tarifa} · IVA {priceTerm.iva_pct}%
+        </span>
+      </div>
+
+      {result && (
+        <>
+          {/* Avisos de datos incompletos */}
+          {result.warnings.length > 0 && (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 space-y-0.5">
+              {result.warnings.map((w, i) => (
+                <div key={i} className="text-xs text-amber-700">⚠ {w}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Tabla desglose */}
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50">
+                <tr className="text-slate-500">
+                  <th className="px-3 py-2 text-left font-medium">Concepto</th>
+                  <th className="px-3 py-2 text-right font-medium">Cantidad</th>
+                  <th className="px-3 py-2 text-right font-medium">Precio</th>
+                  <th className="px-3 py-2 text-right font-medium">Días</th>
+                  <th className="px-3 py-2 text-right font-medium">Importe</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+
+                {/* — Potencia — */}
+                {ALL_ESTIMATE_PERIODS
+                  .filter(p => (result.potencia[p]?.cantidad ?? 0) > 0)
+                  .map(p => (
+                    <tr key={`pot-${p}`} className="hover:bg-slate-50/70">
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 flex-shrink-0 rounded-full"
+                                style={{ background: FACTURA_PERIOD_COLORS[p] }} />
+                          <span className="text-slate-700">Potencia {p}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                        {result.potencia[p].cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} kW
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-slate-500 tabular-nums">
+                        {result.potencia[p].precio_c != null
+                          ? result.potencia[p].precio_c!.toFixed(4) + ' c€/kW/d'
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-slate-500">{dias}</td>
+                      <td className="px-3 py-1.5 text-right font-medium text-slate-800 tabular-nums">
+                        {result.potencia[p].importe != null
+                          ? fmtEur(result.potencia[p].importe)
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                    </tr>
+                  ))
+                }
+
+                {/* Subtotal fijo */}
+                <tr className="bg-slate-50">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    Subtotal término fijo (potencia)
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-xs font-semibold text-slate-700 tabular-nums">
+                    {fmtEur(result.terminoFijo)}
+                  </td>
+                </tr>
+
+                {/* — Energía — */}
+                {ALL_ESTIMATE_PERIODS
+                  .filter(p => (result.energia[p]?.cantidad ?? 0) > 0)
+                  .map(p => (
+                    <tr key={`eng-${p}`} className="hover:bg-slate-50/70">
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 flex-shrink-0 rounded-full"
+                                style={{ background: FACTURA_PERIOD_COLORS[p] }} />
+                          <span className="text-slate-700">Energía {p}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                        {result.energia[p].cantidad.toLocaleString('es-ES', { maximumFractionDigits: 0 })} kWh
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-slate-500 tabular-nums">
+                        {result.energia[p].precio_c != null
+                          ? result.energia[p].precio_c!.toFixed(4) + ' c€/kWh'
+                          : <span className="text-amber-400 font-medium">sin precio</span>}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-slate-400">—</td>
+                      <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                        {result.energia[p].importe != null
+                          ? <span className="text-slate-800">{fmtEur(result.energia[p].importe)}</span>
+                          : <span className="text-amber-400">?</span>}
+                      </td>
+                    </tr>
+                  ))
+                }
+
+                {/* Subtotal variable */}
+                <tr className="bg-slate-50">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    Subtotal término variable (energía)
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-xs font-semibold text-slate-700 tabular-nums">
+                    {fmtEur(result.terminoVariable)}
+                  </td>
+                </tr>
+
+                {/* Alquiler */}
+                {result.alquiler > 0 && (
+                  <tr className="hover:bg-slate-50/70">
+                    <td colSpan={4} className="px-3 py-1.5 text-slate-700">
+                      Alquiler equipo de medida
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-medium text-slate-800 tabular-nums">
+                      {fmtEur(result.alquiler)}
+                    </td>
+                  </tr>
+                )}
+
+                {/* Bono social */}
+                {result.bonoSocial > 0 && (
+                  <tr className="hover:bg-slate-50/70">
+                    <td colSpan={4} className="px-3 py-1.5 text-slate-700">
+                      Financiación Bono Social
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-medium text-slate-800 tabular-nums">
+                      {fmtEur(result.bonoSocial)}
+                    </td>
+                  </tr>
+                )}
+
+                {/* IEE */}
+                <tr className="hover:bg-slate-50/70">
+                  <td colSpan={4} className="px-3 py-1.5 text-slate-700">
+                    IEE (Impuesto Especial Electricidad)
+                    <span className="ml-1.5 text-slate-400">
+                      {result.iee > (result.terminoFijo + result.terminoVariable) * 0.005
+                        ? '· mínimo 1 €/MWh Art. 99.2'
+                        : '· 0,5% RD-ley 7/2026'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-right font-medium text-slate-800 tabular-nums">
+                    {fmtEur(result.iee)}
+                  </td>
+                </tr>
+
+                {/* IVA */}
+                <tr className="hover:bg-slate-50/70">
+                  <td colSpan={4} className="px-3 py-1.5 text-slate-700">
+                    IVA ({priceTerm.iva_pct}%)
+                    {priceTerm.iva_pct === 10 && (
+                      <span className="ml-1.5 text-slate-400">· reducido pot. ≤10 kW</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 text-right font-medium text-slate-800 tabular-nums">
+                    {fmtEur(result.iva)}
+                  </td>
+                </tr>
+
+                {/* TOTAL */}
+                <tr className="bg-slate-800 text-white">
+                  <td colSpan={4} className="px-3 py-3 font-bold text-sm">
+                    TOTAL ESTIMADO
+                    <span className="ml-2 text-xs font-normal text-slate-400">
+                      excluye Reg.RRTT y reactiva
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-right text-sm font-bold tabular-nums">
+                    {fmtEur(result.total)}
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+
+          {/* KPIs rápidos */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded border border-slate-200 bg-white p-3 text-center shadow-sm">
+              <div className="text-xs text-slate-500">Consumo total</div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                {result.totalKWh.toLocaleString('es-ES', { maximumFractionDigits: 0 })} kWh
+              </div>
+            </div>
+            <div className="rounded border border-slate-200 bg-white p-3 text-center shadow-sm">
+              <div className="text-xs text-slate-500">Precio medio energía</div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                {result.totalKWh > 0
+                  ? ((result.terminoVariable / result.totalKWh) * 100).toFixed(4) + ' c€/kWh'
+                  : '—'}
+              </div>
+            </div>
+            <div className="rounded border border-slate-200 bg-white p-3 text-center shadow-sm">
+              <div className="text-xs text-slate-500">Coste todo incluido</div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                {result.totalKWh > 0
+                  ? ((result.total / result.totalKWh) * 100).toFixed(4) + ' c€/kWh'
+                  : '—'}
+              </div>
+            </div>
+          </div>
+
+          {/* Nota legal */}
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Ref. precios: {priceTerm.notas?.split('.')[0] ?? `Facturas ${priceTerm.tarifa}`}.
+            {' '}Estimación basada en consumo DataDis y precios contractuales de referencia.
+            No incluye Regularización RRTT Sistema (cargo retroactivo distribuidora) ni excesos de reactiva.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+type Tab = 'info' | 'contrato' | 'curva' | 'cierres' | 'reactiva' | 'consumo' | 'factura'
 
 export default function SupplyDetailPage() {
   const { cups } = useParams<{ cups: string }>()
@@ -1343,6 +1703,7 @@ export default function SupplyDetailPage() {
     { id: 'cierres',  label: 'Cierres',     icon: Calendar },
     { id: 'reactiva', label: 'Reactiva',    icon: Activity },
     { id: 'consumo',  label: 'Consumo',     icon: BarChart2 },
+    { id: 'factura',  label: 'Factura',     icon: Receipt },
   ]
 
   const tariff = supply ? sf(supply, 'tarifa', 'tariff', 'tarifaCode') : ''
@@ -1446,6 +1807,7 @@ export default function SupplyDetailPage() {
             {tab === 'cierres'  && <CierresTab supply={supply} contract={contract} />}
             {tab === 'reactiva' && <ReactivaTab supply={supply} />}
             {tab === 'consumo'  && <ConsumoTab supply={supply} contract={contract} />}
+            {tab === 'factura'  && <FacturaTeoricoTab supply={supply} contract={contract} />}
           </div>
         </>
       )}

@@ -256,6 +256,43 @@ export function useDatadisReactive(
   })
 }
 
+// ─── Precios contractuales (datadis_supply_price_terms) ──────────────────────
+
+import type { SupplyPriceTerm } from '../../core/energia/invoiceEstimate'
+export type { SupplyPriceTerm }
+
+/**
+ * Devuelve la fila vigente de precios contractuales para un CUPS dado.
+ * "Vigente" = valid_to IS NULL (registro activo sin fecha de fin).
+ * Cache 24h — los precios contractuales cambian muy raramente.
+ */
+export function useSupplyPriceTerms(cups: string | null) {
+  return useQuery({
+    queryKey: ['datadis', 'price_terms', cups],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('datadis_supply_price_terms')
+        .select('*')
+        .eq('cups', cups!)
+        .is('valid_to', null)
+        .order('valid_from', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) {
+        logError(error, 'useSupplyPriceTerms')
+        throw error
+      }
+
+      return (data as SupplyPriceTerm | null)
+    },
+    enabled: !!cups,
+    staleTime: 24 * 60 * 60 * 1000,  // 24h
+    retry: 1,
+  })
+}
+
 // ─── Asociar suministro a empresa (Upsert en tabla cups) ──────────────────────
 
 export function useAsociarSuministroAEmpresa() {
@@ -276,7 +313,7 @@ export function useAsociarSuministroAEmpresa() {
       const pointType = supply.pointType ?? undefined
 
       // Upsert sobre codigo_cups
-      const { error } = await supabase.from('cups').upsert(
+       const { error } = await supabase.from('cups').upsert(
         {
           codigo_cups: supply.cups,
           empresa_id,
