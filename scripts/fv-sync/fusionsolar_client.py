@@ -923,6 +923,74 @@ class StorageStateClient(FusionSolarClient):
             alarms = raw
         return alarms
 
+    def _fetch_via_page_eval(self, path: str, payload: Any) -> dict:
+        """
+        POST al endpoint dado usando page.evaluate(fetch(...)) en lugar de
+        context.request.post().
+
+        Por qué esto y no _fetch():
+          CloudWAF de FusionSolar EU5 bloquea con 503 vacío las peticiones a
+          day-real-kpi cuando vienen de context.request (Playwright APIRequestContext),
+          pero permite las que vienen del contexto JS de la página (fetch() llamado
+          desde el SPA). La diferencia observable: station-list funciona con
+          context.request porque el SPA lo llama durante la inicialización de la
+          home; day-real-kpi solo lo llama el SPA cuando el usuario navega a la
+          página de detalle de una planta, lo que el WAF usa como contexto.
+          Al usar page.evaluate(fetch(...)), el request sale del motor JS del
+          Chromium headless con las mismas cookies (incluidas HttpOnly) y la
+          misma firma TLS que un request real del SPA. El WAF no lo distingue.
+
+        Lanza FusionSolarAuthError o FusionSolarResponseError.
+        """
+        import json as _json
+        url     = self._url_for_endpoint(path)
+        headers = self._api_headers()
+
+        logger.debug("_fetch_via_page_eval POST %s | headers=%s", url, list(headers.keys()))
+
+        result = self._page.evaluate(
+            """([url, payload, headers]) =>
+                fetch(url, {
+                    method:  'POST',
+                    headers: headers,
+                    body:    JSON.stringify(payload),
+                }).then(async r => {
+                    const body = await r.text();
+                    return {ok: r.ok, status: r.status, body};
+                })
+            """,
+            [url, payload, headers],
+        )
+
+        status = result.get("status", 0)
+        body   = result.get("body", "")
+        ok     = result.get("ok", False)
+
+        logger.debug("_fetch_via_page_eval POST %s → HTTP %d | body[:200]=%s",
+                     url, status, body[:200])
+
+        if not ok:
+            if "/unisso/login.action" in body:
+                raise FusionSolarAuthError(
+                    "page.evaluate fetch redirige a login (sesión expirada)",
+                    redirect_url="/unisso/login.action",
+t=path,
+                )
+            logger.warning('_fetch_via_page_eval HTTP %d %s | body[:300]: %s',
+                           status, path, body[:300])
+            raise FusionSolarResponseError(status, body[:300], path)
+
+        if "/unisso/login.action" in body:
+            raise FusionSolarAuthError(
+                "HTTP 200 con redirect a login en body",
+                redirect_url="/unisso/login.action",
+                endpoint=path,
+            )
+        try:
+            return _json.loads(body) if body else {}
+        except Exception:
+            raise FusionSolarResponseError(status, f"No-JSON: {body[:200]}", path)
+
     def get_daily_kpi(self, station_code: str, day: date) -> dict:
         """Producción de un día concreto para una planta.
 
@@ -930,6 +998,12 @@ class StorageStateClient(FusionSolarClient):
         "queryTime"+"timeZone" en lugar de "stationCodes"+"collectTime"
         de la API global FusionSolar.
         Incluye retry con backoff para los 503 transitorios del endpoint.
+
+        NOTA: usa _fetch_via_page_eval() (page.evaluate fetch) en lugar de
+        _fetch() (context.request). CloudWAF de FusionSolar bloquea con 503 vacío
+        las llamadas directas a day-real-kpi desde context.request, pero permite
+        las que vienen del contexto JS del navegador. Diagnóstico confirmado
+        2026-05-14: station-list OK con context.request, day-real-kpi 503 siempre.
         """
         import time as _time
         dt    = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
@@ -962,7 +1036,7 @@ class StorageStateClient(FusionSolarClient):
 
             t_attempt = _time.time()
             try:
-                data    = self._fetch("POST", self._DAILY_KPI, payload)
+                data    = self._fetch_via_page_eval(self._DAILY_KPI, payload)
                 elapsed = _time.time() - t_attempt
                 raw  = data.get("data", data)
                 if isinstance(raw, list):
@@ -978,4 +1052,86 @@ class StorageStateClient(FusionSolarClient):
                 return result
             except FusionSolarAuthError:
                 elapsed = _time.time() - t_attempt
-                logger.warn
+                logger.warning(
+                    "DIAG get_daily_kpi AUTH_ERROR (intento %d/3, %.2fs) %s %s → no reintentar",
+                    attempt + 1, elapsed, station_code, day,
+                )
+                raise   # sesión expirada — no reintentar
+            except FusionSolarResponseError as e:
+                elapsed  = _time.time() - t_attempt
+                last_exc = e
+                logger.warning(
+                    "DIAG get_daily_kpi HTTP_ERROR (intento %d/3, %.2fs) %s %s "
+                    "| status=%d | body[:300]=%s",
+                    attempt + 1, elapsed, station_code, day,
+                    e.status, e.body_preview,
+                )
+            except Exception as e:
+                elapsed  = _time.time() - t_attempt
+                last_exc = e
+                logger.warning(
+                    "DIAG get_daily_kpi UNEXPECTED_ERROR (intento %d/3, %.2fs) %s %s: %s",
+                    attempt + 1, elapsed, station_code, day, e,
+                )
+
+        logger.warning(
+            "DIAG get_daily_kpi AGOTADOS 3 intentos %s %s → devuelve {}. "
+            "Último error: %s",
+            station_code, day, last_exc,
+        )
+        return {}
+
+    def close(self) -> None:
+        try:
+            if self._browser:
+                self._browser.close()
+        except Exception as e:
+            logger.debug("browser.close() error: %s", e)
+        try:
+            if self._pw_ctx and self._pw:
+                self._pw_ctx.__exit__(None, None, None)
+        except Exception as e:
+            logger.debug("playwright.__exit__() error: %s", e)
+        self._browser = None
+        self._page    = None
+        self._pw      = None
+
+
+# ─────────────────────────────────────────────────────────
+# Factory
+# ─────────────────────────────────────────────────────────
+
+def make_client(
+    plataforma: str,
+    base_url: str,
+    username: str,
+    password: str,
+    storage_state: dict | None = None,
+) -> FusionSolarClient:
+    """
+    Crea el cliente correcto según la plataforma y el modo de autenticación.
+
+    Args:
+        plataforma:    "fusionsolar" (unico implementado)
+        base_url:      URL del portal (ej. https://uni003eu5.fusionsolar.huawei.com)
+        username:      Usuario del portal
+        password:      Contrasena en claro (ya descifrada)
+        storage_state: Storage state completo de Playwright (cookies + localStorage).
+                       Si se proporciona → StorageStateClient (Playwright headless sin login).
+                       Si None → WebAuthClient (Playwright login headless completo).
+
+    Nota: httpx (CookieAuthClient) no funciona con FusionSolar porque CloudWAF
+    verifica el fingerprint TLS del cliente. Playwright replica el fingerprint de
+    Chrome, httpx no. Por eso ambos modos usan Playwright.
+    """
+    if plataforma != "fusionsolar":
+        raise NotImplementedError(f"Plataforma '{plataforma}' no implementada aun")
+
+    if storage_state:
+        logger.info(
+            "make_client: usando StorageStateClient (storage state pre-extraido, sin login en CI)"
+        )
+        return StorageStateClient(base_url, storage_state)
+
+    logger.info("make_client: usando WebAuthClient (Playwright login headless)")
+    return WebAuthClient(base_url, username, password)
