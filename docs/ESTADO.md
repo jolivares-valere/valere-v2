@@ -1,6 +1,27 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-14 — Datadis: perf cache 6h + Hito 1 cerrado (b58f4e1). TSC 0 errores.**
+> **Última actualización: 2026-05-14 — Hito 2: Factura Teórica v1 completa (60ab260). TSC 0 errores. Migration Supabase aplicada.**
+>
+> ## ✅ SESIÓN 2026-05-14 (4ª parte) — HITO 2: FACTURA TEÓRICA V1
+>
+> | Artefacto | Cambio | Commit |
+> |---|---|---|
+> | `supabase/migrations/20260514_hito2_supply_price_terms.sql` | Nueva tabla `datadis_supply_price_terms` + seed 5 CUPS reales CHEMTROL (3×3.0TD Nexus, 1×2.0TD Naturgy, 1×6.1TD Bassols). Índice único `(cups) WHERE valid_to IS NULL`. RLS authenticaded. **Aplicada en prod.** | `60ab260` |
+> | `src/core/energia/invoiceEstimate.ts` | Motor de cálculo puro: `calculateInvoiceEstimate()`. Potencia P1-P6, energía P1-P6, IEE (max 0.5% vs 1€/MWh mínimo Art.99.2), IVA 10%/21%, alquiler, bonoSocial. Confianza: completa/parcial/baja. | `60ab260` |
+> | `src/features/datadis/api.ts` | Hook `useSupplyPriceTerms(cups)`: cache 24h, filtra `valid_to IS NULL`, retorna fila vigente. | `60ab260` |
+> | `src/features/datadis/SupplyDetailPage.tsx` | Tab "Factura Teórica" completo: selector mes, badge confianza, tabla desglose P1-P6 potencia+energía, IEE+IVA+TOTAL, 3 KPIs, nota legal. React Query deduplica con ConsumoTab (cache 6h compartido). | `60ab260` |
+>
+> ### Decisiones técnicas Hito 2
+> - P4/P5 energía NULL en 3.0TD: ningún CUPS tuvo consumo en esos períodos → confianza='parcial' si hay consumo P4/P5
+> - `(supabase as any).from('datadis_supply_price_terms')`: tabla nueva no en tipos generados → cast temporal hasta regeneración
+> - Reg. RRTT Sistema excluida: cargo retroactivo distribuidora impredecible → nota legal en UI
+> - IEE: max(5‰ de (potencia+energía), 1€/MWh × totalKWh) per Art. 99.2 Ley 38/1992
+>
+> ### ⚠️ Pendiente para próxima sesión
+> - **Push a GitHub**: `git push origin main` (commit local `60ab260`, push requiere credenciales Windows)
+> - **Pendiente anterior**: SQL fase28.6 (`supabase/migrations/20260422_fase28_6_rls_policies_cleanup.sql`) — aún no ejecutada
+>
+> ---
 >
 > ## ✅ SESIÓN 2026-05-14 (3ª parte) — DATADIS: PERFORMANCE CACHE + HITO 1 CIERRE
 >
