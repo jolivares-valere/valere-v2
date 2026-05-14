@@ -502,6 +502,7 @@ class StorageStateClient(FusionSolarClient):
         self._portal_url   = None   # URL final del portal (Referer en API calls)
         self._roarand      = None   # no usado (SPA no envía roarand)
         self._station_cache: dict[str, dict] = {}
+        self._last_station_navigated: str | None = None   # evita navegaciones redundantes
 
         # API base URL: el SPA llama a eu5.fusionsolar.huawei.com/rest/...
         # pero el portal está en uni003eu5.fusionsolar.huawei.com.
@@ -923,6 +924,62 @@ class StorageStateClient(FusionSolarClient):
             alarms = raw
         return alarms
 
+    def _navigate_to_station_detail(self, station_code: str) -> None:
+        """
+        Navega la página al detalle de la planta para desbloquear day-real-kpi.
+
+        Diagnóstico 2026-05-14: CloudWAF FusionSolar EU5 bloquea con 503 las
+        llamadas a day-real-kpi tanto desde context.request como desde
+        page.evaluate(fetch()) cuando el browser NO ha navegado previamente
+        a la página de detalle de planta. El WAF valida la secuencia de
+        navegación: home-list → plantDetail → day-real-kpi.
+
+        Estrategia: navegar al hash del SPA correspondiente al detalle de
+        planta (mismo base URL del portal, hash cambiado a #/plantDetail/<dn>).
+        Esto desencadena las peticiones de contexto que el WAF espera ver
+        antes de permitir day-real-kpi.
+
+        Sólo navegamos una vez por planta por sesión (_last_station_navigated).
+        """
+        if self._last_station_navigated == station_code:
+            logger.debug("_navigate_to_station_detail: contexto de %s ya establecido", station_code)
+            return
+
+        if not self._portal_url:
+            logger.warning("_navigate_to_station_detail: _portal_url no disponible, saltando")
+            return
+
+        # Construir URL de detalle: misma base del portal (SPA single-page),
+        # hash cambiado a la ruta de plantDetail. EU5 usa #/plantDetail/<NE_CODE>.
+        portal_base = self._portal_url.split("#")[0]
+        detail_url  = f"{portal_base}#/plantDetail/{station_code}"
+
+        logger.info("DIAG _navigate_to_station_detail → %s", detail_url)
+        t0 = time.time()
+        try:
+            self._page.goto(detail_url, wait_until="domcontentloaded", timeout=25_000)
+            try:
+                self._page.wait_for_load_state("networkidle", timeout=12_000)
+            except Exception:
+                logger.warning("_navigate_to_station_detail: networkidle timeout → +3s extra")
+                self._page.wait_for_timeout(3_000)
+
+            elapsed = time.time() - t0
+            current = self._page.url
+            logger.info(
+                "DIAG _navigate_to_station_detail OK (%.2fs) | URL=%s",
+                elapsed, current,
+            )
+            self._last_station_navigated = station_code
+        except Exception as e:
+            elapsed = time.time() - t0
+            logger.warning(
+                "DIAG _navigate_to_station_detail ERROR (%.2fs): %s — "
+                "continuando de todas formas",
+                elapsed, e,
+            )
+            # No bloqueamos: intentar day-real-kpi igualmente
+
     def _fetch_via_page_eval(self, path: str, payload: Any) -> dict:
         """
         POST al endpoint dado usando page.evaluate(fetch(...)) en lugar de
@@ -930,15 +987,12 @@ class StorageStateClient(FusionSolarClient):
 
         Por qué esto y no _fetch():
           CloudWAF de FusionSolar EU5 bloquea con 503 vacío las peticiones a
-          day-real-kpi cuando vienen de context.request (Playwright APIRequestContext),
-          pero permite las que vienen del contexto JS de la página (fetch() llamado
-          desde el SPA). La diferencia observable: station-list funciona con
-          context.request porque el SPA lo llama durante la inicialización de la
-          home; day-real-kpi solo lo llama el SPA cuando el usuario navega a la
-          página de detalle de una planta, lo que el WAF usa como contexto.
-          Al usar page.evaluate(fetch(...)), el request sale del motor JS del
-          Chromium headless con las mismas cookies (incluidas HttpOnly) y la
-          misma firma TLS que un request real del SPA. El WAF no lo distingue.
+          day-real-kpi cuando vienen de context.request (Playwright APIRequestContext).
+          Con page.evaluate el request sale del motor JS del Chromium headless con
+          las mismas cookies (incluidas HttpOnly) y la misma firma TLS que un
+          request real del SPA. Sin embargo, si el WAF no ha visto la navegación
+          a la página de detalle de planta, también devuelve 503. Por eso
+          get_daily_kpi llama antes a _navigate_to_station_detail().
 
         Lanza FusionSolarAuthError o FusionSolarResponseError.
         """
@@ -974,7 +1028,7 @@ class StorageStateClient(FusionSolarClient):
                 raise FusionSolarAuthError(
                     "page.evaluate fetch redirige a login (sesión expirada)",
                     redirect_url="/unisso/login.action",
-t=path,
+                    endpoint=path,
                 )
             logger.warning('_fetch_via_page_eval HTTP %d %s | body[:300]: %s',
                            status, path, body[:300])
@@ -1023,6 +1077,13 @@ t=path,
             "DIAG get_daily_kpi %s %s | endpoint=%s | ts_ms=%d | payload=%s",
             station_code, day, self._DAILY_KPI, ts_ms, payload,
         )
+
+        # Plan B: navegar al detalle de planta antes de llamar a day-real-kpi.
+        # CloudWAF FusionSolar EU5 bloquea este endpoint (503) si la sesión
+        # del browser no incluye una navegación previa a la página de detalle
+        # de planta. _navigate_to_station_detail establece ese contexto.
+        # Solo navega la primera vez por estación por sesión (cacheado).
+        self._navigate_to_station_detail(station_code)
 
         last_exc: Exception | None = None
         for attempt in range(3):
@@ -1075,8 +1136,8 @@ t=path,
                 )
 
         logger.warning(
-            "DIAG get_daily_kpi AGOTADOS 3 intentos %s %s → devuelve {}. "
-            "Último error: %s",
+            "DIAG get_daily_kpi AGOTADOS 3 intentos %s %s \u2192 devuelve {}. "
+            "\u00daltimo error: %s",
             station_code, day, last_exc,
         )
         return {}
