@@ -717,8 +717,25 @@ def sync_credencial(
                         kpi_d = client.get_station_kpi(station_code)  # caché station-list
                     else:
                         kpi_d = client.get_daily_kpi(station_code, fecha)
-                        # get_daily_kpi hace hasta 3 intentos internamente
-                        _audit_intentos = 3 if not kpi_d else 1
+                        # get_daily_kpi hace hasta 3 intentos internamente.
+                        # Si devuelve {} vacío (ej: bloqueo WAF 503), NO guardamos 0.0
+                        # en fv_kpi_diario — eso contaminaría el histórico con datos falsos.
+                        # En su lugar: skip + auditoría con error_tipo="waf_503_skip".
+                        if not kpi_d:
+                            _ms = int((time.monotonic() - _t0) * 1000)
+                            logger.warning(
+                                "  KPI diario SKIP %s %s — get_daily_kpi vacio (probablemente WAF 503). "
+                                "No se escribe 0.0 en BD.",
+                                station_code, fecha,
+                            )
+                            _audit_record(
+                                sb, run_id, cred_id, planta_id, "daily_kpi",
+                                ok=False, error_tipo="waf_503_skip",
+                                error_raw="get_daily_kpi returned empty dict (WAF 503 on all retries)",
+                                intentos=3, ms_elapsed=_ms, fecha_dato=fecha,
+                            )
+                            continue   # siguiente fecha — NO hacer upsert
+                        _audit_intentos = 1
                     # Energía — guard contra NaN/overflow
                     _overflow_energia = False
                     try:

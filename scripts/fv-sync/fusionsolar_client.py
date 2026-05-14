@@ -926,114 +926,31 @@ class StorageStateClient(FusionSolarClient):
 
     def _navigate_to_station_detail(self, station_code: str) -> None:
         """
-        Establece el contexto de sesión WAF necesario para que day-real-kpi no sea bloqueado.
+        Intento de establecer contexto WAF para day-real-kpi. STUB — ver diagnóstico.
 
-        Diagnóstico 2026-05-14 (Plan A): navegar al hash #/plantDetail/<dn> → aceptado
-        por el SPA (URL cambia), pero completado en 0.03s sin ningún request HTTP.
-        El WAF ve solo el fetch() de day-real-kpi — sin contexto de estación → 503.
+        Diagnóstico 2026-05-14 (Planes A/B/C):
+          - Plan A: hash nav #/plantDetail/<dn> → SPA redirige a #/home/list. 0 requests HTTP.
+          - Plan B: page.evaluate(fetch()) con hash nav → mismo resultado, 503.
+          - Plan C: prelim device-list via context.request → device-list también 503.
+            Conclusión: el WAF de FusionSolar EU5 bloquea TODOS los POST station-específicos
+            (device-list, day-real-kpi) cuando el SPA no ha navegado a la ruta correcta
+            de detalle de planta. La ruta correcta es desconocida y no es #/plantDetail/<dn>.
 
-        Diagnóstico 2026-05-14 (Plan B): el WAF necesita requests HTTP, no hash changes.
-        El SPA render desde caché tras el hash change. No hay llamada a day-real-kpi.
+        Estado actual: day-real-kpi histórico NO es viable via automatización headless.
+        sync_job.py gestiona este caso: si get_daily_kpi devuelve {}, SKIP (no guarda 0.0).
+        La reconstrucción histórica se hace manualmente via CSV export desde FusionSolar.
 
-        Plan C (implementado aquí): llamar EXPLÍCITAMENTE a device-list para la planta
-        via context.request (que el WAF sí permite) antes de llamar a day-real-kpi.
-        device-list es el primer request HTTP station-específico que el SPA hace al
-        cargar la página de detalle → el WAF lo usa como señal de "sesión en detalle".
-
-        Flujo:
-          1. Hash navigation (mantiene el URL del browser en station-detail)
-          2. Prelim: POST device-list para esta planta (via context.request)
-          3. Prelim: GET total-real-kpi (que el SPA hace siempre en el detalle)
-          4. Monitorizar si el SPA llama a day-real-kpi por su cuenta (diagnóstico)
-          5. Continuar → nuestro _fetch_via_page_eval de day-real-kpi
-
-        Solo ejecuta una vez por planta por sesión (_last_station_navigated).
+        Este método es un no-op hasta que se identifique la ruta SPA correcta.
         """
-        import json as _json
-
         if self._last_station_navigated == station_code:
-            logger.debug("_navigate_to_station_detail: contexto de %s ya establecido", station_code)
             return
-
-        if not self._portal_url:
-            logger.warning("_navigate_to_station_detail: _portal_url no disponible, saltando")
-            return
-
-        logger.info("DIAG _navigate_to_station_detail Plan-C: %s", station_code)
-        t0 = time.time()
-
-        # ── Monitorizar si el SPA llama a day-real-kpi por su cuenta ──────────
-        _spa_day_kpi: list[str] = []
-        def _on_kpi_req(req: Any) -> None:
-            if "day-real-kpi" in req.url and req.method == "POST":
-                _spa_day_kpi.append(req.url)
-                logger.info("DIAG SPA called day-real-kpi: %s", req.url)
-        self._page.on("request", _on_kpi_req)
-
-        try:
-            # ── Paso 1: hash navigation ────────────────────────────────────────
-            portal_base = self._portal_url.split("#")[0]
-            detail_url  = f"{portal_base}#/plantDetail/{station_code}"
-            logger.info("DIAG nav hash → %s", detail_url)
-            try:
-                self._page.goto(detail_url, wait_until="domcontentloaded", timeout=20_000)
-                # Breve espera para que el SPA procese el hash change
-                self._page.wait_for_timeout(1_500)
-            except Exception as nav_err:
-                logger.warning("DIAG nav hash error (no fatal): %s", nav_err)
-
-            current_url = self._page.url
-            logger.info("DIAG URL tras nav hash: %s", current_url)
-
-            # ── Paso 2: prelim device-list (station-específico) ───────────────
-            # El SPA llama a device-list cuando carga la página de detalle.
-            # Si el WAF traquea "ha cargado detalle de esta planta", esto lo indica.
-            try:
-                resp = self._context.request.post(
-                    self._url_for_endpoint(self._DEV_LIST),
-                    headers=self._api_headers(),
-                    data=_json.dumps({
-                        "stationCodes": station_code,
-                        "pageNo": 1,
-                        "pageSize": 10,
-                    }),
-                )
-                logger.info("DIAG prelim device-list %s: HTTP %d", station_code, resp.status)
-            except Exception as e:
-                logger.debug("DIAG prelim device-list error: %s", e)
-
-            # ── Paso 3: prelim total-real-kpi ─────────────────────────────────
-            # El SPA llama a total-real-kpi cada vez que abre el detalle de planta.
-            ts_ms = int(time.time() * 1000)
-            try:
-                resp = self._context.request.get(
-                    self._url_for_endpoint(
-                        f"{self._TOTAL_KPI}?queryTime={ts_ms}&timeZone=2"
-                    ),
-                    headers=self._api_headers(),
-                )
-                logger.info("DIAG prelim total-real-kpi: HTTP %d", resp.status)
-            except Exception as e:
-                logger.debug("DIAG prelim total-real-kpi error: %s", e)
-
-            # ── Paso 4: breve pausa para que el WAF registre los requests ─────
-            self._page.wait_for_timeout(800)
-
-            elapsed = time.time() - t0
-            spa_called = bool(_spa_day_kpi)
-            logger.info(
-                "DIAG _navigate_to_station_detail Plan-C done (%.2fs) | "
-                "SPA_called_day_kpi=%s | URL=%s",
-                elapsed, spa_called, self._page.url,
-            )
-            self._last_station_navigated = station_code
-
-        finally:
-            # Eliminar listener para evitar acumulación en sesiones largas
-            try:
-                self._page.remove_listener("request", _on_kpi_req)
-            except Exception:
-                pass
+        # Marcar como "intentado" para evitar reintentos en el mismo backfill
+        self._last_station_navigated = station_code
+        logger.debug(
+            "_navigate_to_station_detail: WAF bypass no resuelto — "
+            "day-real-kpi historico seguira dando 503 para %s",
+            station_code,
+        )
 
     def _fetch_via_page_eval(self, path: str, payload: Any) -> dict:
         """
