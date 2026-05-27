@@ -1,6 +1,82 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-14 — FV histórico: diagnóstico WAF completo + fix no-write-0kWh (e018be1). Realtime FV operativo. Histórico WAF-bloqueado, skip limpio.**
+> **Última actualización: 2026-05-27 (v1.1) — Bloque 1 del Módulo Tarifas y Propuestas APROBADO por ChatGPT con 3 matices integrados. Análisis de 8 archivos reales de Drive completado (docs/ANALISIS_FORMATOS_TARIFAS.md). El modelo de datos de Fase 1 se amplía: ~25 columnas nuevas + 2 sub-tablas. Pendiente push + Fase 0 saneamiento por Juan.**
+>
+> ## ✅ SESIÓN 2026-05-27 — MÓDULO TARIFAS Y PROPUESTAS: BLOQUE 1 (AUDITORÍA + PLAN)
+>
+> ### Contexto de la sesión
+> Juan trae briefing de traspaso desde otra herramienta (ChatGPT) tras varias sesiones intentando construir el sistema de tarifas dentro de Make.com (que llegó al límite de su editor visual). Decisión consolidada: **Make = captura, Supabase Edge Functions = cerebro, Gemini server-side, módulo dentro del CRM**. Volumen real 30-40 tarifas/mes → humano-en-el-bucle desde el día 1.
+>
+> ### Hallazgo principal de la auditoría
+> **El módulo NO se construye desde cero — está al ~70% hecho.** El CRM ya tiene:
+> - `comercializadoras` + `comercializadora_ofertas` (CRUD admin completo + importador XLSX masivo en `XLSXImportadorTarifas`)
+> - `AnalisisPage` ya implementa el comparador end-to-end (lee facturas históricas, simula N ofertas, rankea por ahorro, guarda en `proposals`)
+> - `PropuestasEnergiaPage` ya visualiza propuestas generadas
+> - Motor de cálculo `calculateSimulatedInvoice` (comparador) y `calculateInvoiceEstimate` (factura actual) ya operativos
+> - Edge Function `chat-consultor` con patrón Gemini server-side desplegado (JWT auth, CORS, `@google/genai`) — clonable para `tariffs-extract`
+> - Sistema de roles + signup + RLS granular ya en pie
+>
+> ### Lo que falta (delta)
+> 1. **Capa de ingesta** (Make → webhook → tabla): tabla `tariff_documents` + Edge Function `tariffs-ingest`
+> 2. **Capa de extracción IA**: tabla `tariff_extractions` + Edge Function `tariffs-extract` (clon de chat-consultor)
+> 3. **Versionado de ofertas**: hoy el upsert sobreescribe — añadir `valid_from`/`valid_to`/`status`/`version`/`superseded_by` + RPC `publish_oferta_with_versioning`
+> 4. **Bandeja "tarifas pendientes"**: nuevo tab en `AdminPage` (humano-en-el-bucle)
+> 5. **Logo de comercializadora**: campo no existe — `add column logo_url`
+> 6. **Generador PDF de propuesta** con plantilla Valere (bloqueado por NEG-B: diseño)
+> 7. **Borrador de email con aprobación manual**: tabla `proposal_email_drafts` + Edge Function `proposals-send-email` (Resend ya en uso)
+>
+> ### Aclaración crítica de nomenclatura
+> El schema canónico `src/core/types/database_canonical_2026-04-26.ts` muestra `retailers/retailer_offers` (nombre antiguo) pero **las migraciones de abril renombraron a `comercializadoras/comercializadora_ofertas`** y todo el código vivo usa los nombres en español. **Cualquier código o doc nuevo debe usar los nombres en español.** Regenerar tipos es prerrequisito de Fase 0.
+>
+> ### Entregables de esta sesión
+> | Artefacto | Ubicación |
+> |---|---|
+> | Auditoría técnica completa | `docs/AUDITORIA_MODULO_TARIFAS_PROPUESTAS.md` (12 secciones) |
+> | Plan de implementación por fases (v1.1) | `docs/PLAN_MODULO_TARIFAS_PROPUESTAS.md` (15 secciones, 8 fases técnicas + 2 fases negocio + addendum ChatGPT) |
+> | **Análisis de formatos reales (NUEVO)** | `docs/ANALISIS_FORMATOS_TARIFAS.md` — 8 archivos reales analizados, ~25 campos críticos detectados que NO están en el esquema actual |
+> | Primer commit mínimo recomendado (v1.1) | Solo documentación (5 archivos). Migraciones SQL ampliadas pasan al commit de Fase 1 |
+> | Mensaje de cierre a próxima sesión | `.cowork/outbox/2026-05-27T23-00-00-modulo-tarifas-bloque1-listo.md` |
+>
+> ### Hallazgos del análisis de formatos reales (resumen)
+> 1. **Tres unidades distintas de potencia coexistiendo**: €/kW·año (BASE MET, UniEléctrica A), €/kW·día (METROPOLI MET, Iberdrola), €/kW·mes (Energya-VM).
+> 2. **Multi-zona explícita**: Península, Baleares, Canarias, Ceuta/Melilla, Extra Peninsular. Cada zona con precios distintos en algunas comercializadoras.
+> 3. **Combinatoria masiva**: MET una sola campaña = 56 ofertas (7 productos × 4 accesos × 2 zonas). Iberdrola hoja mensual = 50+ productos.
+> 4. **Descuentos no normalizables**: "15% s/Te y Tp (+5% PyS Tier 1 +2% PyS Tier 2)", "dto 0,02€/Kwh si consumo >40MWh/a". Solución híbrida: texto libre + campos estructurados.
+> 5. **PyS (Productos y Servicios) son catálogo paralelo** — Iberdrola tiene 30+ servicios opcionales (Pack Hogar 8.95€/mes, etc.) que dan descuento sobre la tarifa.
+> 6. **Vigencias múltiples por producto**: UniÉlectrica FLEXIPYME aparece con dos ventanas de contratación con precios distintos.
+> 7. **Precios mes a mes para gas**: MET y Energya-VM dan 12 valores por período.
+> 8. **Visalia y similares son PDFs imagen** — extracción solo con Gemini visual; texto plano NO sirve.
+> 9. **Variantes por umbral de potencia**: Iberdrola separa "2.0TD_2 P1≤10kW" de "2.0TD_3 P1>10kW".
+> 10. **Conceptos especializados frecuentes**: Eventual/Temporal (sin IE), Telemedido/No telemedido, Promocionado/No promocionado, "sin SSAA/CAD" (interna no contratable), bono social por zona, Hora Tempo / Resto h.
+>
+> ### Aprobación de ChatGPT (con 3 matices integrados en §14 del PLAN)
+> 1. **Verificar si SQL fase 28.6 ya está aplicado en producción** antes de re-ejecutarlo (contradicción en históricos).
+> 2. **Refactorizar el casteo JSONB→numeric[]** en RPC `publish_oferta_with_versioning` (la sintaxis propuesta puede fallar en PostgreSQL).
+> 3. **Declarar `status_v2` como temporal** y planificar su consolidación en `status` único en fase posterior.
+>
+> ### ⚠️ Pendientes para próxima sesión (orden estricto)
+> 1. **Juan + ChatGPT aprueban** docs/AUDITORIA y docs/PLAN.
+> 2. **Juan ejecuta Fase 0 (saneamiento)**:
+>    - Push commits locales no pusheados (`60ab260` Hito 2 + commits de esta sesión)
+>    - SQL `20260422_fase28_6_rls_policies_cleanup.sql` en Supabase Dashboard prod
+>    - Regenerar tipos: `npx supabase gen types typescript --project-id gtphkowfcuiqbvfkwjxb > src/core/types/database.ts`
+>    - Abrir rama `claude/modulo-tarifas-propuestas`
+>    - Verificar `npx tsc --noEmit` (0 errores) + `npm test -- --run` (39/39)
+> 3. **Juan reúne en paralelo** (NEG-A, bloquea Fase 3):
+>    - 4 ejemplos reales: PDF fija + PDF indexada + Excel + email cuerpo
+>    - Lista comercializadoras activas + catálogo productos canónicos
+> 4. **Juan reúne en paralelo** (NEG-B, bloquea Fase 5):
+>    - Logo Valere alta resolución + colores + tipografía + propuesta de referencia
+> 5. **Cowork prepara** briefing concreto de Fase 1 (migraciones SQL aditivas) para Claude Code.
+> 6. **Claude Code ejecuta** Fase 1 → commit → PR draft.
+>
+> ### ⚠️ Pendientes heredados anteriores (no resueltos en esta sesión)
+> - **SQL fase28.6** sin ejecutar en Supabase prod (sigue pendiente desde 14 mayo).
+> - **Regenerar tipos Supabase TypeScript** (sigue pendiente — necesario para Fase 0 del módulo).
+> - **Push commit `60ab260`** (Hito 2 factura teórica) — sin verificar si Juan ya lo hizo.
+> - **RESEND_API_KEY** no configurado en local — verificar prod antes de Fase 6.
+>
+> ---
 >
 > ## ✅ SESIÓN 2026-05-14 (5ª parte) — FV SYNC: DIAGNÓSTICO WAF 503 + FIXES
 >
