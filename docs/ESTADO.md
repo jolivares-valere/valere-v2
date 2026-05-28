@@ -1,6 +1,42 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-27 (v1.1) — Bloque 1 del Módulo Tarifas y Propuestas APROBADO por ChatGPT con 3 matices integrados. Análisis de 8 archivos reales de Drive completado (docs/ANALISIS_FORMATOS_TARIFAS.md). El modelo de datos de Fase 1 se amplía: ~25 columnas nuevas + 2 sub-tablas. Pendiente push + Fase 0 saneamiento por Juan.**
+> **Última actualización: 2026-05-28 — Fase 0 del Módulo Tarifas y Propuestas CERRADA AL 100%. Bloque 1 en GitHub (rama `claude/modulo-tarifas-propuestas`, commits `35d14c9` + `1f22535`). Tipos Supabase regenerados (database.ts ya usaba nombres en español — el legacy estaba sólo en `database_canonical_2026-04-26.ts` archivado). RLS verificada: fase 28.6 confirmada aplicada el 13/05 vía MCP (la documentación que la marcaba pendiente era obsoleta). Siguiente: BRIEFING_FASE1_CLAUDE_CODE.md operativo para que Code ejecute las 8 migraciones aditivas + RPC.**
+>
+> ## ✅ SESIÓN 2026-05-28 — FASE 0 CERRADA + ARRANQUE FASE 1
+>
+> ### Cierre de Fase 0 (saneamiento)
+> | Acción | Resultado |
+> |---|---|
+> | Push del Bloque 1 v1.1 (6 docs) en rama `claude/modulo-tarifas-propuestas` | ✅ commit `35d14c9` |
+> | Regeneración tipos Supabase (`supabase gen types typescript`) | ✅ commit `1f22535` — diff vacío: `database.ts` activo ya estaba al día, el legacy era `database_canonical_2026-04-26.ts` (archivo histórico) |
+> | TSC | ✅ 0 errores |
+> | Tests | ✅ 129/129 (no 39 — el repo creció; corregir CLAUDE.md en próximo housekeeping) |
+> | SQL fase 28.6 verificado en Supabase | ✅ Aplicada el 13/05 vía MCP (cabecera del propio SQL lo declara). NO re-ejecutar. Evidencia: cleanup de `cfs_admin`/`cfv_all`/`notificaciones_all` confirmado; las nuevas `notif_select/update/delete` + `cfs_*_authenticated` + `cfv_*_authenticated` presentes |
+>
+> ### Aprendizajes sobre nomenclatura
+> - **`src/core/types/database.ts`** = fichero ACTIVO (siempre usar este).
+> - **`src/core/types/database_canonical_2026-04-26.ts`** = snapshot histórico con nombres legacy (`retailers`/`retailer_offers`). Sólo para referencia, NO usar como fuente de tipos.
+> - Las tablas reales en español: `comercializadoras`, `comercializadora_ofertas`. Confirmado tanto en BD como en código vivo.
+> - Hay 2 policies legacy con nombres alias (`retailers_select`, `retailer_offers_select` sobre las tablas en español). Funcionan correctamente, sólo el nombre interno es legacy. No bloquea nada — housekeeping futuro.
+> - Hay redundancia de policies en `actividades/contactos/documentos/empresas` (`*_funciones` añadidas en sprint captación además de las clásicas `a_*/co_*/doc_*/e_*`). Suma con OR — no es bug, no bloquea.
+>
+> ### Pendientes obsoletos cerrados
+> - ⏳→ ✅ SQL fase 28.6 — confirmado aplicado, era documentación desfasada.
+> - ⏳→ ✅ Regenerar tipos Supabase TS — confirmado al día, era confusión con fichero archivado.
+>
+> ### Pendientes para esta sesión (en curso)
+> - Crear `docs/BRIEFING_FASE1_CLAUDE_CODE.md` operativo (no conceptual) con: 8 migraciones SQL aditivas + RPC `publish_oferta_with_versioning` con casteo JSONB→numeric[] correcto + tests + criterios aceptación + commit message.
+> - Commitear en `claude/modulo-tarifas-propuestas`.
+> - Juan lanza a Claude Code.
+>
+> ### Pendientes en paralelo (Juan, no técnico)
+> - Renombrar archivos genéricos en Drive `TARIFAS_VIGENTES` (sumar comercializadora al nombre).
+> - Reunir 2-3 emails con tarifa en el cuerpo del mensaje (no encontrados en carpeta hoy — sólo PDFs/Excels).
+> - NEG-A: catálogo productos canónicos por comercializadora (bloquea Fase 3).
+> - NEG-B: logo + colores + tipografía Valere (bloquea Fase 5).
+>
+> ---
+>
 >
 > ## ✅ SESIÓN 2026-05-27 — MÓDULO TARIFAS Y PROPUESTAS: BLOQUE 1 (AUDITORÍA + PLAN)
 >
