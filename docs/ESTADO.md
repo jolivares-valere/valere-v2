@@ -1,6 +1,77 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-28 — Fase 0 del Módulo Tarifas y Propuestas CERRADA AL 100%. Bloque 1 en GitHub (rama `claude/modulo-tarifas-propuestas`, commits `35d14c9` + `1f22535`). Tipos Supabase regenerados (database.ts ya usaba nombres en español — el legacy estaba sólo en `database_canonical_2026-04-26.ts` archivado). RLS verificada: fase 28.6 confirmada aplicada el 13/05 vía MCP (la documentación que la marcaba pendiente era obsoleta). Siguiente: BRIEFING_FASE1_CLAUDE_CODE.md operativo para que Code ejecute las 8 migraciones aditivas + RPC.**
+> **Última actualización: 2026-05-28 (cierre tarde) — 🎉 FASE 1 MERGEADA A MAIN. PR #10 squashed-mergeado tras: 9 migraciones SQL aplicadas en Supabase prod + verificación final (1 RPC + 5 tablas confirmadas) + aprobación explícita de ChatGPT. Bloque 1 + Fase 1 ya forman parte de `main`. Siguiente: BRIEFING_FASE2_TARIFFS_INGEST.md para Edge Function de ingesta desde Make.**
+>
+> ## ✅ SESIÓN 2026-05-28 — FASE 1 APLICADA EN PROD + MERGE A MAIN
+>
+> ### Aplicación de migraciones en Supabase prod (proyecto `gtphkowfcuiqbvfkwjxb`)
+> Cowork aplicó las 9 migraciones via Chrome MCP sobre el SQL editor (autorización explícita de Juan). Mantenimiento programado de shared pooler eu-west-1 ralentizó la UI puntualmente (migraciones 07 y 09 con UI colgada en "Running..." pero el DDL se completó correctamente — confirmado al recargar y consultar catálogo PostgreSQL).
+>
+> ### Verificación final SQL (la que ChatGPT pidió antes del merge)
+> ```sql
+> select 'RPC: '||proname from pg_proc where proname='publish_oferta_with_versioning'
+> union all
+> select 'TABLA: '||tablename from pg_tables where schemaname='public' and tablename in (
+>   'tariff_documents','tariff_extractions','proposal_email_drafts',
+>   'comercializadora_productos_servicios','oferta_precios_mensuales'
+> ) order by 1;
+> ```
+> **6 filas devueltas:** 1 RPC + 5 tablas confirmadas en prod ✅.
+>
+> ### PR #10 — Squashed-mergeado a `main`
+> | Campo | Valor |
+> |---|---|
+> | Título | `Claude/modulo tarifas propuestas (#10)` |
+> | Estado final | 🟣 Merged |
+> | Estrategia | Squash and merge |
+> | Commits originales | 5 (35d14c9, 1f22535, e728aab, 01b01b7, 3176057) |
+> | Files changed | 18 (+4.103 / −1) |
+> | All checks | ✅ 5 successful checks |
+> | Conflicts | ✅ None |
+>
+> Los 5 commits originales se condensaron en un único commit squash en `main`. La rama `claude/modulo-tarifas-propuestas` queda obsoleta tras el merge — Juan puede borrarla cuando quiera.
+>
+> ### Lo que ahora vive en `main`
+> - **Documentación del módulo:** `docs/AUDITORIA_MODULO_TARIFAS_PROPUESTAS.md`, `docs/PLAN_MODULO_TARIFAS_PROPUESTAS.md` (v1.1), `docs/ANALISIS_FORMATOS_TARIFAS.md`, `docs/BRIEFING_FASE1_CLAUDE_CODE.md` (v1.1), `docs/SESIONES/2026-05-27-resumen.md`.
+> - **9 migraciones SQL aditivas:** `supabase/migrations/20260528_modulo_tarifas_*.sql` (aplicadas en prod, registradas en repo para reproducibilidad).
+> - **Test placeholder:** `src/features/admin/__tests__/publishOfertaWithVersioning.test.ts` (9 casos documentados en JSDoc para Fase 3).
+> - **Tipos Supabase regenerados:** `src/core/types/database.ts` con `tariff_documents`, `publish_oferta_with_versioning`, `extension_data` y todas las extensiones.
+>
+> ### Lo que NO se ha tocado (intencional)
+> - UI / hooks / pantallas existentes — `AnalisisPage` (comparador) y `XLSXImportadorTarifas` siguen funcionando exactamente igual.
+> - Edge Functions existentes.
+> - Escenario Make.
+> - Sistema RLS legacy.
+>
+> ### Pendientes operativos heredados (ahora más limpios)
+> - ✅→ ✅ SQL fase 28.6 cerrado (era documentación desfasada).
+> - ✅→ ✅ Regenerar tipos Supabase cerrado.
+> - ✅→ ✅ Fase 1 aplicada y mergeada.
+> - ⏳ Push commit local `60ab260` (Hito 2) — verificar si Juan lo hizo en algún momento (probablemente sí, ya está en `main`).
+> - ⏳ RESEND_API_KEY en local — sin importancia hasta Fase 6.
+>
+> ### Aprobaciones ChatGPT acumuladas
+> | Ronda | Decisión |
+> |---|---|
+> | 1 | Aprobado Plan + Análisis de formatos con 3 matices (verificar fase 28.6, casteo JSONB, status_v2 provisional) |
+> | 2 | Aprobado Briefing v1.1 con 4 correcciones técnicas integradas (índices sin current_date, RPC zona, RPC approved, no tocar database.ts) |
+> | 3 | Aprobado PR #10 para merge tras verificación SQL final (1 RPC + 5 tablas confirmadas) |
+>
+> ### Siguiente paso (Fase 2)
+> Cowork prepara `docs/BRIEFING_FASE2_TARIFFS_INGEST.md` cuando Juan lo pida. Contenido:
+> - Edge Function `tariffs-ingest` (clon del patrón `chat-consultor`, con auth por token compartido `MAKE_INGEST_TOKEN` en lugar de JWT).
+> - Modificar el escenario Make: tras subir adjunto a Drive, llamar al endpoint `/tariffs/ingest` con metadatos del email.
+> - Hash SHA256 como dedup exacto en `tariff_documents`.
+> - Tests de la Edge Function.
+>
+> ### Pendientes en paralelo (Juan, no técnico)
+> - **NEG-A ampliado:** renombrar archivos genéricos en Drive `TARIFAS_VIGENTES` con la comercializadora en el nombre.
+> - **NEG-A ampliado:** reenviarme 2-3 emails con la tarifa en el cuerpo del mensaje.
+> - **NEG-A ampliado:** catálogo de productos canónicos por comercializadora (bloquea Fase 3).
+> - **NEG-B:** logo Valere alta resolución + colores + tipografía (bloquea Fase 5).
+>
+> ---
+>
 >
 > ## ✅ SESIÓN 2026-05-28 — FASE 0 CERRADA + ARRANQUE FASE 1
 >
