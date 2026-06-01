@@ -1,6 +1,56 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-06-01 (sesión autónoma) — 🎉 FASE 2 COMPLETADA EN PROD. Edge Functions deployadas, secrets configurados, backfill 2024-2026 ejecutado (40.672 filas en precios_pool_horarios). Escenario Make configurado. Pendiente: activar escenario Make, investigar indicadores PVPC/CO₂ sin datos, Fase 3 (widget dashboard + calculator indexado).**
+> **Última actualización: 2026-05-19 — Sprint Carolina (hallazgos #2 + #3 vista tabla Captación). Backend en prod (3 vistas + 3 RPCs + Edge Function recordatorio). Frontend hooks+componentes base en disco. TSC verde tras limpiar PrecioPoolCard preexistente. Pendiente próxima sesión: integración CaptacionPage + tab Mis llamadas.**
+
+## ✅ SESIÓN 2026-05-19 — SPRINT CAROLINA (Hallazgos #2 + #3)
+
+### Contexto
+Revisión con Carolina Aroca (telemarketing). Recogí 3 hallazgos:
+- **#1** Sincronización Outlook/Google Calendar — apuntado, requiere OAuth Google (pendiente decisión Juan).
+- **#2** Buscador inline + pestaña Enviados con SLA + recordatorios CRM+email.
+- **#3** Vista tabla tipo Excel + edición inline propagable + tab Mis llamadas + export.
+
+Decisiones firmadas Juan:
+- Una pestaña "Enviados" con sub-chips Análisis/Senior (siempre desde historial unificado).
+- Edición inline propagable, whitelist segura en backend.
+- Recordatorio = notificación CRM + email vía Resend.
+- SLA: 3d amarillo / 5d rojo.
+- Eliminada pestaña "Seguimientos" actual; `propuesta_enviada` vuelve a "Por llamar".
+
+### Backend aplicado en prod
+| Artefacto | Cambio |
+|---|---|
+| `supabase/migrations/20260519_sprint_vista_tabla_captacion.sql` | 3 vistas + 3 RPCs (aplicado bloque a bloque vía SQL Editor) |
+| Edge Function `enviar-recordatorio` | Deployada vía CLI (Resend, JWT verify) |
+
+Vistas: `v_captacion_historico_completo`, `v_captacion_enviados_en_seguimiento`, `v_mis_llamadas`.
+RPCs: `editar_campo_oportunidad`, `editar_campo_empresa`, `recordar_a_responsable`.
+
+### Frontend en disco (commit pendiente)
+- `src/features/captacion/api.ts`: 6 hooks nuevos con invalidación cascada (useCaptacionHistorico, useCaptacionEnviados, useMisLlamadas, useEditarCampoOportunidad, useEditarCampoEmpresa, useRecordarAResponsable).
+- Componentes nuevos en `src/features/captacion/components/`: SelectorVista, BuscadorCaptacion, CeldaEditable, ChipsFiltros, PaginacionIncremental, TablaCaptacion.
+- Util `src/core/utils/exportToExcel.ts` (SheetJS).
+
+### Bonus
+- DashboardPage.tsx tenía `PrecioPoolCard` truncado de un sprint inacabado anterior — bloqueaba TSC desde hace tiempo. **Limpiado**. El sprint OMIE puede retomarse desde git history cuando se quiera.
+- **TSC vuelve a 0 errores** tras meses.
+
+### Pendiente próxima sesión
+- Componente `MisLlamadasView` (log cronológico actividades llamada).
+- Integración `CaptacionPage.tsx`: toggle Vista (Fichas/Tabla), tab Enviados, buscador inline.
+- Bloque "Recordar a responsable" en card Enviados.
+- Tests vista tabla + edición inline.
+- Regenerar tipos TS Supabase para eliminar casts `(supabase as any)` en hooks nuevos.
+
+### Cierre operativo
+- Script PowerShell preparado: `COMMIT_SPRINT_CAROLINA_2026-05-19.ps1` (pull + tsc + tests + build + commit + push).
+- Juan ejecuta el PS1 para cerrar el sprint.
+
+---
+
+> **(estado anterior abajo)**
+>
+> Anterior cierre: 2026-06-01 (sesión autónoma) — 🎉 FASE 2 COMPLETADA EN PROD. Edge Functions deployadas, secrets configurados, backfill 2024-2026 ejecutado (40.672 filas en precios_pool_horarios). Escenario Make configurado. Pendiente: activar escenario Make, investigar indicadores PVPC/CO₂ sin datos, Fase 3 (widget dashboard + calculator indexado).
 
 ## ✅ SESIÓN 2026-06-01 TARDE — FASE 2 COMPLETADA EN PROD (sesión autónoma)
 

@@ -792,3 +792,267 @@ export const ETAPA_COLORS: Record<string, string> = {
   cerrado_ganada: 'bg-green-50 border-green-200 text-green-700',
   cerrado_perdida: 'bg-gray-50 border-gray-200 text-gray-700',
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Sprint Vista Tabla Captación (Hallazgos #2 + #3 Carolina 2026-05-19)
+// ═══════════════════════════════════════════════════════════════════
+// Hooks nuevos para:
+//   - Vista tabla con filtros (v_captacion_historico_completo).
+//   - Pestaña Enviados con SLA (v_captacion_enviados_en_seguimiento).
+//   - Mis llamadas (v_mis_llamadas).
+//   - Edición inline propagable (editar_campo_oportunidad, editar_campo_empresa).
+//   - Recordatorio CRM + email (recordar_a_responsable + Edge Function).
+//
+// Nota: usamos (supabase as any) en las vistas/RPCs nuevas hasta regenerar
+// los tipos TS. Cuando se regeneren, eliminar los casts.
+
+/** Fila de v_captacion_historico_completo */
+export type VHistoricoRow = {
+  id: string
+  empresa_id: string
+  empresa_nombre: string | null
+  empresa_nif: string | null
+  empresa_telefono: string | null
+  empresa_email: string | null
+  empresa_ciudad: string | null
+  empresa_segmento: string | null
+  empresa_estado_relacion: 'prospecto' | 'cliente' | 'ex_cliente' | 'descartado' | null
+  tipo: string | null
+  etapa: string | null
+  etapa_operativa: string | null
+  contexto: 'captacion' | 'crm' | null
+  decisor_identificado: boolean | null
+  responsable_actual_id: string | null
+  responsable_actual_nombre: string | null
+  responsable_actual_funciones: string[] | null
+  created_by: string | null
+  creador_nombre: string | null
+  creador_funciones: string[] | null
+  factura_fecha_prevista: string | null
+  factura_recibida_at: string | null
+  factura_documento_id: string | null
+  propuesta_documento_id: string | null
+  propuesta_enviada_at: string | null
+  visita_programada_at: string | null
+  valor_estimado_eur: number | null
+  ahorro_anual_estimado: number | null
+  fecha_vencimiento_contrato_prospecto: string | null
+  fuente_vencimiento_contrato_prospecto: string | null
+  siguiente_accion: string | null
+  fecha_siguiente_accion: string | null
+  origen: string | null
+  motivo_perdida: string | null
+  motivo_perdida_codigo: string | null
+  motivo_perdida_detalle: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  dias_vencimiento: number | null
+  dias_sin_movimiento: number | null
+}
+
+/** Filtros para la tabla histórico */
+export type HistoricoFilters = {
+  etapas?: string[]
+  responsables?: string[]
+  origenes?: string[]
+  soloVencenEn30d?: boolean
+  soloVencidos?: boolean
+  texto?: string
+}
+
+/** Hook tabla histórico completo (todos los tabs en modo Tabla pasan por aquí) */
+export function useCaptacionHistorico(filters?: HistoricoFilters) {
+  return useQuery({
+    queryKey: ['captacion', 'historico', filters],
+    queryFn: async () => {
+      let q: any = (supabase as any).from('v_captacion_historico_completo').select('*')
+
+      if (filters?.etapas && filters.etapas.length > 0) {
+        q = q.in('etapa_operativa', filters.etapas)
+      }
+      if (filters?.responsables && filters.responsables.length > 0) {
+        q = q.in('responsable_actual_id', filters.responsables)
+      }
+      if (filters?.origenes && filters.origenes.length > 0) {
+        q = q.in('origen', filters.origenes)
+      }
+      if (filters?.soloVencidos) {
+        q = q.lt('dias_vencimiento', 0)
+      } else if (filters?.soloVencenEn30d) {
+        q = q.gte('dias_vencimiento', 0).lte('dias_vencimiento', 30)
+      }
+      if (filters?.texto && filters.texto.trim().length > 0) {
+        const t = `%${filters.texto.trim()}%`
+        q = q.or(`empresa_nombre.ilike.${t},empresa_nif.ilike.${t},empresa_telefono.ilike.${t},empresa_email.ilike.${t}`)
+      }
+
+      const { data, error } = await q.order('updated_at', { ascending: false }).limit(500)
+      if (error) {
+        logError(error, 'useCaptacionHistorico')
+        throw error
+      }
+      return (data ?? []) as VHistoricoRow[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+/** Fila de v_captacion_enviados_en_seguimiento */
+export type VEnviadosRow = {
+  id: string
+  empresa_id: string
+  empresa_nombre: string | null
+  empresa_nif: string | null
+  empresa_telefono: string | null
+  tipo: string | null
+  etapa: string | null
+  etapa_operativa: string | null
+  responsable_actual_id: string | null
+  responsable_actual_nombre: string | null
+  responsable_actual_funciones: string[] | null
+  tipo_destinatario: 'senior' | 'analista' | 'otro'
+  ultimo_handoff_at: string | null
+  ultimo_handoff_motivo: string | null
+  dias_desde_envio: number | null
+  dias_sin_movimiento: number | null
+  sla_color: 'verde' | 'amarillo' | 'rojo'
+  valor_estimado_eur: number | null
+  fecha_vencimiento_contrato_prospecto: string | null
+  siguiente_accion: string | null
+  fecha_siguiente_accion: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Hook pestaña Enviados */
+export function useCaptacionEnviados() {
+  return useQuery({
+    queryKey: ['captacion', 'enviados'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('v_captacion_enviados_en_seguimiento')
+        .select('*')
+      if (error) {
+        logError(error, 'useCaptacionEnviados')
+        throw error
+      }
+      return (data ?? []) as VEnviadosRow[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+/** Fila de v_mis_llamadas */
+export type VLlamadaRow = {
+  id: string
+  fecha_actividad: string
+  titulo: string | null
+  descripcion: string | null
+  resultado: string | null
+  duracion_min: number | null
+  oportunidad_id: string
+  empresa_id: string
+  empresa_nombre: string | null
+  empresa_nif: string | null
+  empresa_telefono: string | null
+  etapa_operativa: string | null
+  responsable_actual_id: string | null
+  llamada_creada_por: string | null
+  llamada_creada_por_nombre: string | null
+  created_at: string
+}
+
+export type LlamadasFilters = {
+  rangoDias?: 7 | 30 | 90 | 365
+  resultado?: string
+  texto?: string
+  soloMias?: boolean
+  userId?: string
+}
+
+/** Hook log de llamadas (filtros rango + resultado + texto + solo mías) */
+export function useMisLlamadas(filters?: LlamadasFilters) {
+  return useQuery({
+    queryKey: ['captacion', 'llamadas', filters],
+    queryFn: async () => {
+      let q: any = (supabase as any).from('v_mis_llamadas').select('*')
+
+      if (filters?.rangoDias) {
+        const since = new Date()
+        since.setDate(since.getDate() - filters.rangoDias)
+        q = q.gte('fecha_actividad', since.toISOString())
+      }
+      if (filters?.resultado && filters.resultado !== 'todos') {
+        q = q.eq('resultado', filters.resultado)
+      }
+      if (filters?.soloMias && filters.userId) {
+        q = q.eq('llamada_creada_por', filters.userId)
+      }
+      if (filters?.texto && filters.texto.trim().length > 0) {
+        const t = `%${filters.texto.trim()}%`
+        q = q.or(`empresa_nombre.ilike.${t},empresa_nif.ilike.${t}`)
+      }
+
+      const { data, error } = await q.order('fecha_actividad', { ascending: false }).limit(500)
+      if (error) {
+        logError(error, 'useMisLlamadas')
+        throw error
+      }
+      return (data ?? []) as VLlamadaRow[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+/** Mutación: editar campo inline de oportunidad. Propaga invalidando caches relacionadas. */
+export function useEditarCampoOportunidad() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { oportunidad_id: string; campo: string; valor: string | null }) => {
+      const { data, error } = await (supabase as any).rpc('editar_campo_oportunidad', {
+        p_oportunidad_id: input.oportunidad_id,
+        p_campo: input.campo,
+        p_valor: input.valor ?? '',
+      })
+      if (error) {
+        logError(error, 'useEditarCampoOportunidad')
+        throw error
+      }
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['captacion'] })
+      qc.invalidateQueries({ queryKey: ['oportunidades'] })
+      qc.invalidateQueries({ queryKey: ['oportunidad'] })
+      qc.invalidateQueries({ queryKey: ['actividades'] })
+    },
+  })
+}
+
+/** Mutación: editar campo inline de empresa. Propaga a empresas + contactos + oportunidades. */
+export function useEditarCampoEmpresa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { empresa_id: string; campo: string; valor: string | null }) => {
+      const { data, error } = await (supabase as any).rpc('editar_campo_empresa', {
+        p_empresa_id: input.empresa_id,
+        p_campo: input.campo,
+        p_valor: input.valor ?? '',
+      })
+      if (error) {
+        logError(error, 'useEditarCampoEmpresa')
+        throw error
+      }
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['empresas'] })
+      qc.invalidateQueries({ queryKey: ['empresa'] })
+      qc.invalidateQueries({ queryKey: ['contactos'] })
+      qc.invalidateQueries({ queryKey: ['oportunidades'] })
+      qc.invalidateQueries({ queryKey: ['captacion'] })
+    },
+  })
+}
+

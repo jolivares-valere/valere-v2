@@ -1,0 +1,5 @@
+# Configuración Edge Function enviar-recordatorio
+# Sprint 2026-05-19 Hallazgo #2 — recordatorio CRM + email Resend.
+# Solo usuarios autenticados pueden disparar este email.
+
+verify_jwt = true

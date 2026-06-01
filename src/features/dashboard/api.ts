@@ -303,3 +303,82 @@ export function useMisTareas(userId: string | undefined) {
     },
   })
 }
+
+// ─── Precios ESIOS ────────────────────────────────────────────────────────────
+
+export interface PrecioPoolResumen {
+  /** Precio medio de hoy (€/MWh) */
+  hoy_eur_mwh: number | null
+  /** Precio medio del mes en curso (€/MWh) */
+  mes_eur_mwh: number | null
+  /** Precio medio del mes anterior (€/MWh) */
+  mes_anterior_eur_mwh: number | null
+  /** Última hora disponible */
+  ultima_hora: string | null
+}
+
+/**
+ * Devuelve el precio spot OMIE (indicador 600) resumido:
+ * media de hoy, del mes actual y del mes anterior.
+ * Usa la tabla precios_pool_horarios cacheada por esios-price-cache.
+ */
+export function usePrecioPool() {
+  return useQuery({
+    queryKey: ['dashboard', 'precio-pool'],
+    staleTime: 60 * 60 * 1000, // 1 hora — el cron actualiza 1 vez al día
+    queryFn: async (): Promise<PrecioPoolResumen> => {
+      const hoy = new Date()
+      const inicioDia = new Date(hoy)
+      inicioDia.setUTCHours(0, 0, 0, 0)
+
+      const inicioMes = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1))
+      const inicioMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, 1))
+      const finMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 0, 23, 59, 59))
+
+      // Precio de hoy
+      // Cast a any: tabla precios_pool_horarios añadida en Fase 2 sprint OMIE,
+      // pendiente regenerar tipos TS. Quitar cast cuando se regeneren.
+      const { data: hoyData, error: e1 } = await (supabase as any)
+        .from('precios_pool_horarios')
+        .select('valor, hora_utc')
+        .eq('indicador_id', 600)
+        .gte('hora_utc', inicioDia.toISOString())
+        .lt('hora_utc', new Date(inicioDia.getTime() + 86_400_000).toISOString())
+        .order('hora_utc', { ascending: false })
+
+      if (e1) { logError(e1, 'usePrecioPool-hoy'); throw e1 }
+
+      // Precio mes actual
+      const { data: mesData, error: e2 } = await (supabase as any)
+        .from('precios_pool_horarios')
+        .select('valor')
+        .eq('indicador_id', 600)
+        .gte('hora_utc', inicioMes.toISOString())
+        .lt('hora_utc', new Date(hoy.getTime() + 86_400_000).toISOString())
+
+      if (e2) { logError(e2, 'usePrecioPool-mes'); throw e2 }
+
+      // Precio mes anterior
+      const { data: mesAntData, error: e3 } = await (supabase as any)
+        .from('precios_pool_horarios')
+        .select('valor')
+        .eq('indicador_id', 600)
+        .gte('hora_utc', inicioMesAnterior.toISOString())
+        .lte('hora_utc', finMesAnterior.toISOString())
+
+      if (e3) { logError(e3, 'usePrecioPool-mes-ant'); throw e3 }
+
+      const avg = (rows: { valor: number }[] | null) => {
+        if (!rows || rows.length === 0) return null
+        return rows.reduce((s, r) => s + r.valor, 0) / rows.length
+      }
+
+      return {
+        hoy_eur_mwh:          avg(hoyData as { valor: number }[]),
+        mes_eur_mwh:          avg(mesData as { valor: number }[]),
+        mes_anterior_eur_mwh: avg(mesAntData as { valor: number }[]),
+        ultima_hora:          hoyData?.[0]?.hora_utc ?? null,
+      }
+    },
+  })
+}
