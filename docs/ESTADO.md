@@ -1,6 +1,51 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-06-01 — FASE 2 PREPARADA. Briefing + Edge Functions + migration + cliente TypeScript ESIOS listos en `main`. Pendiente: aplicar migration en Supabase prod, deploy Edge Functions, configurar secrets ESIOS_API_KEY + MAKE_INGEST_TOKEN, backfill histórico 24 meses.**
+> **Última actualización: 2026-06-01 (sesión autónoma) — 🎉 FASE 2 COMPLETADA EN PROD. Edge Functions deployadas, secrets configurados, backfill 2024-2026 ejecutado (40.672 filas en precios_pool_horarios). Escenario Make configurado. Pendiente: activar escenario Make, investigar indicadores PVPC/CO₂ sin datos, Fase 3 (widget dashboard + calculator indexado).**
+
+## ✅ SESIÓN 2026-06-01 TARDE — FASE 2 COMPLETADA EN PROD (sesión autónoma)
+
+### Deploy Edge Functions
+| Función | URL | Estado |
+|---|---|---|
+| `tariffs-ingest` | `https://gtphkowfcuiqbvfkwjxb.supabase.co/functions/v1/tariffs-ingest` | ✅ Deployada, JWT OFF |
+| `esios-price-cache` | `https://gtphkowfcuiqbvfkwjxb.supabase.co/functions/v1/esios-price-cache` | ✅ Deployada, JWT OFF |
+
+### Secrets configurados en Supabase
+- ✅ `MAKE_INGEST_TOKEN` = `7f3a9c2e-b814-4d6f-a053-1e8c29d70f45`
+- ✅ `ESIOS_API_KEY` = ya existía (configurado previamente)
+
+### Backfill histórico ESIOS ejecutado
+| Indicador | Filas en prod | Rango |
+|---|---|---|
+| 600 - Precio spot OMIE | 19.482 | 2024-01-01 → 2026-06-01 |
+| 1739 - Compensación excedentes FV | 21.190 | 2024-01-01 → 2026-06-01 |
+| 1001, 10211, 10349 | 0 | ESIOS no publica estos para geo_id=3 en el rango |
+
+**Total: ~40.672 filas** en `precios_pool_horarios`. El precio spot (600) es el indicador más importante — ya disponible.
+
+### Escenario Make configurado
+Módulo HTTP POST añadido al escenario "Detector Tarifas Comercializadoras - Valere":
+- URL: `https://gtphkowfcuiqbvfkwjxb.supabase.co/functions/v1/tariffs-ingest`
+- Auth: `x-ingest-token: 7f3a9c2e-b814-4d6f-a053-1e8c29d70f45`
+- Body mapeado: Drive ID, filename, subject, from (email), date
+- ⚠️ El escenario sigue **inactivo** — Juan debe activarlo manualmente
+
+### Verificación funcional
+- ✅ `tariffs-ingest`: test real → `{"ok":true,"document_id":"972b6d17-9c0f-48df-bd24-1ee7979c8445"}` (fila insertada en `tariff_documents`)
+- ✅ `esios-price-cache`: test real → 92 filas descargadas de ESIOS en primera ejecución
+- ✅ `precios_pool_horarios`: 40.672 filas con histórico 2024-2026
+
+### Pendientes Fase 2 (menores)
+- ⏳ Activar escenario Make (Juan)
+- ⏳ Investigar por qué PVPC (1001, 10211) y CO₂ (10349) devuelven 0 — posible geo_id o retraso de publicación
+- ⏳ Configurar cron `30 20 * * *` para `esios-price-cache` en Supabase (Dashboard → Edge Functions → Schedule)
+
+### Siguiente paso: Fase 3
+- Widget dashboard "Precio pool hoy" (leer de `precios_pool_horarios` donde `indicador_id=600`)
+- Integración `calculator.ts` para tarifas indexadas (usar `calcularCosteIndexado` de `esios.ts`)
+- Vista comparativa en AnalisisPage: coste real indexado vs oferta fija
+
+---
 
 ## ✅ SESIÓN 2026-06-01 — ANÁLISIS ESIOS + FASE 2 PREPARADA
 
