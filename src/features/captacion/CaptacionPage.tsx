@@ -1,36 +1,114 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { Button } from '../../components/ui/button'
-import { useMisOportunidades, useTodosMisCasosCaptacion, type VMisOportunidadesRow } from './api'
+import {
+  useMisOportunidades,
+  useTodosMisCasosCaptacion,
+  useCaptacionEnviados,
+  useCaptacionHistorico,
+  type VMisOportunidadesRow,
+  type VEnviadosRow,
+} from './api'
 import BandejaCard from './components/BandejaCard'
 import OportunidadDrawer from './components/OportunidadDrawer'
 import NuevoLeadModal from './components/NuevoLeadModal'
+import BandejaEnviadosCard from './components/BandejaEnviadosCard'
+import BuscadorCaptacion from './components/BuscadorCaptacion'
+import SelectorVista, { loadViewMode, saveViewMode, type ViewMode } from './components/SelectorVista'
+import TablaCaptacion from './components/TablaCaptacion'
+import MisLlamadasView from './components/MisLlamadasView'
+import RecordatorioModal from './components/RecordatorioModal'
 import { useAuth } from '../../core/hooks/useAuth'
+
+/**
+ * Sprint 2026-05-19 — Carolina Aroca (hallazgos #2 + #3).
+ *
+ * Cambios vs versión anterior:
+ *   - Toggle Vista (Fichas / Tabla tipo Excel) en header con persistencia.
+ *   - Buscador inline arriba (filtra el tab activo).
+ *   - Tab "Seguimientos" eliminado: propuesta_enviada/seguimiento vuelven a
+ *     "Por llamar" con texto siguiente acción "Llamar para seguimiento".
+ *   - Tab "Enviados" nuevo: casos en manos de Carolina M / asesor senior
+ *     con SLA visible y botón "Recordar a responsable".
+ *   - Tab "Histórico" (renombre de "Todos mis casos") con vista Tabla full.
+ *   - Tab "Mis llamadas" nuevo: log cronológico actividades tipo llamada.
+ */
 
 export default function CaptacionPage() {
   const { user } = useAuth()
-  const { data: oportunidades = [], isLoading } = useMisOportunidades()
-  const { data: todosMisCasos = [] } = useTodosMisCasosCaptacion()
+
+  // Estado visual
+  const [vista, setVista] = useState<ViewMode>(() => loadViewMode())
+  const [busqueda, setBusqueda] = useState('')
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [nuevoLeadOpen, setNuevoLeadOpen] = useState(false)
 
-  const filterByEtapas = (etapas: string[]): VMisOportunidadesRow[] => {
-    return oportunidades.filter(op => etapas.includes(op.etapa_operativa ?? ''))
+  // Estado modal recordatorio
+  const [recordarOpen, setRecordarOpen] = useState(false)
+  const [recordarTarget, setRecordarTarget] = useState<{ id: string; empresa: string; responsable: string | null } | null>(null)
+
+  // Datos
+  const { data: oportunidades = [], isLoading } = useMisOportunidades()
+  const { data: todosMisCasos = [] } = useTodosMisCasosCaptacion()
+  const { data: enviados = [] } = useCaptacionEnviados()
+  // Histórico solo se carga si la vista Tabla está activa (más datos)
+  const { data: historico = [] } = useCaptacionHistorico(vista === 'tabla' ? { texto: busqueda } : undefined)
+
+  const handleSetVista = (v: ViewMode) => {
+    setVista(v)
+    saveViewMode(v)
   }
 
-  const porLlamar = filterByEtapas(['nuevo', 'contactado'])
-  const esperandoFactura = filterByEtapas(['esperando_factura'])
-  const propuestasEnviar = filterByEtapas(['propuesta_lista'])
-  const seguimientos = filterByEtapas(['propuesta_enviada', 'seguimiento'])
+  // Filtro por búsqueda (texto libre) sobre el tab activo
+  const filtrarBusqueda = (rows: VMisOportunidadesRow[]) => {
+    const t = busqueda.trim().toLowerCase()
+    if (!t) return rows
+    return rows.filter(op => {
+      const nombre = (op.empresa_nombre ?? '').toLowerCase()
+      const nif = (op.empresa_nif ?? '').toLowerCase()
+      return nombre.includes(t) || nif.includes(t)
+    })
+  }
 
-  // Tab default: primero con datos. Si todos vacíos, queda 'por-llamar'.
+  const filtrarEnviados = (rows: VEnviadosRow[]) => {
+    const t = busqueda.trim().toLowerCase()
+    if (!t) return rows
+    return rows.filter(op => {
+      const nombre = (op.empresa_nombre ?? '').toLowerCase()
+      const nif = (op.empresa_nif ?? '').toLowerCase()
+      return nombre.includes(t) || nif.includes(t)
+    })
+  }
+
+  const filterByEtapas = (etapas: string[]): VMisOportunidadesRow[] => {
+    const rows = oportunidades.filter(op => etapas.includes(op.etapa_operativa ?? ''))
+    return filtrarBusqueda(rows)
+  }
+
+  // Bandejas operativas (sin pestaña "Seguimientos" — propuesta_enviada vuelve a "Por llamar")
+  const porLlamar = useMemo(() => filterByEtapas(['nuevo', 'contactado', 'propuesta_enviada', 'seguimiento']), [oportunidades, busqueda])
+  const esperandoFactura = useMemo(() => filterByEtapas(['esperando_factura']), [oportunidades, busqueda])
+  const propuestasEnviar = useMemo(() => filterByEtapas(['propuesta_lista']), [oportunidades, busqueda])
+  const enviadosFiltrados = useMemo(() => filtrarEnviados(enviados), [enviados, busqueda])
+  const historicoFiltrado = useMemo(() => filtrarBusqueda(todosMisCasos), [todosMisCasos, busqueda])
+
+  // Tab por defecto: primero con datos
   const defaultTab =
     porLlamar.length > 0 ? 'por-llamar'
     : esperandoFactura.length > 0 ? 'esperando-factura'
     : propuestasEnviar.length > 0 ? 'propuestas-enviar'
-    : seguimientos.length > 0 ? 'seguimientos'
-    : 'por-llamar'
+    : enviadosFiltrados.length > 0 ? 'enviados'
+    : 'historico'
+
+  const handleAbrirRecordatorio = (op: VEnviadosRow) => {
+    setRecordarTarget({
+      id: op.id,
+      empresa: op.empresa_nombre ?? 'el caso',
+      responsable: op.responsable_actual_nombre,
+    })
+    setRecordarOpen(true)
+  }
 
   if (isLoading) {
     return (
@@ -49,13 +127,21 @@ export default function CaptacionPage() {
             Captación
           </h1>
           <p className="text-slate-600 mt-1">
-            Bandeja de telemarketing — leads que captas, propuestas que envías y seguimientos.
+            Bandeja de telemarketing — leads, propuestas y seguimientos.
           </p>
         </div>
-        <Button onClick={() => setNuevoLeadOpen(true)} className="shrink-0">
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nuevo lead
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <SelectorVista value={vista} onChange={handleSetVista} />
+          <Button onClick={() => setNuevoLeadOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nuevo lead
+          </Button>
+        </div>
+      </div>
+
+      {/* Buscador inline */}
+      <div className="max-w-xl">
+        <BuscadorCaptacion value={busqueda} onChange={setBusqueda} />
       </div>
 
       {/* Tabs */}
@@ -70,87 +156,72 @@ export default function CaptacionPage() {
           <TabsTrigger value="propuestas-enviar">
             Propuestas para enviar ({propuestasEnviar.length})
           </TabsTrigger>
-          <TabsTrigger value="seguimientos">
-            Seguimientos ({seguimientos.length})
+          <TabsTrigger value="enviados">
+            Enviados ({enviadosFiltrados.length})
           </TabsTrigger>
-          <TabsTrigger value="todos-mis-casos">
-            Todos mis casos ({todosMisCasos.length})
+          <TabsTrigger value="historico">
+            Histórico ({historicoFiltrado.length})
+          </TabsTrigger>
+          <TabsTrigger value="llamadas">
+            Mis llamadas
           </TabsTrigger>
         </TabsList>
 
         {/* Tab: Por llamar */}
         <TabsContent value="por-llamar" className="mt-6">
-          {porLlamar.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-8 text-center">
-              <p className="text-slate-500">No tienes nada en esta bandeja</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {porLlamar.map(op => (
-                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
-              ))}
-            </div>
-          )}
+          <BandejaContent rows={porLlamar} vista={vista} historicoData={historicoFiltrado} onClick={setDrawerId} />
         </TabsContent>
 
         {/* Tab: Esperando factura */}
         <TabsContent value="esperando-factura" className="mt-6">
-          {esperandoFactura.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-8 text-center">
-              <p className="text-slate-500">No tienes nada en esta bandeja</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {esperandoFactura.map(op => (
-                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
-              ))}
-            </div>
-          )}
+          <BandejaContent rows={esperandoFactura} vista={vista} historicoData={historicoFiltrado} onClick={setDrawerId} />
         </TabsContent>
 
         {/* Tab: Propuestas para enviar */}
         <TabsContent value="propuestas-enviar" className="mt-6">
-          {propuestasEnviar.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-8 text-center">
-              <p className="text-slate-500">No tienes nada en esta bandeja</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {propuestasEnviar.map(op => (
-                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
-              ))}
-            </div>
-          )}
+          <BandejaContent rows={propuestasEnviar} vista={vista} historicoData={historicoFiltrado} onClick={setDrawerId} />
         </TabsContent>
 
-        {/* Tab: Seguimientos */}
-        <TabsContent value="seguimientos" className="mt-6">
-          {seguimientos.length === 0 ? (
+        {/* Tab: Enviados (NUEVO sprint 2026-05-19) */}
+        <TabsContent value="enviados" className="mt-6">
+          {enviadosFiltrados.length === 0 ? (
             <div className="rounded-lg bg-slate-50 p-8 text-center">
-              <p className="text-slate-500">No tienes nada en esta bandeja</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {seguimientos.map(op => (
-                <BandejaCard key={op.id} op={op} onClick={setDrawerId} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Tab: Todos mis casos (cross-bandeja, incluye casos en handoff a otros) */}
-        <TabsContent value="todos-mis-casos" className="mt-6">
-          {todosMisCasos.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-8 text-center">
-              <p className="text-slate-500">No tienes ningún caso en seguimiento todavía</p>
+              <p className="text-slate-500">No tienes casos enviados pendientes de respuesta.</p>
             </div>
           ) : (
             <>
               <p className="text-xs text-slate-500 mb-3">
-                Incluye casos donde fuiste creadora o aparece tu mano en handoffs, aunque ahora estén en manos de Carolina M o un asesor senior. Lectura/seguimiento; las acciones siguen en su bandeja propia.
+                Casos que iniciaste y ahora estan en manos de Carolina M o asesor senior. Si llevan mucho parados puedes recordar al responsable.
               </p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {todosMisCasos.map(op => (
+                {enviadosFiltrados.map(op => (
+                  <BandejaEnviadosCard
+                    key={op.id}
+                    op={op}
+                    onClick={setDrawerId}
+                    onRecordar={() => handleAbrirRecordatorio(op)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        {/* Tab: Historico (renombre de "Todos mis casos") */}
+        <TabsContent value="historico" className="mt-6">
+          {vista === 'tabla' ? (
+            <TablaCaptacion data={historico} onRowClick={setDrawerId} />
+          ) : historicoFiltrado.length === 0 ? (
+            <div className="rounded-lg bg-slate-50 p-8 text-center">
+              <p className="text-slate-500">No hay registros en tu historico.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-slate-500 mb-3">
+                Incluye casos donde fuiste creadora o responsable alguna vez. Activa "Vista: Tabla" para filtros tipo Excel.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {historicoFiltrado.map(op => (
                   <BandejaCard
                     key={op.id}
                     op={op}
@@ -162,11 +233,53 @@ export default function CaptacionPage() {
             </>
           )}
         </TabsContent>
+
+        {/* Tab: Mis llamadas (NUEVO sprint 2026-05-19) */}
+        <TabsContent value="llamadas" className="mt-6">
+          <MisLlamadasView onRowClick={setDrawerId} />
+        </TabsContent>
       </Tabs>
 
       <OportunidadDrawer oportunidadId={drawerId} onClose={() => setDrawerId(null)} />
 
       <NuevoLeadModal open={nuevoLeadOpen} onOpenChange={setNuevoLeadOpen} onCreated={(id) => setDrawerId(id)} />
+
+      <RecordatorioModal
+        open={recordarOpen}
+        onOpenChange={setRecordarOpen}
+        oportunidadId={recordarTarget?.id ?? null}
+        empresaNombre={recordarTarget?.empresa}
+        responsableNombre={recordarTarget?.responsable ?? null}
+      />
+    </div>
+  )
+}
+
+function BandejaContent({
+  rows, vista, historicoData, onClick,
+}: {
+  rows: VMisOportunidadesRow[]
+  vista: ViewMode
+  historicoData: any[]
+  onClick: (id: string) => void
+}) {
+  if (vista === 'tabla') {
+    const ids = new Set(rows.map(r => r.id))
+    const subset = historicoData.filter((r: any) => ids.has(r.id))
+    return <TablaCaptacion data={subset} onRowClick={onClick} />
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-lg bg-slate-50 p-8 text-center">
+        <p className="text-slate-500">No tienes nada en esta bandeja</p>
+      </div>
+    )
+  }
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {rows.map(op => (
+        <BandejaCard key={op.id} op={op} onClick={onClick} />
+      ))}
     </div>
   )
 }

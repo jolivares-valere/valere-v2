@@ -1056,3 +1056,5 @@ export function useEditarCampoEmpresa() {
   })
 }
 
+
+export { useRecordarAResponsable } from './useRecordarAResponsable'
