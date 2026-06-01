@@ -71,13 +71,13 @@ const COLORS: Record<ChipKey, string> = {
 
 const LABELS: Record<ChipKey, string> = {
   todos: 'Todos',
-  activos: '🟢 Activos',
-  ganados: '✅ Ganados',
-  perdidos: '❌ Perdidos',
-  mios: '👤 Míos',
-  equipo: '👥 Equipo',
-  vence_30d: '🟠 Vencen <30d',
-  vencidos: '🔴 Vencidos',
+  activos: 'Activos',
+  ganados: 'Ganados',
+  perdidos: 'Perdidos',
+  mios: 'Mios',
+  equipo: 'Equipo',
+  vence_30d: 'Vencen <30d',
+  vencidos: 'Vencidos',
 }
 
 export default function ChipsFiltros({ data, userId, activos, onToggle, onMoreFilters }: Props) {

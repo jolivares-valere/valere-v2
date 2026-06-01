@@ -148,17 +148,17 @@ export default function TablaCaptacion({ data, onRowClick }: Props) {
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full table-fixed border-collapse text-xs">
+        <table className="border-collapse text-xs" style={{ minWidth: '900px', width: '100%' }}>
           <colgroup>
-            <col className="w-[5%]" />
-            <col className="w-[18%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
-            <col className="w-[13%]" />
-            <col className="w-[11%]" />
-            <col className="w-[10%]" />
-            <col className="w-[10%]" />
-            <col className="w-[11%]" />
+            <col style={{ width: '40px' }} />
+            <col style={{ minWidth: '180px' }} />
+            <col style={{ minWidth: '120px' }} />
+            <col style={{ minWidth: '110px' }} />
+            <col style={{ minWidth: '120px' }} />
+            <col style={{ minWidth: '90px' }} />
+            <col style={{ minWidth: '110px' }} />
+            <col style={{ minWidth: '90px' }} />
+            <col style={{ minWidth: '80px' }} />
           </colgroup>
           <thead className="bg-slate-50 text-slate-600">
             <tr>

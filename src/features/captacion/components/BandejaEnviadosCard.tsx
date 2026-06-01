@@ -51,17 +51,17 @@ export default function BandejaEnviadosCard({ op, onClick, onRecordar }: Props) 
       tabIndex={0}
       className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-valere-blue-dark"
     >
-      {/* Nombre empresa */}
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="font-semibold text-slate-900 truncate">
+      {/* Nombre empresa + badge destinatario */}
+      <div className="mb-2 min-w-0">
+        <p className="font-semibold text-slate-900 truncate mb-1">
           {op.empresa_nombre ?? 'Sin empresa'}
         </p>
         <span
-          className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${destinatario.color}`}
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${destinatario.color}`}
           title={op.responsable_actual_nombre ?? undefined}
         >
           <ArrowRight className="h-2.5 w-2.5 mr-0.5" />
-          {op.tipo_destinatario === 'senior' ? 'Senior' : op.tipo_destinatario === 'analista' ? 'Análisis' : 'Otro'}
+          {op.tipo_destinatario === 'senior' ? 'Asesor senior' : op.tipo_destinatario === 'analista' ? 'Análisis' : 'Otro'}
         </span>
       </div>
 

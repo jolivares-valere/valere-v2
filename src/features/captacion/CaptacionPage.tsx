@@ -188,6 +188,16 @@ export default function CaptacionPage() {
             <div className="rounded-lg bg-slate-50 p-8 text-center">
               <p className="text-slate-500">No tienes casos enviados pendientes de respuesta.</p>
             </div>
+          ) : vista === 'tabla' ? (
+            <>
+              <p className="text-xs text-slate-500 mb-3">
+                Vista tabla: casos enviados a Carolina M / asesor senior con SLA y dias sin movimiento.
+              </p>
+              <TablaCaptacion
+                data={historico.filter((r: any) => enviadosFiltrados.some(e => e.id === r.id))}
+                onRowClick={setDrawerId}
+              />
+            </>
           ) : (
             <>
               <p className="text-xs text-slate-500 mb-3">
