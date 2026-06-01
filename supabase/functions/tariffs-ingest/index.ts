@@ -42,13 +42,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 interface IngestPayload {
   drive_file_id:    string     // ID del archivo en Google Drive
-  filename:         string     // Nombre original del adjunto
+  filename:         string     // Nombre original del adjunto → columna file_name
   comercializadora?: string    // Nombre de la comercializadora (puede venir vacío)
-  email_subject?:   string     // Asunto del email de origen
-  email_from?:      string     // Remitente del email
-  email_date?:      string     // Fecha del email (ISO8601)
+  email_subject?:   string     // Asunto del email → columna subject
+  email_from?:      string     // Remitente del email → columna sender_email
+  email_date?:      string     // Fecha del email (ISO8601) → columna received_at
   sha256?:          string     // Hash SHA256 del archivo (para dedup)
-  notas?:           string     // Campo libre para Make
+  notas?:           string     // Campo libre para Make → columna notes
 }
 
 // ── Handler ────────────────────────────────────────────────────────
@@ -108,6 +108,12 @@ serve(async (req) => {
     )
   }
 
+  // Normalizar: Make puede enviar drive_url completa en lugar de solo el ID
+  // "https://drive.google.com/file/d/{id}/view" → extraer el ID
+  let driveFileId = payload.drive_file_id
+  const driveMatch = driveFileId.match(/\/d\/([^/]+)/)
+  if (driveMatch) driveFileId = driveMatch[1]
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   })
@@ -116,38 +122,45 @@ serve(async (req) => {
   if (payload.sha256) {
     const { data: existing } = await supabase
       .from('tariff_documents')
-      .select('id, filename, created_at')
+      .select('id, file_name, created_at')
       .eq('sha256', payload.sha256)
       .maybeSingle()
 
     if (existing) {
-      console.log(`[tariffs-ingest] Documento duplicado detectado: ${existing.id} (sha256: ${payload.sha256})`)
+      console.log(`[tariffs-ingest] Duplicado detectado: ${existing.id} (sha256: ${payload.sha256})`)
       return new Response(
         JSON.stringify({
           ok: true,
           duplicado: true,
           document_id: existing.id,
-          mensaje: `Documento ya registrado (${existing.filename}, ${existing.created_at})`,
+          mensaje: `Documento ya registrado (${existing.file_name}, ${existing.created_at})`,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     }
   }
 
-  // Insertar en tariff_documents
-  // Nota: la tabla tariff_documents fue creada en FASE 1 (migration 03/09)
+  // Insertar en tariff_documents (schema definido en migration 03/09 de Fase 1)
+  // Mapeo de campos Make → columnas reales:
+  //   filename      → file_name
+  //   email_subject → subject
+  //   email_from    → sender_email
+  //   email_date    → received_at
+  //   notas         → notes
+  //   source        → 'gmail_make' (valor del check constraint)
+  //   status        → 'received' (primer estado del check constraint)
   const { data: doc, error } = await supabase
     .from('tariff_documents')
     .insert({
-      drive_file_id:    payload.drive_file_id,
-      filename:         payload.filename,
-      comercializadora: payload.comercializadora ?? null,
-      email_subject:    payload.email_subject ?? null,
-      email_from:       payload.email_from ?? null,
-      email_date:       payload.email_date ?? null,
-      sha256:           payload.sha256 ?? null,
-      notas:            payload.notas ?? null,
-      status:           'pendiente',   // Estado inicial: pendiente de extracción
+      source:        'gmail_make',
+      drive_file_id: driveFileId,
+      file_name:     payload.filename,
+      subject:       payload.email_subject ?? null,
+      sender_email:  payload.email_from ?? null,
+      received_at:   payload.email_date ?? new Date().toISOString(),
+      sha256:        payload.sha256 ?? null,
+      notes:         payload.notas ?? null,
+      status:        'received',
     })
     .select('id')
     .single()

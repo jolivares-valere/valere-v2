@@ -1,6 +1,56 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-28 (cierre tarde) — 🎉 FASE 1 MERGEADA A MAIN. PR #10 squashed-mergeado tras: 9 migraciones SQL aplicadas en Supabase prod + verificación final (1 RPC + 5 tablas confirmadas) + aprobación explícita de ChatGPT. Bloque 1 + Fase 1 ya forman parte de `main`. Siguiente: BRIEFING_FASE2_TARIFFS_INGEST.md para Edge Function de ingesta desde Make.**
+> **Última actualización: 2026-06-01 — FASE 2 PREPARADA. Briefing + Edge Functions + migration + cliente TypeScript ESIOS listos en `main`. Pendiente: aplicar migration en Supabase prod, deploy Edge Functions, configurar secrets ESIOS_API_KEY + MAKE_INGEST_TOKEN, backfill histórico 24 meses.**
+
+## ✅ SESIÓN 2026-06-01 — ANÁLISIS ESIOS + FASE 2 PREPARADA
+
+### Token ESIOS recibido
+Juan tiene token personal de ESIOS (REE). Análisis técnico completo en `docs/ANALISIS_ESIOS_INTEGRACION.md`.
+
+### Archivos creados en esta sesión
+
+| Archivo | Descripción |
+|---|---|
+| `docs/ANALISIS_ESIOS_INTEGRACION.md` | Análisis técnico completo: indicadores, arquitectura, plan de integración |
+| `docs/BRIEFING_FASE2_TARIFFS_INGEST.md` | Instrucciones paso a paso para Claude Code |
+| `supabase/migrations/20260601_esios_precios_pool.sql` | Tabla `precios_pool_horarios` con RLS — **pendiente aplicar en prod** |
+| `supabase/functions/esios-price-cache/index.ts` | Cron nightly que cachea precios ESIOS en Supabase |
+| `supabase/functions/tariffs-ingest/index.ts` | Endpoint para Make (ingesta de tarifas por email) |
+| `src/core/services/esios.ts` | Cliente TypeScript ESIOS con tipos, constantes y `calcularCosteIndexado()` |
+
+### Estado Fase 2 — checklist
+
+- ✅ Briefing redactado (`docs/BRIEFING_FASE2_TARIFFS_INGEST.md`)
+- ✅ Migration SQL lista (`supabase/migrations/20260601_esios_precios_pool.sql`)
+- ✅ Edge Function `esios-price-cache` escrita (cron nightly, 5 indicadores, upsert por lotes)
+- ✅ Edge Function `tariffs-ingest` escrita (auth token, dedup SHA256, mapeo correcto a schema real)
+- ✅ Cliente TypeScript `src/core/services/esios.ts` (tipos, constantes, `calcularCosteIndexado`)
+- ✅ TSC 0 errores verificado
+- ⏳ Aplicar migration `20260601_esios_precios_pool.sql` en Supabase prod
+- ⏳ Deploy `tariffs-ingest` en Supabase Edge Functions
+- ⏳ Deploy `esios-price-cache` en Supabase Edge Functions
+- ⏳ Configurar secret `ESIOS_API_KEY` en Supabase
+- ⏳ Configurar secret `MAKE_INGEST_TOKEN` en Supabase (generar UUID aleatorio)
+- ⏳ Configurar cron `30 20 * * *` para `esios-price-cache`
+- ⏳ Backfill histórico 24 meses (2024-01-01 → 2025-12-31) — curl manual POST a la Edge Function
+- ⏳ Configurar Make para llamar a `tariffs-ingest` con el token
+
+### Indicadores ESIOS que se cachean
+
+| ID | Nombre | Unidad |
+|---|---|---|
+| 600 | Precio mercado spot OMIE | €/MWh |
+| 1001 | PVPC término energía 2.0TD | €/kWh |
+| 10211 | PVPC precio total 2.0TD | €/kWh |
+| 1739 | Compensación excedentes FV | €/kWh |
+| 10349 | Factor emisiones CO₂ | gCO₂/kWh |
+
+### Próximos pasos (Fase 3, tras deploy Fase 2)
+- Widget dashboard "Precio pool hoy" (leer de `precios_pool_horarios`)
+- Integración `calculator.ts` para tarifas indexadas (usar `calcularCosteIndexado`)
+- Vista comparativa en AnalisisPage: coste real indexado vs oferta fija
+
+---
 >
 > ## ✅ SESIÓN 2026-05-28 — FASE 1 APLICADA EN PROD + MERGE A MAIN
 >
