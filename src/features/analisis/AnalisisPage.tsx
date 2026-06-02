@@ -9,6 +9,7 @@ import StatCard from '@/core/components/StatCard';
 import EmptyState from '@/core/components/EmptyState';
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery';
 import { calculateSimulatedInvoice, distributeConsumption } from '@/core/energia/calculator';
+import { usePoolPrecioMedio } from '@/core/hooks/usePoolPrecioMedio';
 import { cupsToSupplyPoint } from '@/core/energia/adapters';
 import { formatEur, formatPct, safeNum } from '@/core/utils/format';
 import { getTariffConfig } from '@/core/energia/tariffs';
@@ -64,6 +65,19 @@ export default function Analysis() {
   });
 
   const selectedSP = supplyPoints.find(sp => sp.id === selectedSPId) || null;
+
+  // Rango de fechas para precio pool — basado en el min/max de las facturas cargadas
+  const poolFechaInicio = invoices.length > 0
+    ? `${Math.min(...invoices.map(i => i.year))}-${String(Math.min(...invoices.filter(i => i.year === Math.min(...invoices.map(iv => iv.year))).map(i => i.month))).padStart(2, '0')}-01`
+    : null
+  const poolFechaFin = invoices.length > 0
+    ? `${Math.max(...invoices.map(i => i.year))}-${String(Math.max(...invoices.filter(i => i.year === Math.max(...invoices.map(iv => iv.year))).map(i => i.month))).padStart(2, '0')}-28`
+    : null
+  const { precioMedioEurKwh: poolPrecioMedio } = usePoolPrecioMedio(
+    poolFechaInicio,
+    poolFechaFin,
+    invoices.length > 0
+  )
 
   // === VALIDATION CHECKS ===
   const validationChecks = useMemo(() => {
@@ -195,7 +209,7 @@ export default function Analysis() {
       // For each offer, simulate all invoices and sum annual cost
       const compResults: ComparisonResult[] = [];
 
-      for (const offer of (offers as RetailerOfferWithName[])) {
+      for (const offer of (offers as unknown as RetailerOfferWithName[])) {
         let annualCost = 0;
 
         for (const inv of invoices) {
@@ -211,6 +225,7 @@ export default function Analysis() {
             offer,
             boePrices: (boePrices || []) as BoeRegulatedPrice[],
             globalConfig,
+            poolPrecioMedioEurKwh: poolPrecioMedio ?? undefined,
           });
 
           annualCost += result.total_eur;

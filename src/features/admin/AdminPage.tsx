@@ -366,6 +366,8 @@ function OffersTab() {
       include_in_comparison: true,
       show_tolls_separately: false,
       notes: '',
+      price_type: 'fijo' as const,
+      spread_eur_kwh: 0,
     };
   };
 
@@ -405,6 +407,8 @@ function OffersTab() {
       include_in_comparison: o.include_in_comparison ?? true,
       show_tolls_separately: o.show_tolls_separately ?? false,
       notes: o.notes ?? '',
+      price_type: (o.price_type ?? 'fijo') as 'fijo' | 'indexado',
+      spread_eur_kwh: o.spread_eur_kwh ?? 0,
     });
     setIsEditing(true);
     setEditingId(o.id);
@@ -598,6 +602,30 @@ function OffersTab() {
                 Comparar
               </label>
             </div>
+            <div>
+              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Tipo de precio</label>
+              <select
+                value={form.price_type}
+                onChange={e => setForm((p) => ({ ...p, price_type: e.target.value as 'fijo' | 'indexado' }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              >
+                <option value="fijo">Precio fijo por periodo</option>
+                <option value="indexado">Indexado al pool OMIE</option>
+              </select>
+            </div>
+            {form.price_type === 'indexado' && (
+              <div>
+                <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Spread sobre pool (EUR/kWh)</label>
+                <input
+                  type="number" step="0.0001"
+                  value={form.spread_eur_kwh}
+                  onChange={e => setForm((p) => ({ ...p, spread_eur_kwh: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                  placeholder="Ej: 0.0050"
+                />
+                <p className="text-[11px] text-valere-ink/40 mt-1">Margen de la comercializadora sobre el precio spot diario</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <button onClick={() => setDialogOpen(false)} className="px-4 py-2 text-sm text-valere-ink/60">Cancelar</button>

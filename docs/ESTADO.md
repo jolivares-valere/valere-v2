@@ -1,6 +1,27 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-05-19 — Sprint Carolina (hallazgos #2 + #3 vista tabla Captación). Backend en prod (3 vistas + 3 RPCs + Edge Function recordatorio). Frontend hooks+componentes base en disco. TSC verde tras limpiar PrecioPoolCard preexistente. Pendiente próxima sesión: integración CaptacionPage + tab Mis llamadas.**
+> **Última actualización: 2026-06-02 — Fase 3 tarifas indexadas. Migration en prod (price_type + spread_eur_kwh en comercializadora_ofertas). Motor de cálculo soporta indexado (pool promedio + spread). Hook usePoolPrecioMedio. UI formulario ofertas actualizada. TSC 0 errores.**
+
+## ✅ SESIÓN 2026-06-02 — FASE 3: TARIFAS INDEXADAS
+
+### Qué se hizo
+| Artefacto | Cambio |
+|---|---|
+| `supabase/migrations/20260602_retailer_offers_indexado.sql` | Nuevos campos `price_type` + `spread_eur_kwh` en `comercializadora_ofertas`. Vista `retailer_offers` actualizada. |
+| `src/types/database.ts` | `RetailerOffer` con `price_type` y `spread_eur_kwh` |
+| `src/core/energia/calculator.ts` | `SimulationParams.poolPrecioMedioEurKwh` + rama indexada en `calculateSimulatedInvoice` |
+| `src/core/hooks/usePoolPrecioMedio.ts` | Hook nuevo: consulta `precios_pool_horarios` (indicador 600) y devuelve precio medio EUR/kWh para un rango |
+| `src/features/analisis/AnalisisPage.tsx` | Usa `usePoolPrecioMedio` y pasa el precio pool al motor de cálculo para ofertas indexadas |
+| `src/features/admin/AdminPage.tsx` | Formulario de ofertas con selector `fijo`/`indexado` y campo `spread_eur_kwh` |
+
+### Estado final
+- TSC: 0 errores
+- Commit pendiente: ejecutar PS1 de cierre desde PowerShell
+
+### Pendiente próxima sesión
+- Widget `PrecioPoolCard` en Dashboard (Fase 3 visual)
+- Tests para `usePoolPrecioMedio` y lógica indexada en calculator
+- Integración `CaptacionPage.tsx`: toggle Vista (Fichas/Tabla), tab Enviados, buscador inline (Sprint Carolina pendiente)
 
 ## ✅ SESIÓN 2026-05-19 — SPRINT CAROLINA (Hallazgos #2 + #3)
 

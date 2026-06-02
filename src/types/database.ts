@@ -96,6 +96,10 @@ export interface RetailerOffer {
   show_tolls_separately: boolean;
   notes: string;
   created_at: string;
+  /** 'fijo' = precios fijos por periodo; 'indexado' = precio pool OMIE + spread */
+  price_type: 'fijo' | 'indexado';
+  /** Margen de la comercializadora sobre precio pool en EUR/kWh (solo aplica si price_type='indexado') */
+  spread_eur_kwh: number;
 }
 
 export interface Proposal {

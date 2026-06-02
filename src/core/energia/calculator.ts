@@ -19,6 +19,12 @@ interface SimulationParams {
   offer: RetailerOffer | null;
   boePrices: BoeRegulatedPrice[];
   globalConfig: Record<string, number>;
+  /**
+   * Precio pool OMIE promedio del periodo de facturacion en EUR/kWh.
+   * Solo necesario si offer.price_type === 'indexado'.
+   * Se obtiene consultando precios_pool_horarios y promediando el indicador 600.
+   */
+  poolPrecioMedioEurKwh?: number;
 }
 
 /**
@@ -52,6 +58,12 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
   const batteryFeePerKwp = safeNum(offer?.battery_fee_per_kwp_eur);
   const tenderFeePct = safeNum(offer?.tender_fee_pct);
   const allowZeroInvoice = offer?.allow_zero_invoice ?? false;
+  const isIndexado = offer?.price_type === 'indexado';
+  const spreadEurKwh = safeNum(offer?.spread_eur_kwh);
+  // Precio energia indexado: pool promedio del periodo (EUR/kWh) + spread de la comercializadora
+  const precioIndexadoEurKwh = isIndexado
+    ? safeNum(params.poolPrecioMedioEurKwh) + spreadEurKwh
+    : 0;
 
   const DAYS_IN_YEAR = 365;
   const DAYS_IN_MONTH = 30;
@@ -98,7 +110,8 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
 
   for (let i = 0; i < tariffCfg.energia; i++) {
     const consumption = consumption_p[i];
-    const price = isSilver ? 0 : offerEnergyPrices[i];
+    // Precio por periodo: indexado (pool+spread uniforme), silver (0), o precio fijo de oferta
+    const price = isSilver ? 0 : isIndexado ? precioIndexadoEurKwh : offerEnergyPrices[i];
     const cost = consumption * price;
     free_energy_periods.push(cost);
     totalFreeEnergy += cost;
