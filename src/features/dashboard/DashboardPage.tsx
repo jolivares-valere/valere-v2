@@ -1,5 +1,5 @@
-﻿import { Link } from 'react-router-dom'
-import { Building2, FileText, Clock, AlertTriangle, TrendingUp, Percent, Timer, ChevronRight, Flame, User, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Building2, FileText, Clock, AlertTriangle, TrendingUp, Percent, Timer, ChevronRight, Flame, User, Users, Zap, TrendingDown } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 import {
   useDashboardKPIs,
@@ -10,6 +10,7 @@ import {
   useAlertasVencimiento,
   useOportunidadesEstancadas,
   useDashboardScope,
+  usePrecioPool,
   type AlertaVencimiento,
   type OportunidadEstancada,
 } from './api'
@@ -93,20 +94,20 @@ export default function DashboardPage() {
           </span>
           <div className="flex-1">
             <p className="text-sm font-semibold text-slate-900">
-              {resumenVenc.data.total} contrato{resumenVenc.data.total === 1 ? '' : 's'} próximo{resumenVenc.data.total === 1 ? '' : 's'} a vencer
+              {resumenVenc.data.total} contratos proximos a vencer
             </p>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-600">
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-2 w-2 rounded-full bg-red-600" />
-                <span className="font-medium text-red-700">{resumenVenc.data.criticas}</span> críticas (≤15 días)
+                <span className="font-medium text-red-700">{resumenVenc.data.criticas}</span> criticas
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-2 w-2 rounded-full bg-orange-500" />
-                <span className="font-medium text-orange-700">{resumenVenc.data.proximas}</span> próximas (≤30 días)
+                <span className="font-medium text-orange-700">{resumenVenc.data.proximas}</span> proximas
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                <span className="font-medium text-amber-700">{resumenVenc.data.futuras}</span> futuras (≤90 días)
+                <span className="font-medium text-amber-700">{resumenVenc.data.futuras}</span> futuras
               </span>
             </div>
           </div>
@@ -118,13 +119,13 @@ export default function DashboardPage() {
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPI icon={<Building2 className="h-5 w-5" />} label="Empresas" value={kpis.data?.empresas_activas} to="/empresas" />
         <KPI icon={<FileText className="h-5 w-5" />} label="Contratos activos" value={kpis.data?.contratos_activos} to="/contratos?estado=activo" />
-        <KPI icon={<Clock className="h-5 w-5" />} label="Vencen 30 días" value={kpis.data?.vencen_30d} to="/contratos" accent="orange" />
+        <KPI icon={<Clock className="h-5 w-5" />} label="Vencen 30 dias" value={kpis.data?.vencen_30d} to="/contratos" accent="orange" />
         <KPI icon={<TrendingUp className="h-5 w-5" />} label="Oportunidades abiertas" value={totalOps} to="/oportunidades" accent="blue" />
       </div>
 
-      {/* KPIs fila 2 — avanzados */}
+      {/* KPIs fila 2 */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPI icon={<Clock className="h-5 w-5" />} label="Vencen 90 días" value={kpisAv.data?.vencen_90d} to="/contratos" accent="amber" />
+        <KPI icon={<Clock className="h-5 w-5" />} label="Vencen 90 dias" value={kpisAv.data?.vencen_90d} to="/contratos" accent="amber" />
         <KPI icon={<AlertTriangle className="h-5 w-5" />} label="Contratos en incidencia" value={kpisAv.data?.contratos_incidencia} to="/contratos?estado=incidencia" accent="red" />
         <KPI icon={<Timer className="h-5 w-5" />} label="Oport. sin actividad 30d" value={kpisAv.data?.oportunidades_estancadas} to="/oportunidades" accent="orange" />
         <KPI
@@ -139,6 +140,9 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Widget precio pool OMIE */}
+      <PrecioPoolWidget />
+
       {/* Alertas accionables */}
       <section className="mb-8 rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
@@ -146,14 +150,8 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold text-slate-900">Alertas accionables</h2>
         </div>
         <div className="grid gap-0 lg:grid-cols-2">
-          <AlertasContratos
-            loading={alertasVenc.isLoading}
-            rows={alertasVenc.data ?? []}
-          />
-          <AlertasOportunidades
-            loading={opEstancadas.isLoading}
-            rows={opEstancadas.data ?? []}
-          />
+          <AlertasContratos loading={alertasVenc.isLoading} rows={alertasVenc.data ?? []} />
+          <AlertasOportunidades loading={opEstancadas.isLoading} rows={opEstancadas.data ?? []} />
         </div>
       </section>
 
@@ -168,7 +166,7 @@ export default function DashboardPage() {
             </span>
           )}
         </h2>
-        {opKPI.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+        {opKPI.isLoading && <p className="text-sm text-slate-500">Cargando...</p>}
         {!opKPI.isLoading && (opKPI.data?.length ?? 0) === 0 && (
           <p className="text-sm text-slate-500">No hay oportunidades abiertas.</p>
         )}
@@ -195,17 +193,17 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Fila inferior (huérfanos + tareas) */}
+      {/* Fila inferior */}
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <AlertTriangle className="h-4 w-4 text-orange-500" />
-            Contratos huérfanos
+            Contratos huerfanos
             <span className="ml-auto text-xs text-slate-500">{huerfanos.data?.length ?? 0}</span>
           </h2>
-          {huerfanos.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+          {huerfanos.isLoading && <p className="text-sm text-slate-500">Cargando...</p>}
           {!huerfanos.isLoading && (huerfanos.data?.length ?? 0) === 0 && (
-            <p className="text-sm text-slate-500">Sin contratos huérfanos.</p>
+            <p className="text-sm text-slate-500">Sin contratos huerfanos.</p>
           )}
           <ul className="divide-y divide-slate-100">
             {huerfanos.data?.map((h) => (
@@ -215,12 +213,10 @@ export default function DashboardPage() {
                     {h.empresa_nombre}
                   </Link>
                   <p className="text-xs text-slate-500">
-                    {h.numero_contrato ?? 'Sin nº'} · vence {formatDate(h.fecha_fin)} ({h.dias_para_vencimiento}d)
+                    {h.numero_contrato ?? 'Sin numero'} · vence {formatDate(h.fecha_fin)} ({h.dias_para_vencimiento}d)
                   </p>
                 </div>
-                <StatusBadge variant="alert" size="sm">
-                  {h.prioridad_renovacion}
-                </StatusBadge>
+                <StatusBadge variant="alert" size="sm">{h.prioridad_renovacion}</StatusBadge>
               </li>
             ))}
           </ul>
@@ -228,7 +224,7 @@ export default function DashboardPage() {
 
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-slate-900">Mis tareas pendientes</h2>
-          {tareas.isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+          {tareas.isLoading && <p className="text-sm text-slate-500">Cargando...</p>}
           {!tareas.isLoading && (tareas.data?.length ?? 0) === 0 && (
             <p className="text-sm text-slate-500">Sin tareas pendientes.</p>
           )}
@@ -248,14 +244,74 @@ export default function DashboardPage() {
   )
 }
 
+function PrecioPoolWidget() {
+  const { data, isLoading, isError } = usePrecioPool()
+
+  function fmtMWh(v: number | null | undefined): string {
+    if (v == null) return '—'
+    return v.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' EUR/MWh'
+  }
+
+  const tendencia =
+    data?.hoy_eur_mwh != null && data?.mes_anterior_eur_mwh != null
+      ? data.hoy_eur_mwh > data.mes_anterior_eur_mwh ? 'up'
+        : data.hoy_eur_mwh < data.mes_anterior_eur_mwh ? 'down'
+        : 'flat'
+      : null
+
+  return (
+    <section className="mb-8 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700">
+          <Zap className="h-4 w-4" />
+        </span>
+        <h2 className="text-sm font-semibold text-slate-900">Precio pool OMIE (spot)</h2>
+        {data?.ultima_hora && (
+          <span className="ml-auto text-xs text-slate-400">
+            Actualizado: {new Date(data.ultima_hora).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+          </span>
+        )}
+      </div>
+      {isLoading && <p className="text-sm text-slate-500">Cargando precios...</p>}
+      {isError && <p className="text-sm text-red-600">No se pudieron cargar los precios de OMIE.</p>}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Media hoy</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900">{fmtMWh(data?.hoy_eur_mwh)}</span>
+              {tendencia === 'up' && (
+                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600">
+                  <TrendingUp className="h-3.5 w-3.5" /> vs mes ant.
+                </span>
+              )}
+              {tendencia === 'down' && (
+                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-600">
+                  <TrendingDown className="h-3.5 w-3.5" /> vs mes ant.
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Media mes actual</span>
+            <span className="mt-1 text-2xl font-bold text-slate-900">{fmtMWh(data?.mes_eur_mwh)}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Media mes anterior</span>
+            <span className="mt-1 text-2xl font-bold text-slate-700">{fmtMWh(data?.mes_anterior_eur_mwh)}</span>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function AlertasContratos({ loading, rows }: { loading: boolean; rows: AlertaVencimiento[] }) {
   return (
     <div className="border-b border-slate-100 p-4 lg:border-b-0 lg:border-r">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contratos que vencen (90 días)</h3>
-      {loading && <p className="text-sm text-slate-500">Cargando…</p>}
-      {!loading && rows.length === 0 && (
-        <p className="text-sm text-slate-500">Sin alertas en este periodo.</p>
-      )}
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contratos que vencen (90 dias)</h3>
+      {loading && <p className="text-sm text-slate-500">Cargando...</p>}
+      {!loading && rows.length === 0 && <p className="text-sm text-slate-500">Sin alertas en este periodo.</p>}
       <ul className="divide-y divide-slate-100">
         {rows.map((r) => (
           <li key={r.id} className="flex items-center justify-between py-2.5 text-sm">
@@ -263,9 +319,7 @@ function AlertasContratos({ loading, rows }: { loading: boolean; rows: AlertaVen
               <Link to={`/contratos/${r.id}`} className="block truncate font-medium text-slate-900 hover:underline">
                 {r.empresa_nombre}
               </Link>
-              <p className="truncate text-xs text-slate-500">
-                {r.compania} · {formatDate(r.fecha_fin)}
-              </p>
+              <p className="truncate text-xs text-slate-500">{r.compania} · {formatDate(r.fecha_fin)}</p>
             </div>
             <span className={`ml-3 shrink-0 rounded px-2 py-0.5 text-xs font-medium ${colorDias(r.dias_restantes)}`}>
               {r.dias_restantes}d
@@ -283,11 +337,9 @@ function AlertasContratos({ loading, rows }: { loading: boolean; rows: AlertaVen
 function AlertasOportunidades({ loading, rows }: { loading: boolean; rows: OportunidadEstancada[] }) {
   return (
     <div className="p-4">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Oportunidades sin actividad (+30 días)</h3>
-      {loading && <p className="text-sm text-slate-500">Cargando…</p>}
-      {!loading && rows.length === 0 && (
-        <p className="text-sm text-slate-500">Sin alertas en este periodo.</p>
-      )}
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Oportunidades sin actividad (+30 dias)</h3>
+      {loading && <p className="text-sm text-slate-500">Cargando...</p>}
+      {!loading && rows.length === 0 && <p className="text-sm text-slate-500">Sin alertas en este periodo.</p>}
       <ul className="divide-y divide-slate-100">
         {rows.map((r) => (
           <li key={r.id} className="flex items-center justify-between py-2.5 text-sm">
@@ -295,9 +347,7 @@ function AlertasOportunidades({ loading, rows }: { loading: boolean; rows: Oport
               <Link to="/oportunidades" className="block truncate font-medium text-slate-900 hover:underline">
                 {r.nombre}
               </Link>
-              <p className="truncate text-xs text-slate-500">
-                {r.empresa_nombre} · {ETAPA_LABEL[r.etapa] ?? r.etapa}
-              </p>
+              <p className="truncate text-xs text-slate-500">{r.empresa_nombre} · {ETAPA_LABEL[r.etapa] ?? r.etapa}</p>
             </div>
             <div className="ml-3 shrink-0">
               <StatusBadge variant="neutral" size="sm">{r.dias_sin_actualizar}d</StatusBadge>
