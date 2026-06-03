@@ -25,6 +25,12 @@ interface SimulationParams {
    * Se obtiene consultando precios_pool_horarios y promediando el indicador 600.
    */
   poolPrecioMedioEurKwh?: number;
+  /**
+   * Precio medio de SSAA (Servicios de Ajuste) en EUR/kWh para el periodo.
+   * Solo se suma al coste si offer.ssaa_incluidos === false (ej: Nexus).
+   * Fuente: REE publica el valor mensual (~0.017 EUR/kWh de referencia).
+   */
+  ssaaPrecioMedioEurKwh?: number;
 }
 
 /**
@@ -64,6 +70,11 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
   const precioIndexadoEurKwh = isIndexado
     ? safeNum(params.poolPrecioMedioEurKwh) + spreadEurKwh
     : 0;
+  // SSAA externos: solo se suman si la oferta NO los incluye en el precio (ej: Nexus)
+  const ssaaIncluidos = offer?.ssaa_incluidos !== false; // default true
+  const ssaaPrecioEurKwh = ssaaIncluidos ? 0 : safeNum(params.ssaaPrecioMedioEurKwh ?? 0.017);
+  // Fee Valere: EUR/MWh -> EUR/kWh. Se descuenta del precio visible al cliente.
+  const feeValereEurKwh = safeNum(offer?.fee_valere_eur_mwh) / 1000;
 
   const DAYS_IN_YEAR = 365;
   const DAYS_IN_MONTH = 30;
@@ -108,10 +119,16 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
   let totalFreeEnergy = 0;
   const isSilver = surplusModel === 'gestion_silver';
 
+  // Coste SSAA externo: se aplica al consumo total cuando ssaa_incluidos=false
+  const totalSsaaExternoEur = ssaaIncluidos ? 0 :
+    consumption_p.reduce((acc, c) => acc + c * ssaaPrecioEurKwh, 0);
+
   for (let i = 0; i < tariffCfg.energia; i++) {
     const consumption = consumption_p[i];
     // Precio por periodo: indexado (pool+spread uniforme), silver (0), o precio fijo de oferta
-    const price = isSilver ? 0 : isIndexado ? precioIndexadoEurKwh : offerEnergyPrices[i];
+    // Fee Valere se resta: es margen interno Valere, no coste para el cliente
+    const precioBase = isSilver ? 0 : isIndexado ? precioIndexadoEurKwh : offerEnergyPrices[i];
+    const price = Math.max(0, precioBase - feeValereEurKwh);
     const cost = consumption * price;
     free_energy_periods.push(cost);
     totalFreeEnergy += cost;
@@ -127,7 +144,7 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
   const tenderFeeMonthly = (fvInstallationCost * tenderFeePct / 100) / 12;
 
   // === 7. TOTALS WITH FLOOR LOGIC ===
-  const subtotalBeforeSurplus = totalPowerCost + totalRegulatedEnergy + totalFreeEnergy + batteryFee + tenderFeeMonthly;
+  const subtotalBeforeSurplus = totalPowerCost + totalRegulatedEnergy + totalFreeEnergy + totalSsaaExternoEur + batteryFee + tenderFeeMonthly;
   const fixedAndRegulated = totalPowerCost + totalRegulatedEnergy + batteryFee + tenderFeeMonthly;
 
   if (!allowZeroInvoice) {
@@ -152,6 +169,7 @@ export function calculateSimulatedInvoice(params: SimulationParams): InvoiceSimu
       power_fixed_eur: totalPowerCost,
       energy_regulated_eur: totalRegulatedEnergy,
       energy_free_eur: totalFreeEnergy,
+      ssaa_externo_eur: totalSsaaExternoEur,
       battery_fee_eur: batteryFee,
       tender_fee_eur: tenderFeeMonthly,
       subtotal_eur: subtotal,

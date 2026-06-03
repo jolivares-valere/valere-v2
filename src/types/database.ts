@@ -100,6 +100,10 @@ export interface RetailerOffer {
   price_type: 'fijo' | 'indexado';
   /** Margen de la comercializadora sobre precio pool en EUR/kWh (solo aplica si price_type='indexado') */
   spread_eur_kwh: number;
+  /** true = SSAA ya incluidos en energy_prices; false = sumar SSAA reales aparte (ej: Nexus) */
+  ssaa_incluidos: boolean;
+  /** Comision Valere en EUR/MWh — se resta del precio visible al cliente en comparativa. 0 si ya incluido. */
+  fee_valere_eur_mwh: number;
 }
 
 export interface Proposal {
@@ -181,6 +185,7 @@ export interface InvoiceBreakdown {
   power_fixed_eur: number;
   energy_regulated_eur: number;
   energy_free_eur: number;
+  ssaa_externo_eur: number;
   battery_fee_eur: number;
   tender_fee_eur: number;
   subtotal_eur: number;

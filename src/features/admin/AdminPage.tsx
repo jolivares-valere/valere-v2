@@ -368,6 +368,8 @@ function OffersTab() {
       notes: '',
       price_type: 'fijo' as const,
       spread_eur_kwh: 0,
+      ssaa_incluidos: true,
+      fee_valere_eur_mwh: 0,
     };
   };
 
@@ -409,6 +411,8 @@ function OffersTab() {
       notes: o.notes ?? '',
       price_type: (o.price_type ?? 'fijo') as 'fijo' | 'indexado',
       spread_eur_kwh: o.spread_eur_kwh ?? 0,
+      ssaa_incluidos: o.ssaa_incluidos ?? true,
+      fee_valere_eur_mwh: o.fee_valere_eur_mwh ?? 0,
     });
     setIsEditing(true);
     setEditingId(o.id);
@@ -626,6 +630,23 @@ function OffersTab() {
                 <p className="text-[11px] text-valere-ink/40 mt-1">Margen de la comercializadora sobre el precio spot diario</p>
               </div>
             )}
+            <div>
+              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Fee Valere (EUR/MWh)</label>
+              <input
+                type="number" step="0.01"
+                value={form.fee_valere_eur_mwh}
+                onChange={e => setForm((p) => ({ ...p, fee_valere_eur_mwh: parseFloat(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                placeholder="Ej: 6"
+              />
+              <p className="text-[11px] text-valere-ink/40 mt-1">Comision interna Valere en EUR/MWh. Se descuenta del precio visible al cliente.</p>
+            </div>
+            <div className="flex items-end gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={form.ssaa_incluidos} onChange={e => setForm((p) => ({ ...p, ssaa_incluidos: e.target.checked }))} className="rounded" />
+                SSAA incluidos en precio
+              </label>
+            </div>
           </div>
           <DialogFooter>
             <button onClick={() => setDialogOpen(false)} className="px-4 py-2 text-sm text-valere-ink/60">Cancelar</button>
