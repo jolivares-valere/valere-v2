@@ -1,6 +1,26 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-06-02 — Fase 3 tarifas indexadas. Migration en prod (price_type + spread_eur_kwh en comercializadora_ofertas). Motor de cálculo soporta indexado (pool promedio + spread). Hook usePoolPrecioMedio. UI formulario ofertas actualizada. TSC 0 errores.**
+> **Última actualización: 2026-06-04 — Sesión intensiva. Fase 3 motor de cálculo (indexado+SSAA+fee), 29 ofertas en prod, pipeline tarifas completo (tablas+EF+Make), sistema multiagente Drive operativo, protocolo gobierno VIGENTE. Pendiente: backfill Visalia dry_run=true (aprobado por Juan).**
+
+## ✅ SESIÓN 2026-06-04 — PIPELINE TARIFAS + SISTEMA MULTIAGENTE
+
+### Completado
+| Artefacto | Estado |
+|---|---|
+| calculator.ts Fase 3: indexado + SSAA externos + fee Valere | ✅ commit 05ab64b |
+| 29 ofertas reales cargadas en comercializadora_ofertas | ✅ prod |
+| Tablas: tariff_sources, tariff_extractions, tariff_staging | ✅ prod |
+| Edge Function tariffs-ingest-email v2 (cleanHtml + dedup) | ✅ deployada |
+| Make Rama B: filtro + stopOnHttpError=true + truncado seguro | ✅ activo |
+| Carpeta 00_SYNC_AGENTES_VALERE Drive (10 docs) | ✅ pública |
+| Sistema multiagente operativo (Claude+ChatGPT+Gemini leen Drive) | ✅ |
+| Protocolo gobierno multiagente | ✅ VIGENTE aprobado Juan |
+
+### Pendiente próxima sesión
+- Backfill Visalia 04/06/2026 — dry_run=true (APROBADO, ejecutar próxima sesión)
+- Crear escenario Make "Backfill Tarifas - Manual"
+- Validar extracción Gemini con emails reales Visalia
+- Pantalla revisión tariff_staging en CRM (Fase 2)
 
 ## ✅ SESIÓN 2026-06-02 — FASE 3: TARIFAS INDEXADAS
 
