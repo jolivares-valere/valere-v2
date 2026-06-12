@@ -6541,7 +6541,6 @@ export type Database = {
         Row: {
           event_type: string
           id: string
-          is_approved: boolean
           occurred_at: string
           payload: Json
           received_at: string

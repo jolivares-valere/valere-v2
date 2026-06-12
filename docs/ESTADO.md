@@ -1,6 +1,26 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-06-10 — Sesión de análisis estratégico (Fable 5). Auditoría completa repo + Supabase. Creado `docs/ANALISIS_ESTRATEGICO_2026-06-10.md`: diagnóstico (el CRM está construido pero el circuito de propuestas está roto en 3 puntos), 83 avisos de seguridad Supabase priorizados, diseño integraciones Datadis/SIPS/telemedida/FV multi-plataforma, roadmap S1-S7. NUEVA DIRECCIÓN PROPUESTA: congelar módulos nuevos y cerrar circuito consumo→análisis→propuesta PDF→envío→tracking. Pendiente decisión Juan sobre 7 puntos (sección 8 del análisis).**
+> **Última actualización: 2026-06-12 (noche) — SPRINT 7 DÍAS APROBADO (`docs/PLAN_SPRINT_7DIAS_2026-06-12.md` — este plan manda hasta el 19/06). Decisiones Juan: unificar en `propuestas`, NO borrar `_migration_*`/backups, alcance completo. Backfill Visalia EJECUTADO: 43 tarifas en `tariff_staging`. Pipeline reparado (gemini-2.5-flash, EF v4; migration `20260612_tariff_extractions_fix_backfill.sql` aplicada en prod). Día 1 en curso: PR #11 (`claude/fase1-analisis-menu`) con Fase 1 + tipos + informes + fix pipeline. Telemedida = Telegest/Linkener/CGNET (doc ChatGPT).**
+
+## 🚀 SESIÓN 2026-06-12 (tarde/noche) — ANÁLISIS GLOBAL + SPRINT 7 DÍAS + BACKFILL + DÍA 1
+
+### Completado
+| Artefacto | Estado |
+|---|---|
+| Auditoría completa multi-LLM (docs + código + Supabase vivo) | ✅ |
+| `docs/PLAN_SPRINT_7DIAS_2026-06-12.md` — plan aprobado día a día | ✅ |
+| Backfill Visalia real: 43 tarifas en staging (16 elec + 9 gas dom + 18 gas PYME) | ✅ prod |
+| Pipeline reparado: EF v4 gemini-2.5-flash + 2 migrations tariff_extractions | ✅ prod + repo |
+| PR #11: Fase 1 (CNMC 3.0TD, anualización, menú Energía) + tipos is_approved/client_telemetry + hooks informes + smoke tests | ✅ subido |
+| Hallazgo operativo: archivos se revertían en local → parche pre-TSC en PS1 (`patch-database-types.cjs`) | ✅ mitigado |
+| `.env.txt` estaba staged con todo el repo → `git reset` + gitignore | ✅ evitado |
+
+### Pendiente inmediato
+- Merge PR #11 cuando CI esté verde → deploy → verificación en navegador (menú Energía, anualización, alta incidencias C3)
+- Día 1 resto: unificación `proposals`→`propuestas`, limpiar chat-ia/tipos triplicados, `.gitattributes`, CLAUDE.md al día
+- Juan: revisar las 43 tarifas en `tariff_staging`
+
+> Última actualización anterior: 2026-06-10 — Sesión de análisis estratégico (Fable 5). Auditoría completa repo + Supabase. Creado `docs/ANALISIS_ESTRATEGICO_2026-06-10.md`: diagnóstico (el CRM está construido pero el circuito de propuestas está roto en 3 puntos), 83 avisos de seguridad Supabase priorizados, diseño integraciones Datadis/SIPS/telemedida/FV multi-plataforma, roadmap S1-S7. NUEVA DIRECCIÓN PROPUESTA: congelar módulos nuevos y cerrar circuito consumo→análisis→propuesta PDF→envío→tracking. Pendiente decisión Juan sobre 7 puntos (sección 8 del análisis).**
 
 ## 🔒 SESIÓN 2026-06-11 — FASE 0 EJECUTADA (limpieza + hardening en prod)
 
