@@ -1,6 +1,56 @@
 # Estado actual del proyecto Valere v2
 
-> **Última actualización: 2026-06-04 — Sesión intensiva. Fase 3 motor de cálculo (indexado+SSAA+fee), 29 ofertas en prod, pipeline tarifas completo (tablas+EF+Make), sistema multiagente Drive operativo, protocolo gobierno VIGENTE. Pendiente: backfill Visalia dry_run=true (aprobado por Juan).**
+> **Última actualización: 2026-06-10 — Sesión de análisis estratégico (Fable 5). Auditoría completa repo + Supabase. Creado `docs/ANALISIS_ESTRATEGICO_2026-06-10.md`: diagnóstico (el CRM está construido pero el circuito de propuestas está roto en 3 puntos), 83 avisos de seguridad Supabase priorizados, diseño integraciones Datadis/SIPS/telemedida/FV multi-plataforma, roadmap S1-S7. NUEVA DIRECCIÓN PROPUESTA: congelar módulos nuevos y cerrar circuito consumo→análisis→propuesta PDF→envío→tracking. Pendiente decisión Juan sobre 7 puntos (sección 8 del análisis).**
+
+## 🔒 SESIÓN 2026-06-11 — FASE 0 EJECUTADA (limpieza + hardening en prod)
+
+### Completado
+| Acción | Estado |
+|---|---|
+| Datos TEST de la auditoría borrados (3 empresas, 2 CUPS, 3 facturas, 2 propuestas, 1 contrato, 3 contactos, 1 oportunidad) | ✅ verificado 0 restantes |
+| Usuario `test.auditor@valereconsultores.com` eliminado de auth.users | ✅ |
+| REVOKE anon en todas las funciones public (0 SECURITY DEFINER ejecutables por anon) | ✅ migración `fase0_hardening_funciones_anon_searchpath` |
+| Funciones cron/worker (cleanup_*, holded_dispatch_worker) sin EXECUTE de authenticated | ✅ |
+| search_path fijo en 16 funciones | ✅ |
+| 3 vistas → security_invoker (retailer_offers, fv_credenciales_safe, fv_sync_health_latest); policies base verificadas (qual=true authenticated) | ✅ sin rotura |
+| Advisor: 83 avisos → ~35, 0 ERRORs | ✅ |
+| Migración consolidada en repo: `supabase/migrations/20260611_fase0_hardening_funciones.sql` | ✅ |
+
+### Pendiente Fase 0 (decisión Juan / manual)
+- ❌ **Leaked password protection**: NO se puede activar — requiere **plan Pro** (el proyecto está en plan Gratis). El toggle está deshabilitado en Dashboard → Auth → Protección contra ataques. Queda como aviso aceptado del advisor hasta que se valore el upgrade.
+- ⚠️ **Índice de git CORRUPTO** en el repo local de Juan ("bad signature / index file corrupt") — es la causa del error `git pull`. El script `COMMIT_FASE0_2026-06-11.ps1` lo repara (borra .git/index + git reset) antes de commitear. El sandbox NO puede arreglarlo (sin permiso de escritura en .git Windows).
+- Tablas `_migration_*` y `*_backup_20260511` — Juan NO autorizó borrado todavía.
+- Registros basura/duplicados (dzt, xfgj, ABRASIVOS ×2...) — Juan NO autorizó todavía.
+- Unificación `proposals`+`propuestas` — requiere sesión de código (frontend), planificar en Fase 1.
+- Diagnóstico del error `git pull` ("did not send all necessary objects") + confirmar commit deployado en Cloudflare.
+
+### Siguiente: FASE 1 (ver plan en ANALISIS_ESTRATEGICO_2026-06-10.md §7 y AUDITORIA_FUNCIONAL §12)
+Normalización temporal del análisis + fix 3.0TD (6 periodos potencia) + reparar alta de incidencias + menú grupo "Energía" + tests calculator.
+
+## 📊 SESIÓN 2026-06-10 — ANÁLISIS ESTRATÉGICO Y AUDITORÍA (sin código)
+
+### Completado (parte 2 — auditoría funcional en producción)
+| Artefacto | Estado |
+|---|---|
+| `docs/AUDITORIA_FUNCIONAL_2026-06-10.md` — auditoría real en navegador con 2 clientes TEST (sustituye al intento fallido del agente ChatGPT) | ✅ creado |
+| Usuario auditor `test.auditor@valereconsultores.com` (manager, ID 492a6574) | ⚠️ ACTIVO — borrar tras revisión |
+| Datos TEST en prod: 2 empresas, 2 CUPS, 3 facturas, 2 propuestas, 1 contrato, 1 lead | ⚠️ pendiente limpieza (SQL en §14 del informe) |
+| Hallazgos críticos: C1 sin PDF · C2 cálculo no normalizado (ahorros -32,8% en verde) · C3 incidencias rotas · C4 flujo energía fuera del menú · A1 3.0TD con 3 periodos potencia | ✅ documentados |
+| Sorpresa positiva: "Guardar Propuesta" SÍ existe en prod y el circuito datos→análisis→propuesta funciona | ✅ verificado |
+
+### Completado (parte 1 — análisis estratégico)
+| Artefacto | Estado |
+|---|---|
+| `docs/ANALISIS_ESTRATEGICO_2026-06-10.md` (auditoría + plan integraciones + roadmap) | ✅ creado |
+| Auditoría repo: 206 archivos, ~53k líneas, 0 `as any`, 0 TODOs, 8/10 | ✅ |
+| Auditoría Supabase: 83 tablas reales, 14 EF, 83 avisos advisor (3 ERROR security_definer_view, 27 funciones SECURITY DEFINER ejecutables por anon) | ✅ |
+| Hallazgos críticos: PDF de propuestas fantasma, /analisis no persiste, doble tabla proposals/propuestas, facturas=0 filas | ✅ documentados |
+| Investigación APIs: Datadis terceros, SIPS CNMC (solo comercializadoras → importador Excel), IEC 60870-5-102 telemedida, GoodWe SEMS OpenAPI | ✅ |
+
+### Pendiente próxima sesión (decisión Juan primero — sección 8 del análisis)
+- Juan responde a los 7 puntos (diseño comparativas, Excel SIPS muestra, pasarelas telemedida, cuenta Datadis empresa, cuenta org GoodWe SEMS, prioridad S2/S3, Visalia)
+- **S1 — Seguridad y limpieza**: REVOKEs anon, search_path 16 funciones, leaked password, borrar `_migration_*` y `*_backup_20260511`, unificar proposals+propuestas
+- Heredado del 04/06: backfill Visalia dry_run=true, escenario Make backfill, pantalla tariff_staging
 
 ## ✅ SESIÓN 2026-06-04 — PIPELINE TARIFAS + SISTEMA MULTIAGENTE
 
