@@ -247,11 +247,12 @@ DEVUELVE EXCLUSIVAMENTE JSON válido con esta estructura exacta, sin texto adici
 // ─── Llamada a Gemini ─────────────────────────────────────────────────────────
 
 async function callGemini(prompt: string): Promise<{ json: GeminiExtraction | null; raw: string; tokens_in: number; tokens_out: number }> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`
+  // 2026-06-12: gemini-1.5-flash retirado (404). thinkingBudget:0 para extraccion determinista.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+    generationConfig: { temperature: 0.1, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } }
   }
 
   const res = await fetch(url, {
@@ -400,7 +401,7 @@ Deno.serve(async (req) => {
   const extractionData = {
     tariff_source_id: sourceId,
     model: 'gemini',
-    model_version: 'gemini-1.5-flash',
+    model_version: 'gemini-2.5-flash',
     raw_json: { text: geminiResult.raw },
     status: geminiResult.json ? 'pending' : 'invalid',
     tokens_input: geminiResult.tokens_in,

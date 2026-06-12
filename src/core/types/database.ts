@@ -6484,12 +6484,15 @@ export type Database = {
         Row: {
           apellidos: string | null
           approved: boolean | null
+          approved_at: string | null
+          approved_by: string | null
           avatar_url: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
           funciones: string[]
           id: string
+          is_approved: boolean
           legacy_potencia_id: string | null
           nombre: string | null
           role: string | null
@@ -6499,12 +6502,15 @@ export type Database = {
         Insert: {
           apellidos?: string | null
           approved?: boolean | null
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           funciones?: string[]
           id: string
+          is_approved?: boolean
           legacy_potencia_id?: string | null
           nombre?: string | null
           role?: string | null
@@ -6514,17 +6520,47 @@ export type Database = {
         Update: {
           apellidos?: string | null
           approved?: boolean | null
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           funciones?: string[]
           id?: string
+          is_approved?: boolean
           legacy_potencia_id?: string | null
           nombre?: string | null
           role?: string | null
           status?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      client_telemetry: {
+        Row: {
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          received_at: string
+          user_id: string | null
+        }
+        Insert: {
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          received_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          received_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
