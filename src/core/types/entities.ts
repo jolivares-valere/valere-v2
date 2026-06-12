@@ -42,6 +42,10 @@ export interface UserProfile {
   role: string | null
   status: string | null
   approved: boolean | null
+  /** Columna canonica de aprobacion (migration 20260612000001_user_approval_flow). */
+  is_approved?: boolean | null
+  approved_by?: string | null
+  approved_at?: string | null
   avatar_url: string | null
   funciones: string[]
   created_at: string | null

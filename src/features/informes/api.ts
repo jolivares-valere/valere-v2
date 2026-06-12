@@ -257,3 +257,221 @@ export function useComercialesList() {
     },
   })
 }
+
+// ── Informe: Pipeline de oportunidades abiertas ───────────────────────────────
+
+export interface PipelineFila {
+  id: string
+  nombre: string
+  empresa_id: string
+  empresa_nombre: string
+  comercial_nombre: string
+  etapa: string
+  valor_estimado_eur: number
+  ahorro_anual_estimado: number
+  probabilidad_pct: number | null
+  fecha_cierre_prevista: string | null
+  /** Días desde la última actualización de la oportunidad. */
+  dias_en_etapa: number
+}
+
+const ETAPAS_ABIERTAS = ['prospecto', 'auditoria_consumo', 'oferta_presentada', 'negociacion'] as const
+
+export function useInformePipeline(comercialId?: string | null) {
+  return useQuery({
+    queryKey: [RESOURCE, 'pipeline', comercialId ?? null],
+    queryFn: async (): Promise<PipelineFila[]> => {
+      let q = supabase
+        .from('oportunidades')
+        .select(
+          'id, nombre, empresa_id, comercial_id, etapa, valor_estimado_eur, ahorro_anual_estimado, probabilidad_pct, fecha_cierre_prevista, updated_at, empresa:empresas!oportunidades_empresa_id_fkey(id, nombre), comercial:user_profiles!oportunidades_comercial_id_fkey(id, full_name)',
+        )
+        .in('etapa', ETAPAS_ABIERTAS as unknown as string[])
+        .is('deleted_at', null)
+      if (comercialId) q = q.eq('comercial_id', comercialId)
+
+      const { data, error } = await q
+      if (error) { logError(error, 'useInformePipeline'); throw error }
+
+      const hoy = Date.now()
+      const rows = (data ?? []) as unknown as Array<{
+        id: string
+        nombre: string
+        empresa_id: string
+        etapa: string
+        valor_estimado_eur: number | null
+        ahorro_anual_estimado: number | null
+        probabilidad_pct: number | null
+        fecha_cierre_prevista: string | null
+        updated_at: string | null
+        empresa: { id: string; nombre: string } | null
+        comercial: { id: string; full_name: string | null } | null
+      }>
+
+      return rows
+        .map((r) => ({
+          id: r.id,
+          nombre: r.nombre,
+          empresa_id: r.empresa_id,
+          empresa_nombre: r.empresa?.nombre ?? '—',
+          comercial_nombre: r.comercial?.full_name ?? '—',
+          etapa: r.etapa,
+          valor_estimado_eur: r.valor_estimado_eur ?? 0,
+          ahorro_anual_estimado: r.ahorro_anual_estimado ?? 0,
+          probabilidad_pct: r.probabilidad_pct,
+          fecha_cierre_prevista: r.fecha_cierre_prevista,
+          dias_en_etapa: r.updated_at
+            ? Math.max(0, Math.floor((hoy - new Date(r.updated_at).getTime()) / 86_400_000))
+            : 0,
+        }))
+        .sort((a, b) => b.valor_estimado_eur - a.valor_estimado_eur)
+    },
+  })
+}
+
+// ── Informe: Histórico de propuestas ─────────────────────────────────────────
+
+export interface PropuestaHistFila {
+  id: string
+  empresa_id: string
+  empresa_nombre: string
+  oportunidad_nombre: string
+  version: number
+  compania_propuesta: string | null
+  ahorro_estimado_pct: number | null
+  comision_estimada: number | null
+  estado: string
+  fecha_envio: string | null
+  fecha_respuesta: string | null
+}
+
+export function useInformePropuestasHist(comercialId?: string | null) {
+  return useQuery({
+    queryKey: [RESOURCE, 'propuestas-hist', comercialId ?? null],
+    queryFn: async (): Promise<PropuestaHistFila[]> => {
+      const { data, error } = await supabase
+        .from('propuestas')
+        .select(
+          'id, empresa_id, version, compania_propuesta, ahorro_estimado_pct, comision_estimada, estado, fecha_envio, fecha_respuesta, created_at, empresa:empresas!propuestas_empresa_id_fkey(id, nombre, comercial_id), oportunidad:oportunidades!propuestas_oportunidad_id_fkey(id, nombre)',
+        )
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+      if (error) { logError(error, 'useInformePropuestasHist'); throw error }
+
+      const rows = (data ?? []) as unknown as Array<{
+        id: string
+        empresa_id: string
+        version: number | null
+        compania_propuesta: string | null
+        ahorro_estimado_pct: number | null
+        comision_estimada: number | null
+        estado: string
+        fecha_envio: string | null
+        fecha_respuesta: string | null
+        empresa: { id: string; nombre: string; comercial_id: string | null } | null
+        oportunidad: { id: string; nombre: string } | null
+      }>
+
+      return rows
+        .filter((r) => !comercialId || r.empresa?.comercial_id === comercialId)
+        .map((r) => ({
+          id: r.id,
+          empresa_id: r.empresa_id,
+          empresa_nombre: r.empresa?.nombre ?? '—',
+          oportunidad_nombre: r.oportunidad?.nombre ?? '—',
+          version: r.version ?? 1,
+          compania_propuesta: r.compania_propuesta,
+          ahorro_estimado_pct: r.ahorro_estimado_pct,
+          comision_estimada: r.comision_estimada,
+          estado: r.estado,
+          fecha_envio: r.fecha_envio,
+          fecha_respuesta: r.fecha_respuesta,
+        }))
+    },
+  })
+}
+
+// ── Informe: Renovaciones próximas (contratos que vencen en N días) ──────────
+
+export interface RenovacionFila {
+  contrato_id: string
+  empresa_id: string
+  empresa_nombre: string
+  comercial_nombre: string
+  numero_contrato: string | null
+  compania: string
+  tarifa_acceso: string | null
+  codigo_cups: string
+  consumo_kwh: number
+  fecha_fin: string
+  dias_restantes: number
+}
+
+export function useInformeRenovacionesProximas(ventanaDias: number, comercialId?: string | null) {
+  return useQuery({
+    queryKey: [RESOURCE, 'renovaciones-proximas', ventanaDias, comercialId ?? null],
+    queryFn: async (): Promise<RenovacionFila[]> => {
+      const hoy = new Date()
+      const limite = new Date(hoy.getTime() + ventanaDias * 86_400_000)
+      const toISO = (d: Date) => d.toISOString().slice(0, 10)
+
+      let q = supabase
+        .from('contratos')
+        .select(
+          'id, empresa_id, comercial_id, numero_contrato, compania, tarifa_acceso, fecha_fin, consumo_sips_kwh, consumo_po_kwh, empresa:empresas!contratos_empresa_id_fkey(id, nombre), comercial:user_profiles!contratos_comercial_id_fkey(id, full_name)',
+        )
+        .eq('estado', 'activo')
+        .is('deleted_at', null)
+        .gte('fecha_fin', toISO(hoy))
+        .lte('fecha_fin', toISO(limite))
+        .order('fecha_fin', { ascending: true })
+      if (comercialId) q = q.eq('comercial_id', comercialId)
+
+      const { data, error } = await q
+      if (error) { logError(error, 'useInformeRenovacionesProximas'); throw error }
+
+      const rows = (data ?? []) as unknown as Array<{
+        id: string
+        empresa_id: string
+        numero_contrato: string | null
+        compania: string
+        tarifa_acceso: string | null
+        fecha_fin: string
+        consumo_sips_kwh: number | null
+        consumo_po_kwh: number | null
+        empresa: { id: string; nombre: string } | null
+        comercial: { id: string; full_name: string | null } | null
+      }>
+
+      // CUPS por contrato (un viaje, agrupado en memoria)
+      const contratoIds = rows.map((r) => r.id)
+      const cupsPorContrato = new Map<string, string>()
+      if (contratoIds.length > 0) {
+        const { data: cupsRows, error: e2 } = await supabase
+          .from('cups')
+          .select('contrato_id, codigo_cups')
+          .in('contrato_id', contratoIds)
+          .is('deleted_at', null)
+        if (e2) { logError(e2, 'useInformeRenovacionesProximas.cups'); throw e2 }
+        for (const c of (cupsRows ?? []) as unknown as Array<{ contrato_id: string | null; codigo_cups: string }>) {
+          if (c.contrato_id && !cupsPorContrato.has(c.contrato_id)) cupsPorContrato.set(c.contrato_id, c.codigo_cups)
+        }
+      }
+
+      const hoyMs = hoy.getTime()
+      return rows.map((r) => ({
+        contrato_id: r.id,
+        empresa_id: r.empresa_id,
+        empresa_nombre: r.empresa?.nombre ?? '—',
+        comercial_nombre: r.comercial?.full_name ?? '—',
+        numero_contrato: r.numero_contrato,
+        compania: r.compania,
+        tarifa_acceso: r.tarifa_acceso,
+        codigo_cups: cupsPorContrato.get(r.id) ?? '—',
+        consumo_kwh: r.consumo_sips_kwh ?? r.consumo_po_kwh ?? 0,
+        fecha_fin: r.fecha_fin,
+        dias_restantes: Math.max(0, Math.ceil((new Date(r.fecha_fin).getTime() - hoyMs) / 86_400_000)),
+      }))
+    },
+  })
+}
