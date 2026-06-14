@@ -2,6 +2,41 @@
 
 > **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
 
+## 🔧 SESIÓN 2026-06-14 (Día 2 sprint) — REPARACIÓN GIT + FASE 1 PIEZAS + FASE 2 PPTX (arranque)
+
+> Sesión Cowork. Reparado el repo git corrupto, reimplementadas las 2 piezas de Fase 1 (mergeadas y desplegadas), y arrancada la Fase 2 (generador PPTX): contrato + builder mergeados, Edge Function validada (sin desplegar aún).
+
+### Completado y MERGEADO en main
+| Artefacto | Estado |
+|---|---|
+| **Git reparado**: refs/heads/main duplicado + rama fantasma `claud` → `REPARAR_GIT_VALERE_2026-06-14.ps1` (con backup) | ✅ |
+| Repo al día: recuperado PR #11 (que estaba en GitHub, no en local por corrupción) | ✅ |
+| **Fase 1 piezas** (PR #12, commit 74c6f76): menú Energía en Sidebar + anualización en /analisis | ✅ desplegado Cloudflare, verificado en navegador |
+| **Fase 2.1** (PR #14, commit f6099a3): `src/core/propuestas/clienteJson.ts` + `buildClienteJson.ts` + 8 tests (fee invisible) | ✅ mergeado |
+| Fix TSC SIPS (BuscadorCupsPage formatter recharts) | ✅ en disco |
+
+### Fase 2.3 — Edge Function PPTX (VALIDADA, SIN DESPLEGAR)
+- Código en `C:\Users\joliv\.claude\fase2_pptx_entregables\generar-propuesta-pptx-index.ts`
+- Port del generador LOWFIT a Deno+pptxgenjs. 8 slides núcleo (portada, resumen, puntos, perfil P1-P6, ranking, dictamen, próximos pasos, cierre) con identidad Valere exacta.
+- PROBADO en sandbox: genera PPTX válido (ZIP, 165KB), QA fee invisible LIMPIO. Preview renderizado OK (demo: caso tipo LOWFIT, ahorro 46.058€ -23,1%).
+- Demo: `C:\Users\joliv\.claude\fase2_pptx_entregables\Propuesta_DEMO_Valere.pptx`
+- **Bucket `propuestas` (privado) ya CREADO en Supabase.**
+
+### Pendiente Fase 2 (próxima sesión)
+1. Migración `proposals.pptx_url` (columna text).
+2. Desplegar EF `generar-propuesta-pptx` a Supabase (requiere OK Juan).
+3. Cablear LOGO: subir `C:\Users\joliv\.claude\logo Valere.jpg` (2043×675, el HORIZONTAL correcto) al bucket y pasarlo a la EF como logoBase64. (Falta versión PNG transparente para slides con fondo de color.)
+4. F2.4: botón "Generar propuesta PPTX" en /analisis que invoca la EF → descarga.
+5. F2.5: QA fee invisible en CI.
+
+### Notas de coordinación
+- Hay OTRA sesión Cowork diseñando el módulo de propuestas como circuito de datos (solo .md): `docs/DISENO_MODULO_PROPUESTAS_2026-06-14.md`. No pisar: esta sesión = código, la otra = docs.
+- Decisión: Fase 2 implementada sobre tabla `proposals` (la otra sesión diseña unificar proposals→propuestas; si migra, será rename trivial).
+- LOGO oficial = el HORIZONTAL (`logo Valere.jpg`). Los redondos/cuadrados (672×688) están PROHIBIDOS por norma de marca.
+
+
+> **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
+
 ## 🔧 SESIÓN 2026-06-14 (Día 2 sprint) — REPARACIÓN GIT + FASE 1 PIEZAS PERDIDAS
 
 > Sesión Cowork. Reparado el repo git corrupto (causa raíz del "gremlin") y reimplementadas las 2 piezas de Fase 1 que se perdieron el Día 1. PR nuevo subido.
@@ -1716,4 +1751,5 @@ Juan tiene token personal de ESIOS (REE). Análisis técnico completo en `docs/A
 | 2026-04-29 mañana | e8ed8c2…6464a89 | Reescritura Playwright, fixes CI ubuntu-22.04, fix login |
 | 2026-04-29 noche | a3d4a21 | Fix dashboard, asistente RAG, ExpedienteDetail |
 | 2026-04-30 | 00243bd, a388e04 | Schema FV multi-credencial, mantenimiento, workflow informes |
+
 
