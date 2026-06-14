@@ -38,6 +38,13 @@ const captacionItems: Item[] = [
   { to: '/cartera-senior',  label: 'Cartera senior', icon: Briefcase, roles: ['asesor_senior', 'admin'] },
 ]
 
+const energiaItems: Item[] = [
+  { to: '/datos',             label: 'Captura de datos', icon: Upload },
+  { to: '/analisis',          label: 'Analisis',         icon: BarChart3 },
+  { to: '/propuestas-energia', label: 'Propuestas',      icon: FileText },
+  { to: '/tracking',          label: 'Seguimiento',      icon: Activity },
+]
+
 const potenciasItems: Item[] = [
   { to: '/potencias',                label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/empresas',                 label: 'Clientes',       icon: Users },
@@ -179,6 +186,22 @@ export default function Sidebar({ onClose, collapsed = false, onToggleCollapse }
                   <NavItem key={item.to} {...item} onClose={onClose} collapsed={collapsed} />
                 ) : null
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Seccion Energia */}
+        {showCrmComercial && (
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            {!collapsed && (
+              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Energia
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {energiaItems.map(item => (
+                <NavItem key={item.to} {...item} onClose={onClose} collapsed={collapsed} />
+              ))}
             </div>
           </div>
         )}

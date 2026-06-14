@@ -13,6 +13,7 @@ import { usePoolPrecioMedio } from '@/core/hooks/usePoolPrecioMedio';
 import { cupsToSupplyPoint } from '@/core/energia/adapters';
 import { formatEur, formatPct, safeNum } from '@/core/utils/format';
 import { getTariffConfig } from '@/core/energia/tariffs';
+import { annualizeFactor } from './anualizacion';
 import type {
   InvoiceHistory, BoeRegulatedPrice, RetailerOfferWithName
 } from '@/types/database';
@@ -200,7 +201,12 @@ export default function Analysis() {
 
       // Calculate historical annual cost
       const totalHistorical = invoices.reduce((acc, inv) => acc + safeNum(inv.total_amount_eur), 0);
-      setHistoricalCost(totalHistorical);
+      // ANUALIZACION (Fase 1): extrapola a 365 dias para que el % de ahorro
+      // no mienta cuando se cargan pocas facturas. Mismo factor a ambos lados.
+      const totalBilledDays = invoices.reduce((acc, inv) => acc + (safeNum(inv.billed_days) || 30), 0);
+      const annualFactor = annualizeFactor(totalBilledDays);
+      const totalHistoricalAnnual = totalHistorical * annualFactor;
+      setHistoricalCost(totalHistoricalAnnual);
 
       if (totalHistorical <= 0) {
         toast.warning('El coste histórico total es 0€. Comprueba que las facturas tengan el importe total rellenado.');
@@ -231,13 +237,14 @@ export default function Analysis() {
           annualCost += result.total_eur;
         }
 
-        const savings = totalHistorical - annualCost;
-        const savingsPct = totalHistorical > 0 ? (savings / totalHistorical) * 100 : 0;
+        const annualCostAnnual = annualCost * annualFactor;
+        const savings = totalHistoricalAnnual - annualCostAnnual;
+        const savingsPct = totalHistoricalAnnual > 0 ? (savings / totalHistoricalAnnual) * 100 : 0;
 
         compResults.push({
           offerName: offer.product_name || 'Sin nombre',
           retailerName: offer.comercializadoras?.name || 'Desconocido',
-          annualCost,
+          annualCost: annualCostAnnual,
           savings,
           savingsPct,
           surplusModel: offer.surplus_model || '',
