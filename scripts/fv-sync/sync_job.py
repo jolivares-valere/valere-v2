@@ -855,8 +855,23 @@ def sync_credencial(
                     exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 if exp_dt < now_utc:
                     estado_sesion = "caducada"
-                elif exp_dt < now_utc + _dt.timedelta(hours=24):
+                elif exp_dt < now_utc + _dt.timedelta(days=3):
                     estado_sesion = "por_caducar"
+                    # F3.4: avisar por email cuando faltan <=3 dias para caducar
+                    try:
+                        dias_rest = (exp_dt - now_utc).days
+                        _send_email(
+                            asunto=f"Sesion FV por caducar: {username}",
+                            html=(f"<h2 style='color:#ea580c'>Sesion FusionSolar por caducar</h2>"
+                                  f"<p>La credencial <b>{username}</b> caduca en ~{dias_rest} dia(s) "
+                                  f"({cexp[:10]}).</p>"
+                                  f"<p>Renueva la sesion con el Renovador Valere FV y luego pulsa "
+                                  f"Sincronizar en el CRM.</p>"
+                                  f"<p><a href='{CRM_URL}'>Abrir Valere CRM</a></p>"),
+                            resend_key=os.environ.get("RESEND_API_KEY"),
+                        )
+                    except Exception as _e:
+                        logger.warning("No se pudo enviar aviso de caducidad: %s", _e)
                 else:
                     estado_sesion = "activa"
             except Exception:
