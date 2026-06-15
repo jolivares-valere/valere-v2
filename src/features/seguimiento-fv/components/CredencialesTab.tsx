@@ -322,16 +322,24 @@ export default function CredencialesTab({ fixtureCredenciales, fixturesPlantas }
                   </div>
                 )}
 
-                {/* Aviso renovar sesión */}
+                {/* Aviso renovar sesión — flujo guiado con el Renovador local */}
                 {necesitaRenovar && (
-                  <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                    <KeyRound className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="text-xs text-amber-800">
-                      <p className="font-semibold mb-1">Sesión caducada — renueva las cookies</p>
-                      <pre className="font-mono bg-amber-100 rounded px-2 py-1 text-amber-900 whitespace-pre-wrap overflow-x-auto">
-{`cd valere-v2/scripts/fv-sync
-python extract_cookies.py --cred ${cred.id}`}
-                      </pre>
+                  <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                    <div className="flex items-start gap-2">
+                      <KeyRound className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800">
+                        <p className="font-semibold mb-1">Sesión caducada — hay que renovar las cookies</p>
+                        <p className="mb-1.5">
+                          FusionSolar caduca la sesión periódicamente y exige iniciar sesión a mano.
+                          Abre el <strong>Renovador Valere FV</strong> en tu PC, inicia sesión en el portal
+                          y vuelve aquí a <strong>Sincronizar</strong>.
+                        </p>
+                        <p className="text-amber-700">
+                          Pasos: 1) doble clic en <span className="font-mono">RENOVAR_SESION_FV.bat</span> ·
+                          2) elige esta credencial (<span className="font-mono">{cred.nombre || cred.username}</span>) ·
+                          3) inicia sesión en FusionSolar · 4) pulsa «Sincronizar» abajo.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
