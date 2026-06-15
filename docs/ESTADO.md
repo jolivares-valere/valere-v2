@@ -2,6 +2,96 @@
 
 > **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
 
+## 🔧 SESIÓN 2026-06-14/15 (Día 2-3 sprint) — REPARACIÓN GIT + FASE 1 + FASE 2 PPTX + CAPTURA FACTURAS + DIAGNÓSTICO FV
+
+> Sesión Cowork larga. Reparado git corrupto, Fase 1 desplegada, Fase 2 PPTX arrancada y desplegada, captura de facturas mejorada (por periodo + coordinación), y diagnóstico exhaustivo del módulo Plantas FV (credenciales). Varios PRs.
+
+### MERGEADO en main
+| PR | Qué | Commit |
+|---|---|---|
+| #12 | Fase 1: menú Energía en Sidebar + anualización en /analisis | 74c6f76 |
+| #13 | docs ESTADO.md sesión | ea0bc98 |
+| #14 | Fase 2.1: ClienteJson + buildClienteJson + tests | f6099a3 |
+
+### PENDIENTE DE MERGE (CI verde esperado)
+| PR | Rama | Estado |
+|---|---|---|
+| #15 | claude/faseA-captura-facturas | Fase A captura facturas + fix database.ts (commit 707f524). Mergear cuando CI verde. |
+
+### Fase 2 — PPTX de propuesta (avanzado)
+- F2.1 ClienteJson + builder: MERGEADO (#14).
+- F2.3 Edge Function `generar-propuesta-pptx`: escrita, validada (genera PPTX real 8 slides, fee invisible OK), y **DESPLEGADA en Supabase (v1, ACTIVE)**. Código + demo en `C:\Users\joliv\.claude\fase2_pptx_entregables\`. Logo oficial: `C:\Users\joliv\.claude\logo Valere.jpg` (horizontal 2043×675, el correcto).
+- Bucket `propuestas` (privado) creado.
+- PENDIENTE F2: columna proposals.pptx_url, botón en /analisis (F2.4), cablear logo, QA fee en CI (F2.5).
+
+### Captura de facturas (módulo Energía /datos) — Fase A hecha (PR #15)
+- **Modelo POR PERIODO** (no por mes): facturas.fecha_inicio/fecha_fin (date). Permite 2 facturas/mes y periodos que cruzan meses. Constraint UNIQUE (cups_id, fecha_inicio, fecha_fin) + índice. APLICADO EN PROD.
+- Columnas nuevas: origen ('manual'/'datadis'/'ia'/'telemedida'), documento_url. Migración versionada: supabase/migrations/20260614_facturas_coordinacion.sql.
+- Frontend: autorrelleno comercializadora del CUPS + contexto (tarifa/potencias) + campos fecha + anti-duplicado por periodo + origen:'manual'. database.ts: InvoiceHistory ampliada.
+- COORDINACIÓN: facturas la escriben manual + Datadis; la lee análisis. ⚠️ La próxima vez que se toque Datadis (useDatadis.ts) debe poblar fecha_inicio/fecha_fin (hoy solo month/year).
+- PENDIENTE: Fase B (adjuntar PDF/Excel, reusar sistema documentos polimórfico existente), Fase C (extracción IA con ai-adapter Gemini multimodal). Diseño en outputs/DISENO_CAPTURA_FACTURAS_IA.md.
+
+### 🔴 DIAGNÓSTICO MÓDULO PLANTAS FV (bug credenciales) — para chat nuevo dedicado
+- **BUG:** "Nueva credencial" no guarda; solo hay 1 credencial (JOLIVARES, instalador multicliente, 7 plantas, estado_sesion='error').
+- **CAUSA RAÍZ:** constraint `UNIQUE (plataforma, region_url, username)` en fv_credenciales → rechaza 2ª credencial si se reutiliza el mismo usuario instalador. La EF hace throw, no se guarda.
+- Arquitectura seguridad CORRECTA: password cifrado AES-GCM en tabla separada fv_credenciales_secret (solo service_role), RLS admin/master, EF fv-create-credential (ACTIVE v5).
+- estado_sesion='error' → login FusionSolar fallando (problema conocido cookies/WAF FusionSolar EU5, no permite histórico headless — ver scripts/fv-sync/README.md).
+- Modelo 1 credencial→N plantas (fv_planta.credencial_id) correcto.
+- Ficheros: src/features/seguimiento-fv/ (CredencialFormModal, CredencialesTab, api.ts), supabase/functions/fv-create-credential/, scripts/fv-sync/ (Python cron GitHub Actions).
+- **SE TRABAJA EN CHAT NUEVO DEDICADO A FV** (prompt entregado a Juan). No mezclar con captura/propuestas.
+
+### Reglas operativas confirmadas
+- Sandbox NO escribe en .git. Parche .cjs idempotente + PS1 (ASCII, TSC+tests, abort si falla) que ejecuta Juan. No push directo a main: rama claude/<desc> + PR.
+- LECCIÓN: el git add del PS1 debe incluir TODOS los ficheros tocados (el PR #15 falló CI por olvidar database.ts).
+
+
+> **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
+
+## 🔧 SESIÓN 2026-06-14/15 (Día 2-3 sprint) — REPARACIÓN GIT + FASE 1 + FASE 2 PPTX + CAPTURA FACTURAS + DIAGNÓSTICO FV
+
+> Sesión Cowork larga. Reparado git corrupto, Fase 1 desplegada, Fase 2 PPTX arrancada y desplegada, captura de facturas mejorada (por periodo + coordinación), y diagnóstico exhaustivo del módulo Plantas FV (credenciales). Varios PRs.
+
+### MERGEADO en main
+| PR | Qué | Commit |
+|---|---|---|
+| #12 | Fase 1: menú Energía en Sidebar + anualización en /analisis | 74c6f76 |
+| #13 | docs ESTADO.md sesión | ea0bc98 |
+| #14 | Fase 2.1: ClienteJson + buildClienteJson + tests | f6099a3 |
+
+### PENDIENTE DE MERGE (CI verde esperado)
+| PR | Rama | Estado |
+|---|---|---|
+| #15 | claude/faseA-captura-facturas | Fase A captura facturas + fix database.ts (commit 707f524). Mergear cuando CI verde. |
+
+### Fase 2 — PPTX de propuesta (avanzado)
+- F2.1 ClienteJson + builder: MERGEADO (#14).
+- F2.3 Edge Function `generar-propuesta-pptx`: escrita, validada (genera PPTX real 8 slides, fee invisible OK), y **DESPLEGADA en Supabase (v1, ACTIVE)**. Código + demo en `C:\Users\joliv\.claude\fase2_pptx_entregables\`. Logo oficial: `C:\Users\joliv\.claude\logo Valere.jpg` (horizontal 2043×675, el correcto).
+- Bucket `propuestas` (privado) creado.
+- PENDIENTE F2: columna proposals.pptx_url, botón en /analisis (F2.4), cablear logo, QA fee en CI (F2.5).
+
+### Captura de facturas (módulo Energía /datos) — Fase A hecha (PR #15)
+- **Modelo POR PERIODO** (no por mes): facturas.fecha_inicio/fecha_fin (date). Permite 2 facturas/mes y periodos que cruzan meses. Constraint UNIQUE (cups_id, fecha_inicio, fecha_fin) + índice. APLICADO EN PROD.
+- Columnas nuevas: origen ('manual'/'datadis'/'ia'/'telemedida'), documento_url. Migración versionada: supabase/migrations/20260614_facturas_coordinacion.sql.
+- Frontend: autorrelleno comercializadora del CUPS + contexto (tarifa/potencias) + campos fecha + anti-duplicado por periodo + origen:'manual'. database.ts: InvoiceHistory ampliada.
+- COORDINACIÓN: facturas la escriben manual + Datadis; la lee análisis. ⚠️ La próxima vez que se toque Datadis (useDatadis.ts) debe poblar fecha_inicio/fecha_fin (hoy solo month/year).
+- PENDIENTE: Fase B (adjuntar PDF/Excel, reusar sistema documentos polimórfico existente), Fase C (extracción IA con ai-adapter Gemini multimodal). Diseño en outputs/DISENO_CAPTURA_FACTURAS_IA.md.
+
+### 🔴 DIAGNÓSTICO MÓDULO PLANTAS FV (bug credenciales) — para chat nuevo dedicado
+- **BUG:** "Nueva credencial" no guarda; solo hay 1 credencial (JOLIVARES, instalador multicliente, 7 plantas, estado_sesion='error').
+- **CAUSA RAÍZ:** constraint `UNIQUE (plataforma, region_url, username)` en fv_credenciales → rechaza 2ª credencial si se reutiliza el mismo usuario instalador. La EF hace throw, no se guarda.
+- Arquitectura seguridad CORRECTA: password cifrado AES-GCM en tabla separada fv_credenciales_secret (solo service_role), RLS admin/master, EF fv-create-credential (ACTIVE v5).
+- estado_sesion='error' → login FusionSolar fallando (problema conocido cookies/WAF FusionSolar EU5, no permite histórico headless — ver scripts/fv-sync/README.md).
+- Modelo 1 credencial→N plantas (fv_planta.credencial_id) correcto.
+- Ficheros: src/features/seguimiento-fv/ (CredencialFormModal, CredencialesTab, api.ts), supabase/functions/fv-create-credential/, scripts/fv-sync/ (Python cron GitHub Actions).
+- **SE TRABAJA EN CHAT NUEVO DEDICADO A FV** (prompt entregado a Juan). No mezclar con captura/propuestas.
+
+### Reglas operativas confirmadas
+- Sandbox NO escribe en .git. Parche .cjs idempotente + PS1 (ASCII, TSC+tests, abort si falla) que ejecuta Juan. No push directo a main: rama claude/<desc> + PR.
+- LECCIÓN: el git add del PS1 debe incluir TODOS los ficheros tocados (el PR #15 falló CI por olvidar database.ts).
+
+
+> **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
+
 ## 🔧 SESIÓN 2026-06-14 (Día 2 sprint) — REPARACIÓN GIT + FASE 1 PIEZAS PERDIDAS
 
 > Sesión Cowork. Reparado el repo git corrupto (causa raíz del "gremlin") y reimplementadas las 2 piezas de Fase 1 que se perdieron el Día 1. PR nuevo subido.
@@ -1716,4 +1806,6 @@ Juan tiene token personal de ESIOS (REE). Análisis técnico completo en `docs/A
 | 2026-04-29 mañana | e8ed8c2…6464a89 | Reescritura Playwright, fixes CI ubuntu-22.04, fix login |
 | 2026-04-29 noche | a3d4a21 | Fix dashboard, asistente RAG, ExpedienteDetail |
 | 2026-04-30 | 00243bd, a388e04 | Schema FV multi-credencial, mantenimiento, workflow informes |
+
+
 
