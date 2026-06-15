@@ -57,6 +57,11 @@ export interface InvoiceHistory {
   retailer: string;
   billed_days: number;
   created_at: string;
+  // Modelo por periodo + coordinacion multi-fuente (2026-06-14).
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  origen?: string | null;
+  documento_url?: string | null;
 }
 
 export interface Retailer {
