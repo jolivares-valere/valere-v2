@@ -17,6 +17,7 @@ import type { Cups, Empresa } from '@/core/types/entities';
 import { cupsToSupplyPoint, supplyPointFormToCupsPayload } from '@/core/energia/adapters';
 import { toast } from 'sonner';
 import { getTariffConfig, validateCUPS, validatePowers } from '@/core/energia/tariffs';
+import { supabase } from '@/core/supabase/client';
 
 export default function DataCapture() {
   const location = useLocation()
@@ -183,14 +184,25 @@ export default function DataCapture() {
     const numPeriods = invTariffConfig.energia;
     setInvConsumptionPeriods(new Array(numPeriods).fill(0));
     setInvSurplusPeriods(new Array(numPeriods).fill(0));
-    setInvForm({
-      cups_id: selectedSPId,
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      billed_days: 30,
-      consumption_kwh: 0,
-      surplus_kwh: 0,
-    });
+    {
+      // Modelo por PERIODO: por defecto, mes natural actual (editable).
+      const hoy = new Date();
+      const ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      const fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      setInvForm({
+        cups_id: selectedSPId,
+        fecha_inicio: iso(ini),
+        fecha_fin: iso(fin),
+        month: hoy.getMonth() + 1,
+        year: hoy.getFullYear(),
+        billed_days: 30,
+        consumption_kwh: 0,
+        surplus_kwh: 0,
+        // Fase A: autorrelleno desde el CUPS.
+        retailer: selectedSP?.current_retailer || '',
+      } as Record<string, unknown>);
+    }
     setIsEditingInv(false);
     setEditingInvId(null);
     setInvDialogOpen(true);
@@ -210,6 +222,8 @@ export default function DataCapture() {
     );
     setInvForm({
       cups_id: inv.cups_id ?? selectedSPId,
+      fecha_inicio: (inv as unknown as Record<string, string | undefined>).fecha_inicio ?? '',
+      fecha_fin: (inv as unknown as Record<string, string | undefined>).fecha_fin ?? '',
       month: inv.month,
       year: inv.year,
       billed_days: inv.billed_days || 30,
@@ -255,11 +269,51 @@ export default function DataCapture() {
       toast.error('El consumo total debe ser mayor que 0');
       return;
     }
+    const invFormR = invForm as Record<string, unknown>;
+    const fIni = invFormR.fecha_inicio as string | undefined;
+    const fFin = invFormR.fecha_fin as string | undefined;
+    if (!fIni || !fFin) {
+      toast.error('Indica el periodo de la factura (fecha de inicio y fin).');
+      return;
+    }
+    if (new Date(fFin) < new Date(fIni)) {
+      toast.error('La fecha de fin no puede ser anterior a la de inicio.');
+      return;
+    }
+    // Derivar month/year/billed_days de las fechas (compat Datadis/codigo existente).
+    const dIni = new Date(fIni);
+    const dFin = new Date(fFin);
+    const diasFacturados = Math.round((dFin.getTime() - dIni.getTime()) / 86400000) + 1;
     const payload = {
       ...invForm,
+      fecha_inicio: fIni,
+      fecha_fin: fFin,
+      // month/year de referencia = mes/año de la fecha de fin del periodo.
+      month: dFin.getMonth() + 1,
+      year: dFin.getFullYear(),
+      billed_days: diasFacturados,
       consumption_kwh: totalConsumption,
       surplus_kwh: totalSurplus,
+      origen: 'manual',
     };
+    // Coordinacion multi-fuente: identidad = cups_id + periodo (constraint UNIQUE en BD).
+    // Misma factura no se duplica entre manual / Datadis / IA.
+    if (!isEditingInv) {
+      const { data: existente } = await (supabase as unknown as { from: (t: string) => any })
+        .from('facturas')
+        .select('id, origen')
+        .eq('cups_id', selectedSPId)
+        .eq('fecha_inicio', fIni)
+        .eq('fecha_fin', fFin)
+        .maybeSingle();
+      const ex = existente as { id: string; origen?: string } | null;
+      if (ex) {
+        toast.error(
+          `Ya existe una factura para este periodo y CUPS${ex.origen === 'datadis' ? ' (importada de Datadis)' : ''}. Edítala desde el historial.`,
+        );
+        return;
+      }
+    }
     if (isEditingInv && editingInvId) {
       const { id, created_at, cups_id, supply_point_id, ...updateData } =
         payload as Partial<InvoiceHistory>;
@@ -625,32 +679,42 @@ export default function DataCapture() {
           <DialogHeader>
             <DialogTitle className="font-display text-valere-blue-dark">{isEditingInv ? 'Editar Factura' : 'Nueva Factura'}</DialogTitle>
             {selectedSP && (
-              <p className="text-xs text-valere-ink/40 mt-1">
-                Tarifa: {selectedSP.tariff} — {invTariffConfig.energia} periodos de energía
-              </p>
+              <div className="text-xs text-valere-ink/40 mt-1 space-y-0.5">
+                <p>Tarifa: {selectedSP.tariff} — {invTariffConfig.energia} periodos de energía</p>
+                {selectedSP.current_retailer && (
+                  <p>Comercializadora actual: {selectedSP.current_retailer}</p>
+                )}
+                {selectedSP.powers && (
+                  <p>
+                    Potencias contratadas:{' '}
+                    {invTariffConfig.labels.potencia
+                      .map((lbl, i) => {
+                        const pw = (selectedSP.powers as unknown as Record<string, number>)[`p${i + 1}`]
+                        return pw ? `${lbl} ${pw} kW` : null
+                      })
+                      .filter(Boolean)
+                      .join(' · ') || 'sin datos'}
+                  </p>
+                )}
+              </div>
             )}
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div>
-              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Mes</label>
-              <select
-                value={invForm.month || 1}
-                onChange={e => setInvForm(p => ({ ...p, month: parseInt(e.target.value) }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {new Date(2000, i).toLocaleString('es-ES', { month: 'long' })}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Inicio periodo</label>
+              <input
+                type="date"
+                value={(invForm as Record<string, string>).fecha_inicio || ''}
+                onChange={e => setInvForm(p => ({ ...p, fecha_inicio: e.target.value } as typeof p))}
+                className={inputClass}
+              />
             </div>
             <div>
-              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Año</label>
+              <label className="block text-xs font-bold text-valere-ink/50 uppercase tracking-wider mb-1.5">Fin periodo</label>
               <input
-                type="number"
-                value={invForm.year || new Date().getFullYear()}
-                onChange={e => setInvForm(p => ({ ...p, year: parseInt(e.target.value) }))}
+                type="date"
+                value={(invForm as Record<string, string>).fecha_fin || ''}
+                onChange={e => setInvForm(p => ({ ...p, fecha_fin: e.target.value } as typeof p))}
                 className={inputClass}
               />
             </div>
