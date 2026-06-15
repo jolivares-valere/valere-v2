@@ -1,4 +1,6 @@
-# Estado actual del proyecto Valere v2
+﻿# Estado actual del proyecto Valere v2
+
+> **Ultima actualizacion: 2026-06-15 - FV credenciales Fase 1 DESPLEGADA (PR #17, migracion + EF v6 en Supabase). Bug guardado resuelto. Pendiente Fase 3 FusionSolar/cookies.**
 
 > **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
 
