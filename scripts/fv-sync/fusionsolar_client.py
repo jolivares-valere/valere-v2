@@ -233,24 +233,41 @@ class WebAuthClient(FusionSolarClient):
         self._page.keyboard.press("Enter")
         logger.debug("Formulario enviado via keyboard.press(Enter) sobre campo con foco JS")
 
-        # Paso 5: esperar redirección al portal
+        # Paso 5: esperar a que el login complete (modo Telegest: login directo robusto)
         # Registrar URL actual antes de esperar (ayuda a diagnosticar fallos de login)
         url_antes = self._page.url
-        logger.info("URL antes de wait_for_url: %s", url_antes)
+        logger.info("URL antes de esperar login: %s", url_antes)
+        # Esperamos hasta 70s (el SPA de FusionSolar es lento en CI headless) y
+        # aceptamos VARIAS senales de exito: salir de la pagina de login (/unisso/),
+        # o llegar al portal (/uniportal/). No solo la URL exacta /uniportal/.
+        login_ok = False
         try:
-            self._page.wait_for_url("**/uniportal/**", timeout=25_000)
-        except Exception as e:
-            # Guardar screenshot de diagnóstico para entender qué muestra el portal
-            url_despues = self._page.url
-            logger.error("wait_for_url falló. URL actual: %s", url_despues)
+            self._page.wait_for_function(
+                """() => {
+                    const u = window.location.href;
+                    return u.includes('/uniportal/') ||
+                           (!u.includes('/unisso/') && !u.includes('login'));
+                }""",
+                timeout=70_000,
+            )
+            login_ok = True
+        except Exception:
+            login_ok = False
+
+        url_despues = self._page.url
+        if not login_ok or ('/unisso/' in url_despues) or ('login' in url_despues.lower()):
+            # Seguimos en login -> credenciales mal, CAPTCHA, o WAF. Diagnostico con la URL.
+            logger.error("Login no completado. URL actual: %s", url_despues)
             try:
                 import os
-                screenshot_path = os.path.join(os.getcwd(), "playwright_debug.png")
-                self._page.screenshot(path=screenshot_path, full_page=True)
-                logger.info("Screenshot de diagnóstico guardado en %s", screenshot_path)
-            except Exception as se:
-                logger.warning("No se pudo guardar screenshot: %s", se)
-            raise
+                self._page.screenshot(path=os.path.join(os.getcwd(), "playwright_debug.png"), full_page=True)
+            except Exception:
+                pass
+            raise FusionSolarAuthError(
+                reason=f"Login no completado (sigue en pagina de login). URL: {url_despues}",
+                redirect_url=url_despues,
+            )
+        logger.info("Login completado, URL: %s", url_despues)
 
         # Esperar a que el JS del SPA inicialice (networkidle puede ser largo)
         try:
