@@ -764,6 +764,24 @@ def sync_credencial(
                         "ingresos_eur":    round(energia * PRECIO_KWH_EST, 2),
                     }, on_conflict="planta_id,fecha").execute()
                     logger.info("  KPI diario OK %s %s → %.1f kWh", station_code, fecha, energia)
+
+                    # FASE 4: consumo/autoconsumo/excedentes desde energy-balance (solo HOY).
+                    # Defensivo: si falla o la planta no tiene medidor, no toca nada.
+                    if dias_atras == 0 and not dry_run and hasattr(client, "get_energy_balance"):
+                        try:
+                            eb = client.get_energy_balance(station_code, fecha)
+                            campos_eb = {k: eb.get(k) for k in
+                                         ("consumo_kwh", "autoconsumo_kwh", "excedente_kwh", "compra_red_kwh")
+                                         if eb.get(k) is not None}
+                            if campos_eb:
+                                sb.table("fv_kpi_diario").update(campos_eb) \
+                                    .eq("planta_id", planta_id).eq("fecha", fecha.isoformat()).execute()
+                                logger.info("  energy-balance OK %s -> consumo=%s excedente=%s",
+                                            station_code, campos_eb.get("consumo_kwh"), campos_eb.get("excedente_kwh"))
+                            elif eb.get("existMeter") is False:
+                                logger.info("  energy-balance %s sin medidor -> sin consumo", station_code)
+                        except Exception as _eb_err:
+                            logger.warning("  energy-balance fallo %s: %s", station_code, _eb_err)
                     # Auditoría: éxito (o éxito con overflow corregido)
                     _ms = int((time.monotonic() - _t0) * 1000)
                     _etipo = "overflow" if (_overflow_energia or _overflow_potencia) else None
