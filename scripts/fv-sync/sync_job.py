@@ -1008,5 +1008,39 @@ def main() -> None:
         }).execute()
 
 
+def _run_in_clean_thread():
+    """Ejecuta main() en un hilo dedicado.
+
+    ROBUSTEZ CI (2026-06-16): algunos entornos (runners de GitHub Actions)
+    dejan un event loop asyncio en ejecucion en el hilo principal. Playwright
+    sync_api falla con "Sync API inside the asyncio loop" si detecta ese loop.
+    Un hilo nuevo SIEMPRE arranca sin running loop, por lo que Playwright
+    funciona de forma deterministica e independiente del entorno.
+
+    Propaga el codigo de salida: si main() llama sys.exit(n) o lanza, el proceso
+    principal termina con ese codigo.
+    """
+    import threading
+
+    holder = {"exit_code": 0, "exc": None}
+
+    def _target():
+        try:
+            main()
+        except SystemExit as se:
+            holder["exit_code"] = se.code if isinstance(se.code, int) else (0 if se.code is None else 1)
+        except BaseException as e:  # noqa: BLE001 - propagar cualquier fallo al proceso
+            holder["exc"] = e
+
+    t = threading.Thread(target=_target, name="fv-sync-main", daemon=False)
+    t.start()
+    t.join()
+
+    if holder["exc"] is not None:
+        raise holder["exc"]
+    if holder["exit_code"]:
+        sys.exit(holder["exit_code"])
+
+
 if __name__ == "__main__":
-    main()
+    _run_in_clean_thread()
