@@ -519,6 +519,7 @@ class StorageStateClient(FusionSolarClient):
     _ALARM_LIST   = WebAuthClient._ALARM_LIST
     _DEV_LIST     = WebAuthClient._DEV_LIST
     _DAILY_KPI    = WebAuthClient._DAILY_KPI
+    _ENERGY_BALANCE = "/rest/pvms/web/station/v3/overview/energy-balance"
 
     # ── Diagnóstico de cookies ──────────────────────────────
 
@@ -878,6 +879,51 @@ class StorageStateClient(FusionSolarClient):
                 self._station_cache[code] = st
         logger.debug("get_station_list: %d plantas", len(stations))
         return stations
+
+    def get_energy_balance(self, station_code: str, day: date | None = None) -> dict:
+        """Balance energetico del dia: generacion, consumo, autoconsumo, excedente, compra a red.
+
+        Llama al endpoint v3/overview/energy-balance (el que alimenta la grafica del portal).
+        Devuelve dict con totales del dia en kWh, o {} si falla, o {existMeter:False} si no hay
+        medidor. NUNCA lanza: el sync no debe romperse por esto.
+        """
+        if day is None:
+            day = date.today()
+        ts_ms = int(datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc).timestamp() * 1000)
+        path = f"{self._ENERGY_BALANCE}?stationDn={station_code}&timeDim=2&queryTime={ts_ms}&timeZone=2"
+        try:
+            data = self._fetch("GET", path)
+        except Exception as e:
+            logger.warning("  energy-balance error %s: %s", station_code, e)
+            return {}
+        d = data.get("data", data) if isinstance(data, dict) else {}
+        if not isinstance(d, dict):
+            return {}
+        if d.get("existMeter") is False:
+            logger.debug("  energy-balance %s sin medidor (existMeter=false)", station_code)
+            return {"existMeter": False}
+
+        def _suma(clave: str):
+            arr = d.get(clave)
+            if not isinstance(arr, list):
+                return None
+            total = 0.0
+            visto = False
+            for x in arr:
+                try:
+                    total += float(x); visto = True
+                except (TypeError, ValueError):
+                    continue
+            return round(total, 3) if visto else None
+
+        return {
+            "existMeter":      d.get("existMeter"),
+            "generacion_kwh":  _suma("productPower"),
+            "consumo_kwh":     _suma("usePower"),
+            "autoconsumo_kwh": _suma("selfUsePower"),
+            "excedente_kwh":   _suma("onGridPower"),
+            "compra_red_kwh":  _suma("mainsUsePower"),
+        }
 
     def get_station_kpi(self, station_code: str) -> dict:
         """Devuelve KPIs de la planta desde la caché del station-list (sin llamada extra).

@@ -105,10 +105,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // 7. La credencial debe existir (y por tanto su fila de secreto)
-    const { data: cred, error: credErr } = await sbAdmin
-      .from('fv_credenciales').select('id').eq('id', credencial_id).single()
-    if (credErr || !cred) return json({ error: 'Credencial no encontrada' }, 404)
+    // 7. La fila de secreto debe existir (la crea fv-create-credential con password_enc NOT NULL).
+    const { data: secretRow, error: secErr } = await sbAdmin
+      .from('fv_credenciales_secret').select('credencial_id').eq('credencial_id', credencial_id).single()
+    if (secErr || !secretRow) {
+      return json({ error: 'Esta credencial no tiene registro de secreto. Vuelve a crear la credencial en el CRM.' }, 404)
+    }
 
     // 8. Cifrar el storage state server-side
     const stateEnc = await encryptSecret(JSON.stringify(storage_state), encKey)
@@ -118,15 +120,16 @@ Deno.serve(async (req: Request) => {
     const now = new Date()
     const expires = new Date(now.getTime() + dias * 24 * 60 * 60 * 1000)
 
-    // 10. Escribir cookies en fv_credenciales_secret (upsert por si la fila no existiera)
+    // 10. UPDATE (no upsert): la fila existe y password_enc es NOT NULL.
+    //     Un upsert intentaba INSERT sin password_enc -> 23502.
     const { error: secretErr } = await sbAdmin
       .from('fv_credenciales_secret')
-      .upsert({
-        credencial_id:      credencial_id,
+      .update({
         session_cookies:    stateEnc,
         cookies_expires_at: expires.toISOString(),
         cookies_updated_at: now.toISOString(),
-      }, { onConflict: 'credencial_id' })
+      })
+      .eq('credencial_id', credencial_id)
     if (secretErr) {
       console.error('Error al escribir fv_credenciales_secret:', secretErr.code)
       return json({ error: 'No se pudieron guardar las cookies. Intentalo de nuevo.' }, 500)
