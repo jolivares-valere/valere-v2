@@ -500,6 +500,17 @@ def sync_credencial(
     cookies_expires_at = secret.get("cookies_expires_at")
     storage_state: dict | None = None
 
+    # ── MODO DE LOGIN (Fase 5, modo Telegest) ───────────────
+    # FV_LOGIN_MODE controla como se autentica el sync:
+    #   "directo" (DEFAULT) -> login completo user+password en cada sync, IGNORA cookies.
+    #                          Robusto: no depende de cookies que caducan. Como hace Telegest.
+    #                          Requiere que la cuenta NO pida CAPTCHA en headless (verificado: casi nunca).
+    #   "cookies"           -> usa storage state pre-extraido (Renovador) si es valido. Modo antiguo.
+    _login_mode = os.environ.get("FV_LOGIN_MODE", "directo").strip().lower()
+    if _login_mode == "directo":
+        logger.info("Modo login DIRECTO (user+password en cada sync, ignorando cookies) - cred=%s", cred_id)
+        session_state_enc = None  # forzar WebAuthClient (login completo)
+
     if session_state_enc:
         from datetime import timezone as _tz
         now = datetime.now(_tz.utc)
