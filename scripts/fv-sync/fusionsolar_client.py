@@ -596,9 +596,18 @@ class StorageStateClient(FusionSolarClient):
         # Derivamos la API base quitando el prefijo "uniNNN" del subdominio.
         parsed = urlparse(self.base_url)
         api_host = re.sub(r'^uni\d+', '', parsed.hostname or '')
-        self._api_base_url = f"{parsed.scheme}://{api_host}" if api_host else self.base_url
+        self._api_base_url = self._derive_api_base(self.base_url)
         if self._api_base_url != self.base_url:
             logger.info("API base URL: %s (portal: %s)", self._api_base_url, self.base_url)
+
+    @staticmethod
+    def _derive_api_base(base_url: str) -> str:
+        """Deriva la API base desde el portal FusionSolar (quita prefijo uniNNN)."""
+        import re
+        from urllib.parse import urlparse
+        parsed = urlparse(base_url)
+        api_host = re.sub(r"^uni\d+", "", parsed.hostname or "")
+        return f"{parsed.scheme}://{api_host}" if api_host else base_url
 
     # Reutilizamos constantes de WebAuthClient
     _STATION_LIST = WebAuthClient._STATION_LIST
@@ -815,6 +824,21 @@ class StorageStateClient(FusionSolarClient):
 
         logger.info("StorageStateClient: portal OK. URL: %s", current_url)
         self._portal_url = current_url   # usado como Referer en context.request
+
+        # Zona/subdominio dinamico de FusionSolar: Huawei puede redirigir el login
+        # a otro subdominio distinto del guardado en la credencial (uni003 -> uni004).
+        from urllib.parse import urlparse
+        parsed = urlparse(current_url)
+        if parsed.scheme and parsed.netloc:
+            real_base_url = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+            logger.info("FusionSolar zona real detectada tras login: %s", real_base_url)
+            if real_base_url != self.base_url:
+                old_base_url = self.base_url
+                old_api_base_url = self._api_base_url
+                self.base_url = real_base_url
+                self._api_base_url = self._derive_api_base(self.base_url)
+                logger.info("FusionSolar base_url actualizada: %s -> %s", old_base_url, self.base_url)
+                logger.info("FusionSolar _api_base_url actualizada: %s -> %s", old_api_base_url, self._api_base_url)
 
         # Esperar a que el SPA inicialice. El servidor setea roarand CSRF tras el
         # page load — necesitamos networkidle para que el cookie aparezca en el jar.
