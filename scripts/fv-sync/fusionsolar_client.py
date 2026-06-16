@@ -179,6 +179,7 @@ class WebAuthClient(FusionSolarClient):
                 "Chrome/120.0.0.0 Safari/537.36"
             ),
         )
+        self._context = context   # guardar para usar context.request (sin CORS)
         self._page = context.new_page()
 
         # Paso 1: navegar al portal → redirige automáticamente al SSO
@@ -363,67 +364,58 @@ class WebAuthClient(FusionSolarClient):
 
     def _fetch(self, method: str, path: str, payload: Any = None) -> Any:
         """
-        Ejecuta fetch() en el contexto de la página del portal.
-        Las cookies (incluidas las HttpOnly) se envían automáticamente.
-        Los datos se pasan como argumentos JS para evitar problemas de escape.
+        Peticion HTTP usando context.request (Playwright APIRequestContext).
 
-        Diagnóstico: devuelve {ok, status, body} desde JS para capturar el body
-        de respuesta incluso en errores HTTP (503, 401, etc.). Python levanta
-        FusionSolarResponseError con el body real para facilitar la clasificación
-        del patrón de fallos en el backfill histórico.
+        FIX 2026-06-16: ANTES usaba page.evaluate(fetch(...)) que falla con
+        "Failed to fetch" (CORS) porque el SPA llama a un subdominio distinto
+        (eu5 vs uni003eu5). context.request es el cliente HTTP nativo de
+        Playwright: NO tiene restriccion CORS y reenvia las cookies del contexto
+        (incluidas HttpOnly). Es lo mismo que ya hacia StorageStateClient.
         """
         import json as _json
         url = path if path.startswith("http") else self.base_url + path
-        logger.debug("→ _fetch %s %s | payload=%s", method.upper(), url, payload)
+        logger.debug("-> _fetch %s %s | payload=%s", method.upper(), url, payload)
         t0 = time.time()
+        m = method.upper()
 
-        result = self._page.evaluate(
-            """([method, url, payload]) =>
-                fetch(url, {
-                    method,
-                    headers: {"Content-Type": "application/json"},
-                    body: (method !== "GET" && payload !== null)
-                          ? JSON.stringify(payload)
-                          : undefined,
-                }).then(async r => {
-                    const body = await r.text();
-                    return {ok: r.ok, status: r.status, body};
-                })
-            """,
-            [method.upper(), url, payload],
-        )
+        headers = {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": f"{self.base_url}/uniportal/",
+        }
+        try:
+            if m == "GET":
+                resp = self._context.request.get(url, headers=headers, timeout=30000)
+            else:
+                resp = self._context.request.post(
+                    url, headers=headers,
+                    data=_json.dumps(payload) if payload is not None else "{}",
+                    timeout=30000,
+                )
+        except Exception as e:
+            logger.warning("_fetch context.request excepcion %s %s: %s", m, url, e)
+            raise FusionSolarResponseError(status=0, body_preview=str(e), endpoint=path)
 
         elapsed = time.time() - t0
-        status  = result.get("status", 0)
-        body    = result.get("body", "")
-        ok      = result.get("ok", False)
+        status = resp.status
+        body = resp.text()
+        final_url = resp.url
+        logger.debug("<- _fetch %s %s | HTTP %d (%.2fs) | body[:200]=%s",
+                     m, url, status, elapsed, body[:200])
 
-        logger.debug("← _fetch %s %s | HTTP %d (%.2fs) | body[:300]=%s",
-                     method.upper(), url, status, elapsed, body[:300])
-
-        if not ok:
-            # WARNING visible incluso sin --debug para registrar todos los 503
-            logger.warning(
-                "DIAG _fetch HTTP %d %s %s (%.2fs) | body[:400]: %s",
-                status, method.upper(), url, elapsed, body[:400],
-            )
-            # Detectar redireccionamiento a login embebido en 200 (auth silenciosa)
-            if "/unisso/login.action" in body:
-                raise FusionSolarAuthError(
-                    "Respuesta redirige a login (sesión expirada)",
-                    redirect_url="/unisso/login.action",
-                    endpoint=path,
-                )
-            raise FusionSolarResponseError(status, body[:400], path)
-
-        # Comprobar también sesión expirada en respuestas 200 con HTML de login
-        if "/unisso/login.action" in body:
-            logger.warning("DIAG _fetch HTTP 200 pero body contiene /unisso/login.action → sesión expirada")
+        # Redirect a login -> sesion expirada
+        if "/unisso/login.action" in body or "login" in final_url or "unisso" in final_url:
             raise FusionSolarAuthError(
-                "HTTP 200 con redirect a login en body (sesión expirada)",
+                "Respuesta redirige a login (sesion expirada)",
                 redirect_url="/unisso/login.action",
                 endpoint=path,
             )
+
+        if not resp.ok:
+            logger.warning("DIAG _fetch HTTP %d %s %s (%.2fs) | body[:400]: %s",
+                           status, m, url, elapsed, body[:400])
+            raise FusionSolarResponseError(status, body[:400], path)
 
         try:
             return _json.loads(body)
