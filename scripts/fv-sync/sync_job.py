@@ -561,20 +561,26 @@ def sync_credencial(
         # StorageStateClient. Asi no reimplementamos el cliente de datos: reutilizamos
         # el que ya funciona. Defensivo: si algo falla, seguimos con el cliente actual.
         if type(client).__name__ == "WebAuthClient":
+            from fusionsolar_client import StorageStateClient as _SSClient
+            _fresh_state = client._context.storage_state()
+            _n_ck = len(_fresh_state.get("cookies", [])) if isinstance(_fresh_state, dict) else 0
+            logger.info("Login directo OK: extraidas %d cookies frescas -> delegando datos en StorageStateClient", _n_ck)
+            # IMPORTANTE: cerrar el browser del WebAuthClient ANTES de abrir el
+            # StorageStateClient. Dos contextos sync_playwright() simultaneos en el
+            # mismo hilo provocan "Sync API inside the asyncio loop" (el primero deja
+            # un event loop registrado). El storage state ya esta extraido (dict
+            # serializado), no necesita el browser vivo.
             try:
-                from fusionsolar_client import StorageStateClient as _SSClient
-                _fresh_state = client._context.storage_state()
-                _n_ck = len(_fresh_state.get("cookies", [])) if isinstance(_fresh_state, dict) else 0
-                logger.info("Login directo OK: extraidas %d cookies frescas -> delegando datos en StorageStateClient", _n_ck)
-                _ss = _SSClient(region_url, _fresh_state)
-                _ss.login()  # navega al portal con las cookies (recien creadas, validas)
-                try:
-                    client.close()
-                except Exception:
-                    pass
-                client = _ss
-            except Exception as _deleg_err:
-                logger.warning("No se pudo delegar en StorageStateClient: %s. Sigo con WebAuthClient.", _deleg_err)
+                client.close()
+            except Exception:
+                pass
+            # A partir de aqui el WebAuthClient esta cerrado: si la delegacion falla
+            # NO podemos volver a el. Dejamos que la excepcion (incluido el fix de
+            # zona en StorageStateClient.login) propague al manejo de error normal,
+            # que marca la credencial en error/caducada de forma limpia.
+            _ss = _SSClient(region_url, _fresh_state)
+            _ss.login()  # navega al portal con las cookies; aqui actua el fix de zona
+            client = _ss
     except FusionSolarAuthError as e:
         msg = f"AUTH_REDIRECT — sesión rechazada por FusionSolar: {e}"
         logger.error("❌ %s", msg)
