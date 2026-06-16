@@ -43,6 +43,12 @@ export interface FVKpiDiario {
   fecha: string
   energia_kwh: number | null
   ingresos_eur: number | null
+  // Fase 4 — consumo/excedentes desde FusionSolar energy-balance (opcionales: null si no hay medidor,
+  // y opcionales en el tipo porque los tipos generados de Supabase aún no incluyen estas columnas)
+  consumo_kwh?: number | null
+  autoconsumo_kwh?: number | null
+  excedente_kwh?: number | null
+  compra_red_kwh?: number | null
 }
 
 export interface FVDispositivo {
@@ -159,7 +165,7 @@ export function useKpiDiarioPorPlanta(plantaId: string | undefined, dias = 30) {
         logError(error, 'useKpiDiarioPorPlanta')
         throw error
       }
-      return (data ?? []) as FVKpiDiario[]
+      return (data ?? []) as unknown as FVKpiDiario[]
     },
   })
 }

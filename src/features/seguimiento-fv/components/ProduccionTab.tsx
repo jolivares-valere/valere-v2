@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Sun, Zap, Euro } from 'lucide-react'
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { TrendingUp, Sun, Zap, Euro, Home, Upload, Info } from 'lucide-react'
 import type { FVPlanta } from '../api'
 import { useKpiDiarioPorPlanta } from '../api'
 
@@ -20,23 +20,35 @@ export default function ProduccionTab({ plantas }: Props) {
 
   const planta = plantas.find(p => p.id === plantaId)
 
-  // Resumen del período
-  const totalMes    = kpis.reduce((s, k) => s + (k.energia_kwh ?? 0), 0)
-  const ingresosMes = kpis.reduce((s, k) => s + (k.ingresos_eur ?? 0), 0)
-  const maxDia      = kpis.length > 0 ? Math.max(...kpis.map(k => k.energia_kwh ?? 0)) : 0
-  const diasActivos = kpis.filter(k => (k.energia_kwh ?? 0) > 0).length
+  // ¿Esta planta tiene datos de consumo/excedentes? (FusionSolar solo los da si hay medidor)
+  const tieneConsumo = kpis.some(k => k.consumo_kwh != null)
+  const tieneExcedente = kpis.some(k => k.excedente_kwh != null)
 
-  // Datos para recharts
+  // Resumen del período
+  const totalMes      = kpis.reduce((s, k) => s + (k.energia_kwh ?? 0), 0)
+  const consumoMes    = kpis.reduce((s, k) => s + (k.consumo_kwh ?? 0), 0)
+  const excedenteMes  = kpis.reduce((s, k) => s + (k.excedente_kwh ?? 0), 0)
+  const autoconsumoMes = kpis.reduce((s, k) => s + (k.autoconsumo_kwh ?? 0), 0)
+  const ingresosMes   = kpis.reduce((s, k) => s + (k.ingresos_eur ?? 0), 0)
+  const maxDia        = kpis.length > 0 ? Math.max(...kpis.map(k => k.energia_kwh ?? 0)) : 0
+  const diasActivos   = kpis.filter(k => (k.energia_kwh ?? 0) > 0).length
+  // % autoconsumo = autoconsumo / generación (cuánto de lo generado se aprovecha)
+  const pctAutoconsumo = totalMes > 0 && autoconsumoMes > 0
+    ? Math.round((autoconsumoMes / totalMes) * 100) : null
+
+  // Datos para el gráfico: generación + (consumo/excedente si existen)
   const chartData = kpis.map(k => ({
     fecha:      k.fecha.slice(5),
     Generación: Math.round((k.energia_kwh ?? 0) * 10) / 10,
+    ...(tieneConsumo ? { Consumo: Math.round((k.consumo_kwh ?? 0) * 10) / 10 } : {}),
+    ...(tieneExcedente ? { Excedente: Math.round((k.excedente_kwh ?? 0) * 10) / 10 } : {}),
   }))
 
   return (
     <div className="space-y-5">
 
       {/* Selector de planta */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <label className="text-sm font-medium text-slate-600 shrink-0">Planta:</label>
         <select
           value={plantaId}
@@ -54,16 +66,23 @@ export default function ProduccionTab({ plantas }: Props) {
             ⚠ Planta con incidencia
           </span>
         )}
+        {!isLoading && kpis.length > 0 && !tieneConsumo && (
+          <span className="flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-500 text-xs rounded-lg border border-slate-200">
+            <Info className="w-3 h-3" /> Sin medidor de consumo en esta planta
+          </span>
+        )}
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Generación total (30d)', value: fmt(totalMes, 0, ' kWh'),    Icon: Sun,        color: 'text-amber-500' },
-          { label: 'Ingresos estimados',     value: fmt(ingresosMes, 2, ' €'),   Icon: Euro,       color: 'text-emerald-600' },
-          { label: 'Mejor día (30d)',         value: fmt(maxDia, 0, ' kWh'),      Icon: TrendingUp, color: 'text-blue-500' },
-          { label: 'Días activos (30d)',      value: `${diasActivos} días`,       Icon: Zap,        color: 'text-green-500' },
-        ].map(({ label, value, Icon, color }) => (
+          { label: 'Generación (30d)',    value: fmt(totalMes, 0, ' kWh'),     Icon: Sun,        color: 'text-amber-500',   show: true },
+          { label: 'Consumo (30d)',       value: fmt(tieneConsumo ? consumoMes : null, 0, ' kWh'),   Icon: Home,   color: 'text-sky-600',     show: true },
+          { label: 'Excedente vertido',   value: fmt(tieneExcedente ? excedenteMes : null, 0, ' kWh'), Icon: Upload, color: 'text-violet-600',  show: true },
+          { label: 'Autoconsumo',         value: pctAutoconsumo != null ? `${pctAutoconsumo}%` : '—', Icon: Zap,    color: 'text-green-600',   show: true },
+          { label: 'Ingresos est.',       value: fmt(ingresosMes, 2, ' €'),    Icon: Euro,       color: 'text-emerald-600', show: true },
+          { label: 'Mejor día (30d)',     value: fmt(maxDia, 0, ' kWh'),       Icon: TrendingUp, color: 'text-blue-500',    show: true },
+        ].filter(c => c.show).map(({ label, value, Icon, color }) => (
           <div key={label} className="bg-white border border-slate-200 rounded-xl p-4">
             <Icon className={`w-4 h-4 ${color} mb-1.5`} />
             <p className="text-xs text-slate-500 mb-0.5">{label}</p>
@@ -75,7 +94,9 @@ export default function ProduccionTab({ plantas }: Props) {
       {/* Gráfico 30 días */}
       <div className="bg-white border border-slate-200 rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-800">Producción diaria — últimos 30 días</h3>
+          <h3 className="font-semibold text-slate-800">
+            {tieneConsumo ? 'Generación, consumo y excedentes' : 'Producción diaria'} — últimos 30 días
+          </h3>
           <span className="text-xs text-slate-400">{diasActivos} días con generación</span>
         </div>
 
@@ -88,8 +109,8 @@ export default function ProduccionTab({ plantas }: Props) {
             Sin datos de producción — lanza un sync para obtener datos
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <XAxis
                 dataKey="fecha"
                 tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -109,8 +130,11 @@ export default function ProduccionTab({ plantas }: Props) {
                 formatter={(v, name) => [`${v as number} kWh`, name as string] as [string, string]}
                 labelFormatter={l => `Día ${l}`}
               />
+              {(tieneConsumo || tieneExcedente) && <Legend wrapperStyle={{ fontSize: 11 }} />}
               <Bar dataKey="Generación" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-            </BarChart>
+              {tieneConsumo && <Line type="monotone" dataKey="Consumo" stroke="#0284c7" strokeWidth={2} dot={false} />}
+              {tieneExcedente && <Line type="monotone" dataKey="Excedente" stroke="#7c3aed" strokeWidth={2} dot={false} />}
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
@@ -123,7 +147,7 @@ export default function ProduccionTab({ plantas }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50">
             <tr>
-              {['Fecha', 'Generación', 'Ingresos est.'].map(h => (
+              {['Fecha', 'Generación', ...(tieneConsumo ? ['Consumo'] : []), ...(tieneExcedente ? ['Excedente'] : []), 'Ingresos est.'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wide">
                   {h}
                 </th>
@@ -133,17 +157,19 @@ export default function ProduccionTab({ plantas }: Props) {
           <tbody className="divide-y divide-slate-50">
             {isLoading ? (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400 text-sm animate-pulse">Cargando…</td>
+                <td colSpan={5} className="px-4 py-6 text-center text-slate-400 text-sm animate-pulse">Cargando…</td>
               </tr>
             ) : kpis.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-300 text-sm">Sin datos</td>
+                <td colSpan={5} className="px-4 py-6 text-center text-slate-300 text-sm">Sin datos</td>
               </tr>
             ) : (
               [...kpis].reverse().slice(0, 7).map(k => (
                 <tr key={k.fecha} className="hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-medium text-slate-700">{k.fecha}</td>
                   <td className="px-4 py-2.5 text-amber-600">{fmt(k.energia_kwh, 1, ' kWh')}</td>
+                  {tieneConsumo && <td className="px-4 py-2.5 text-sky-600">{fmt(k.consumo_kwh, 1, ' kWh')}</td>}
+                  {tieneExcedente && <td className="px-4 py-2.5 text-violet-600">{fmt(k.excedente_kwh, 1, ' kWh')}</td>}
                   <td className="px-4 py-2.5 text-emerald-600">{fmt(k.ingresos_eur, 2, ' €')}</td>
                 </tr>
               ))
