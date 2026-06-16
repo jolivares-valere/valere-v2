@@ -202,6 +202,7 @@ class WebAuthClient(FusionSolarClient):
         # cuando el elemento tiene display:none o está cubierto por un overlay).
         relleno = self._page.evaluate(
             """([user, pwd]) => {
+                function visible(el){ return el && el.offsetParent !== null; }
                 function fillInput(el, value) {
                     if (!el) return false;
                     try {
@@ -215,48 +216,47 @@ class WebAuthClient(FusionSolarClient):
                     el.dispatchEvent(new Event('blur',   {bubbles: true}));
                     return true;
                 }
-                // --- Campo PASSWORD ---
-                const pwdEl = document.querySelector('input[type="password"]');
-                const okPwd = fillInput(pwdEl, pwd);
-
-                // --- Campo USUARIO: probar varios selectores ---
-                // FusionSolar no siempre usa input[type=text]. Probamos en orden.
-                const selectores = [
-                    'input[type="text"]',
-                    'input[type="email"]',
-                    'input[name*="user" i]',
-                    'input[name*="account" i]',
-                    'input[name*="name" i]',
-                    'input[id*="user" i]',
-                    'input[id*="account" i]',
+                function pick(selectores){
+                    // Devuelve el PRIMER elemento VISIBLE que matchee alguno de los selectores
+                    for (const sel of selectores) {
+                        const els = Array.from(document.querySelectorAll(sel));
+                        const v = els.find(visible);
+                        if (v) return v;
+                    }
+                    return null;
+                }
+                // FusionSolar EU5 (confirmado por dump 2026-06-16): el form tiene 12 inputs,
+                // varios OCULTOS. Los que importan y son VISIBLES:
+                //   usuario  -> #username  (name=ssoCredentials.username)
+                //   password -> #value     (name=ssoCredentials.value)
+                const userEl = pick([
+                    '#username',
+                    'input[name="ssoCredentials.username"]',
                     'input[placeholder*="usuario" i]',
-                    'input[placeholder*="user" i]',
-                    'input[placeholder*="cuenta" i]',
-                    'input[placeholder*="email" i]',
-                ];
-                let userEl = null;
-                for (const sel of selectores) {
-                    const el = document.querySelector(sel);
-                    if (el && el !== pwdEl) { userEl = el; break; }
-                }
-                // Fallback: el primer input visible que NO sea password ni hidden
-                if (!userEl) {
-                    const inputs = Array.from(document.querySelectorAll('input'));
-                    userEl = inputs.find(i =>
-                        i !== pwdEl &&
-                        i.type !== 'password' && i.type !== 'hidden' && i.type !== 'checkbox' &&
-                        i.offsetParent !== null) || null;
-                }
+                    'input[placeholder*="correo" i]',
+                    'input[type="text"]',
+                ]);
+                const pwdEl = pick([
+                    '#value',
+                    'input[name="ssoCredentials.value"]',
+                    'input[type="password"]',
+                ]);
                 const okUser = fillInput(userEl, user);
-                return { okUser, okPwd,
-                         userSel: userEl ? (userEl.name || userEl.id || userEl.type || 'sin-id') : null };
+                const okPwd  = fillInput(pwdEl, pwd);
+                return {
+                    okUser, okPwd,
+                    userSel: userEl ? (userEl.id || userEl.name || 'sin-id') : 'NO-ENCONTRADO',
+                    pwdSel:  pwdEl  ? (pwdEl.id  || pwdEl.name  || 'sin-id') : 'NO-ENCONTRADO',
+                    userVal: userEl ? (userEl.value ? 'rellenado' : 'VACIO') : 'sin-campo'
+                };
             }""",
             [self.username, self.password],
         )
-        logger.info("Relleno login: usuario=%s password=%s (campo usuario: %s)",
-                    relleno.get("okUser"), relleno.get("okPwd"), relleno.get("userSel"))
-        if not relleno.get("okUser"):
-            logger.error("No se encontro el campo de USUARIO en el formulario de login.")
+        logger.info("Relleno login: usuario=%s (campo %s, %s) password=%s (campo %s)",
+                    relleno.get("okUser"), relleno.get("userSel"), relleno.get("userVal"),
+                    relleno.get("okPwd"), relleno.get("pwdSel"))
+        if not relleno.get("okUser") or relleno.get("userVal") == "VACIO":
+            logger.error("El campo de USUARIO no se relleno correctamente (sel=%s).", relleno.get("userSel"))
         logger.debug("Credenciales rellenadas via JS evaluate")
 
         # Paso 4: enviar el formulario
