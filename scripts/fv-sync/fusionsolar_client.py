@@ -233,6 +233,45 @@ class WebAuthClient(FusionSolarClient):
         self._page.keyboard.press("Enter")
         logger.debug("Formulario enviado via keyboard.press(Enter) sobre campo con foco JS")
 
+        # Paso 4.5: cerrar popups de consentimiento de cookies (banners de Huawei).
+        # Algunas cuentas muestran un banner de cookies que tapa el portal y bloquea
+        # el login headless ("se queda en la pagina de login"). Lo cerramos por JS,
+        # buscando botones tipicos de aceptar/cerrar. Defensivo: si no hay, no pasa nada.
+        # Se intenta varias veces porque el banner puede aparecer con retardo.
+        def _cerrar_popups_cookies():
+            try:
+                cerrados = self._page.evaluate(
+                    """() => {
+                        let n = 0;
+                        const textos = ['aceptar todo','aceptar todas','accept all','aceptar',
+                                        'accept','agree','de acuerdo','entendido','ok','allow all',
+                                        'permitir todo','consentir','i agree','got it'];
+                        const btns = Array.from(document.querySelectorAll(
+                            'button, a, span, div[role=button], [class*=cookie] button, [id*=cookie] button'));
+                        for (const b of btns) {
+                            const t = (b.innerText || b.textContent || '').trim().toLowerCase();
+                            if (!t) continue;
+                            if (textos.some(x => t === x || t.includes(x))) {
+                                try { b.click(); n++; } catch(e) {}
+                            }
+                        }
+                        // Tambien botones de cerrar (X) de banners de cookies/privacidad
+                        const cierres = Array.from(document.querySelectorAll(
+                            '[class*=cookie] [class*=close], [id*=cookie] [class*=close], '
+                            + '[class*=privacy] [class*=close], [aria-label*=close i], [aria-label*=cerrar i]'));
+                        for (const c of cierres) { try { c.click(); n++; } catch(e) {} }
+                        return n;
+                    }"""
+                )
+                if cerrados:
+                    logger.info("Cerrados %d popup(s) de cookies/consentimiento", cerrados)
+            except Exception as _e:
+                logger.debug("cerrar_popups_cookies sin efecto: %s", _e)
+
+        for _intento_popup in range(3):
+            _cerrar_popups_cookies()
+            self._page.wait_for_timeout(1500)
+
         # Paso 5: esperar a que el login complete (modo Telegest: login directo robusto)
         # Registrar URL actual antes de esperar (ayuda a diagnosticar fallos de login)
         url_antes = self._page.url
