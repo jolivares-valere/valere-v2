@@ -170,6 +170,98 @@ export function useKpiDiarioPorPlanta(plantaId: string | undefined, dias = 30) {
   })
 }
 
+/** Comparativa de excedentes (Excedentes/Datadis) desde fv_kpi_diario real.
+ *  excedente_fv_kwh = fv_kpi_diario.excedente_kwh (energy-balance v1, real).
+ *  Datadis (excedente_datadis_kwh) = null = guion hasta cruce CUPS.
+ *  Plantas sin medidor (excedente NULL) -> estado sin_datos (honesto, no error). */
+export function useComparativaExcedentes() {
+  return useQuery({
+    queryKey: ['fv_excedentes', 'comparativa'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('fv_kpi_diario')
+        .select('planta_id, fecha, excedente_kwh, energia_kwh, planta:fv_planta(id, nombre, nombre_interno, cups:cups(codigo_cups), empresa:empresas(id, nombre))')
+        .order('fecha', { ascending: false })
+        .limit(500)
+
+      if (error) {
+        logError(error, 'useComparativaExcedentes')
+        throw error
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const porPlanta = new Map<string, any>()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const row of ((data ?? []) as any[])) {
+        if (!porPlanta.has(row.planta_id)) porPlanta.set(row.planta_id, row)
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return Array.from(porPlanta.values()).map((row: any) => {
+        const exc = row.excedente_kwh
+        const sinMedidor = exc === null || exc === undefined
+        return {
+          planta_id: row.planta_id,
+          planta_nombre: row.planta?.nombre ?? row.planta?.nombre_interno ?? '-',
+          empresa_nombre: row.planta?.empresa?.nombre ?? '-',
+          cups: row.planta?.cups?.codigo_cups ?? '-',
+          fecha: row.fecha,
+          produccion_fv_kwh: row.energia_kwh ?? 0,
+          excedente_fv_kwh: sinMedidor ? 0 : Number(exc),
+          excedente_datadis_kwh: null as number | null,
+          diferencia_kwh: null as number | null,
+          diferencia_pct: null as number | null,
+          estado: (sinMedidor ? 'sin_datos' : 'ok') as 'ok' | 'revisar' | 'critico' | 'sin_datos',
+        }
+      })
+    },
+  })
+}
+
+/** Informes mensuales reales desde fv_informe_mensual. */
+export function useInformesMensuales() {
+  return useQuery({
+    queryKey: ['fv_informe_mensual', 'todos'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('fv_informe_mensual')
+        .select('*, empresa:empresas(id, nombre)')
+        .order('mes', { ascending: false })
+
+      if (error) {
+        logError(error, 'useInformesMensuales')
+        throw error
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ((data ?? []) as any[]).map((row: any) => ({
+        id: row.id,
+        empresa_nombre: row.empresa?.nombre ?? '-',
+        mes: row.mes,
+        estado: row.estado as 'borrador' | 'revision_pendiente' | 'aprobado' | 'enviado',
+        energia_total_kwh: row.energia_total_kwh ?? 0,
+        excedentes_kwh: 0,
+        autoconsumo_kwh: 0,
+        ahorro_estimado_eur: row.ahorro_estimado_eur ?? 0,
+        co2_evitado_kg: row.co2_evitado_kg ?? 0,
+        generado_en: row.generado_en ?? row.creado_en,
+      }))
+    },
+  })
+}
+
+/** Incidencias FV reales. La tabla incidencias NO tiene columna origen ni FK a fv_alarma,
+ *  asi que HOY no se distinguen de forma fiable las FV de las comerciales.
+ *  Devolvemos [] (empty state honesto). Pendiente migracion: incidencias.origen=fv
+ *  o FK fv_alarma_id. NO mezclar incidencias comerciales. */
+export function useIncidenciasFV() {
+  return useQuery({
+    queryKey: ['fv_incidencias', 'solo_fv'],
+    queryFn: async () => {
+      return [] as import('./fixtures').FxIncidencia[]
+    },
+  })
+}
+
 /** Dispositivos de una planta */
 export function useDispositivosPorPlanta(plantaId: string | undefined) {
   return useQuery({
