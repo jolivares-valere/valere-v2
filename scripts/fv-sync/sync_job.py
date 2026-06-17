@@ -565,6 +565,23 @@ def sync_credencial(
             _fresh_state = client._context.storage_state()
             _n_ck = len(_fresh_state.get("cookies", [])) if isinstance(_fresh_state, dict) else 0
             logger.info("Login directo OK: extraidas %d cookies frescas -> delegando datos en StorageStateClient", _n_ck)
+            # Host REAL post-login: Huawei autentica cada cuenta en su zona (region-N)
+            # y el login directo puede terminar en un subdominio distinto del guardado
+            # en la credencial (ej: jolivares -> uni004eu5, no uni003eu5). Leemos la URL
+            # final del browser del WebAuthClient ANTES de cerrarlo y la usamos como
+            # base del StorageStateClient; si no, sus datos (station-list) salen vacios.
+            _real_region_url = region_url
+            try:
+                _post_login_url = client._page.url
+            except Exception:
+                _post_login_url = None
+            if _post_login_url:
+                from urllib.parse import urlparse
+                _p = urlparse(_post_login_url)
+                if _p.scheme and _p.netloc:
+                    _real_region_url = f"{_p.scheme}://{_p.netloc}".rstrip("/")
+                    if _real_region_url != region_url:
+                        logger.info("Login directo: region_url real post-login: %s -> %s", region_url, _real_region_url)
             # IMPORTANTE: cerrar el browser del WebAuthClient ANTES de abrir el
             # StorageStateClient. Dos contextos sync_playwright() simultaneos en el
             # mismo hilo provocan "Sync API inside the asyncio loop" (el primero deja
@@ -578,7 +595,7 @@ def sync_credencial(
             # NO podemos volver a el. Dejamos que la excepcion (incluido el fix de
             # zona en StorageStateClient.login) propague al manejo de error normal,
             # que marca la credencial en error/caducada de forma limpia.
-            _ss = _SSClient(region_url, _fresh_state)
+            _ss = _SSClient(_real_region_url, _fresh_state)
             _ss.login()  # navega al portal con las cookies; aqui actua el fix de zona
             client = _ss
     except FusionSolarAuthError as e:
