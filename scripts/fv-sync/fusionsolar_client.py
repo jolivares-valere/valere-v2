@@ -1001,7 +1001,20 @@ class StorageStateClient(FusionSolarClient):
         if day is None:
             day = date.today()
         ts_ms = int(datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc).timestamp() * 1000)
-        path = f"{self._ENERGY_BALANCE}?stationDn={station_code}&timeDim=2&queryTime={ts_ms}&timeZone=2"
+        # FIX 2026-06-19: el SPA real de FusionSolar envia ademas timeZoneStr y el
+        # nonce "_". Sin timeZoneStr el backend v3 responde HTTP 500
+        # (ROA_EXFRAME_EXCEPTION). Replicamos el request del SPA al completo.
+        nonce = int(time.time() * 1000)
+        path = (
+            f"{self._ENERGY_BALANCE}"
+            f"?stationDn={station_code}"
+            f"&timeDim=2"
+            f"&queryTime={ts_ms}"
+            f"&timeZone=2"
+            f"&timeZoneStr=Europe/Madrid"
+            f"&_={nonce}"
+        )
+        logger.debug("energy-balance GET %s", path)
         try:
             data = self._fetch("GET", path)
         except Exception as e:
