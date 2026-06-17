@@ -1,5 +1,28 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-19b - Excedentes verificado en Supabase: fv_kpi_diario YA tiene balance real (8/12 plantas consumo/autoconsumo, 7/12 excedente). Bloque de arranque para Desktop listo. Pendiente menor: compra_red_kwh NULL.**
+
+## SESION 2026-06-19b (Cowork) -- VERIFICAR EXCEDENTES + PREPARAR DESKTOP
+
+> Confirmada la premisa post energy-balance antes de lanzar el MVP en Desktop.
+
+### Verificado en Supabase (run 27691355853, fecha 2026-06-17)
+- fv_kpi_diario: 8/12 plantas con consumo_kwh/autoconsumo_kwh real, 7/12 con excedente_kwh.
+- 4 plantas NULL (CORTIJO EL CABRIL, FOAM JAEN, GUADIX, HOTEL SIERRA LUZ): sin medidor, NULL legitimo.
+- compra_red_kwh NULL en TODAS (0/44): detalle menor, no bloquea. Revisar clave mainsUsePower en v1.
+
+### Entregable
+- docs/ACTUALIZACION_PREVIA_PROMPT_MVP_FV.md: bloque para pegar ANTES del prompt en Desktop.
+  Corrige la premisa "energy-balance bloqueado": Excedentes/Produccion ya con datos reales.
+
+### PENDIENTE
+- [ ] Lanzar MVP fase 1 en Claude Desktop (pegar ACTUALIZACION_PREVIA + PROMPT_MVP).
+- [ ] (menor) compra_red_kwh NULL: revisar mainsUsePower en respuesta v1.
+- [ ] (no bloqueante) day-real-kpi 503 = curva intradia.
+
+---
+
+
 > **Ultima actualizacion: 2026-06-19 - energy-balance RESUELTO (PR #42): era endpoint v3 roto en EU5, fix v1. Consumo/excedente reales pueblan fv_kpi_diario. Produccion/Excedentes del MVP YA NO bloqueados.**
 
 ## SESION 2026-06-19 (Cowork) -- FIX energy-balance HTTP 500 (v3->v1)
