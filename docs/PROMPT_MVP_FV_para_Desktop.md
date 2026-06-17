@@ -47,9 +47,15 @@ energia_mes_kwh, energia_total_kwh, ingresos_hoy_eur, actualizado_en.
 **fv_kpi_diario** (44): planta_id, fecha, energia_kwh, potencia_max_kw, ingresos_eur,
 consumo_kwh, autoconsumo_kwh, excedente_kwh, compra_red_kwh, creado_en.
   -> Origen de Producción y Excedentes. NO crear fv_produccion_diaria.
-  -> consumo/autoconsumo/excedente/compra_red YA SE POBLAN con datos reales (energy-balance v1
-     OK desde 2026-06-19). Cuando una planta no reporte un valor, viene NULL: muéstralo como
-     "—"/"sin datos", NUNCA 0 inventado.
+  -> El balance energético YA LLEGA con datos reales (PR #42, energy-balance v1, verificado
+     run 27691355853 el 2026-06-19). Usa energia_kwh, consumo_kwh, autoconsumo_kwh, excedente_kwh
+     reales cuando existan. Verificado fecha 2026-06-17: 8/12 plantas con consumo/autoconsumo,
+     7/12 con excedente.
+  -> Hay DOS tipos de NULL, píntalos distinto (NUNCA 0 inventado):
+     a) Plantas SIN MEDIDOR (existMeter=false: CORTIJO EL CABRIL, FOAM JAEN, GUADIX, HOTEL
+        SIERRA LUZ) -> consumo/autoconsumo/excedente NULL permanente -> "sin medidor / balance
+        no disponible" (estado honesto, no error).
+     b) compra_red_kwh NULL en TODAS las plantas por ahora (pendiente menor) -> "—".
 
 **fv_alarma** (12): id, planta_id, alarm_id, codigo, severidad, descripcion, dispositivo,
 iniciada_en, resuelta_en, activa, creado_en, actualizado_en.
@@ -168,10 +174,11 @@ HOY no se puede distinguir incidencias FV de comerciales (incidencias no tiene `
 
 ## BLOQUEADO por fuente de datos (NO implementar en Fase 1)
 - Curva intradía (día) -> day-real-kpi 503/WAF, sin tabla fv_produccion_intradia.
-- Consumo/autoconsumo/excedente reales -> energy-balance HTTP 500.
-- Comparativa Datadis completa -> energy-balance + CUPS cruzado.
+- Comparativa Datadis completa -> falta el cruce por CUPS (el balance FV YA llega; lo que
+  falta es el lado Datadis). La columna Datadis se queda en "—" por esto, NO por energy-balance.
 - Informes PDF finales.
 Para estos: empty state operativo, NO UI sobre tablas vacías.
+NOTA: consumo/autoconsumo/excedente reales YA NO están bloqueados (energy-balance resuelto, v1).
 
 ---
 
