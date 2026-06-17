@@ -47,8 +47,9 @@ energia_mes_kwh, energia_total_kwh, ingresos_hoy_eur, actualizado_en.
 **fv_kpi_diario** (44): planta_id, fecha, energia_kwh, potencia_max_kw, ingresos_eur,
 consumo_kwh, autoconsumo_kwh, excedente_kwh, compra_red_kwh, creado_en.
   -> Origen de Producción y Excedentes. NO crear fv_produccion_diaria.
-  -> consumo/autoconsumo/excedente/compra_red hoy salen NULL (sync energy-balance da HTTP 500,
-     frente aparte). Donde estén NULL muestra "—"/"sin datos", NUNCA 0 inventado.
+  -> consumo/autoconsumo/excedente/compra_red YA SE POBLAN con datos reales (energy-balance v1
+     OK desde 2026-06-19). Cuando una planta no reporte un valor, viene NULL: muéstralo como
+     "—"/"sin datos", NUNCA 0 inventado.
 
 **fv_alarma** (12): id, planta_id, alarm_id, codigo, severidad, descripcion, dispositivo,
 iniciada_en, resuelta_en, activa, creado_en, actualizado_en.
@@ -142,7 +143,7 @@ HOY no se puede distinguir incidencias FV de comerciales (incidencias no tiene `
    FIXTURE_COMPARATIVA/INCIDENCIAS/INFORMES por queries reales (hooks en `api.ts`, patrón
    `useTodasLasPlantas`):
    - Informes -> `fv_informe_mensual`.
-   - Excedentes/Datadis -> derivar de `fv_kpi_diario` (excedente_kwh); columna Datadis = "—" (bloqueada).
+   - Excedentes/Datadis -> derivar de `fv_kpi_diario` (`excedente_kwh`) - YA POBLADO (energy-balance v1 OK desde 2026-06-19); columna Datadis = sin cruce CUPS/Datadis completo por ahora.
    - Incidencias -> aplicar REGLA pestaña Incidencias (empty state + propuesta migración).
 
 2. **Centro de Operaciones del día** (primero al entrar o en Resumen): bandeja priorizada de

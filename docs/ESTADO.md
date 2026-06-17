@@ -1,5 +1,29 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-19 - energy-balance RESUELTO (PR #42): era endpoint v3 roto en EU5, fix v1. Consumo/excedente reales pueblan fv_kpi_diario. Produccion/Excedentes del MVP YA NO bloqueados.**
+
+## SESION 2026-06-19 (Cowork) -- FIX energy-balance HTTP 500 (v3->v1)
+
+> Frente tecnico del MVP FV. El endpoint energy-balance daba HTTP 500 para todas las plantas. Resuelto: era la version del endpoint.
+
+### Diagnostico y fix (3 PRs)
+- PR #40: probado anadir timeZoneStr=Europe/Madrid + nonce. NO era la causa (500 persistia).
+- PR #41: diagnostico temporal de variantes (flag FV_DIAG_EB + input diag_eb workflow). Sondeo confirmo: v3 GET=500, v1 GET=200 con todos los datos, v2 GET=200, POST=405.
+- PR #42: FIX DEFINITIVO. _ENERGY_BALANCE v3->v1 en fusionsolar_client.py. Eliminado el diagnostico temporal.
+
+### Verificado (run FV Sync 27691355853, 2026-06-19)
+energy-balance OK para todas las plantas con datos reales: NE=137303012 consumo=368.86 excedente=312.9; NE=197303554 consumo=4487 excedente=941; NE=177242135 consumo=2115 excedente=2320; etc. Cero ROA_EXFRAME. excedente=None en alguna planta es legitimo (no reporta vertido -> NULL).
+
+### IMPACTO en el MVP
+Las columnas consumo_kwh/autoconsumo_kwh/excedente_kwh/compra_red_kwh de fv_kpi_diario YA SE POBLAN. La pestana Excedentes del MVP puede conectarse a datos REALES desde fv_kpi_diario.excedente_kwh (ya NO empty state). Actualizado docs/PROMPT_MVP_FV_para_Desktop.md en consecuencia.
+
+### PENDIENTE FV (no bloqueante)
+- [ ] day-real-kpi 503/WAF = curva intradia (fv_produccion_intradia no existe). OTRO endpoint, sigue bloqueado pero NO bloquea Produccion (datos diarios si llegan).
+- [ ] Lanzar MVP fase 1 en Claude Desktop.
+
+---
+
+
 > **Ultima actualizacion: 2026-06-18b - Prompt MVP FV v2 FINAL + migracion fv_planta_nota versionada (commit d9401af, PR pendiente merge). Esquema/enums incidencias verificados. Listo para Desktop fase 1.**
 
 ## SESION 2026-06-18b (Cowork) -- PROMPT MVP FV v2 FINAL + VERSIONAR MIGRACION
