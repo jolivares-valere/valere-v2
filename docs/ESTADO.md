@@ -1,5 +1,36 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-19c - Auditoria pre-Desktop MVP FV: Produccion/Excedentes ya muestran balance real; las 3 pestanas mock siguen pendientes. Prompt MVP v3 coherente (sin contradicciones energy-balance), listo para lanzar Fase 1.**
+
+## SESION 2026-06-19c (Cowork) -- AUDITORIA PRE-DESKTOP MVP FV
+
+> Re-auditoria en vivo del despliegue actual antes de lanzar la Fase 1 en Claude Desktop.
+
+### Mejoras ya visibles en el CRM
+- Resumen muestra las 12 plantas reales, incluidas las 5 sin asignar. Badge "Sin asignar" = 5.
+- Potencia agregada (287.1 kW) y energia mensual (44 MWh) reflejan datos reales coherentes.
+- Produccion ya refleja el fix de energy-balance (PR #42):
+  - Plantas con medidor (JUAN RUBIO CASA, 2026-06-17): consumo 368.9 kWh, excedente 312.9 kWh, autoconsumo 79%, grafico 3 series.
+  - Plantas sin medidor (FOAM JAEN): "Sin medidor de consumo en esta planta", campos en "--", sin error.
+
+### Pendiente confirmado: Fase 1 aun NO implementada
+- Excedentes/Datadis, Incidencias CRM e Informes siguen usando fixtures/mock.
+- Verificado por red: esas pestanas NO disparan queries a Supabase (fv_kpi_diario, incidencias, fv_informe_mensual).
+- Siguen apareciendo plantas ficticias (Industrias Perez, MercaVal, Garcia Logistica, Panificadora Norte, Coop. Agricola), tambien en bloques del Resumen ("Incidencias abiertas", "Comparativa FV vs Datadis").
+
+### Prompt MVP v3 coherente (un solo bloque)
+- energy-balance ya NO bloqueado; Excedentes usa fv_kpi_diario.excedente_kwh real; Produccion diaria usa fv_kpi_diario.
+- Siguen bloqueados: Datadis completo (cruce CUPS) y curva intradia (day-real-kpi 503).
+- docs/ACTUALIZACION_PREVIA_PROMPT_MVP_FV.md marcado obsoleto (ya integrado, no pegar). Pegar SOLO docs/PROMPT_MVP_FV_para_Desktop.md.
+
+### PENDIENTE
+- [ ] Lanzar prompt v3 unico en Claude Desktop -> Fase 1.
+- [ ] Re-auditar tras despliegue: mock fuera, Excedentes con excedente_kwh, Incidencias real/empty, Informes con fv_informe_mensual, Centro Operaciones, alarmas gestionables, frescura, KPIs reales.
+- [ ] (menor) compra_red_kwh NULL: revisar mainsUsePower en v1.
+- [ ] (no bloqueante) day-real-kpi 503 = curva intradia.
+
+---
+
 > **Ultima actualizacion: 2026-06-19 - energy-balance RESUELTO (PR #42): era endpoint v3 roto en EU5, fix v1. Consumo/excedente reales pueblan fv_kpi_diario. Produccion/Excedentes del MVP YA NO bloqueados.**
 
 ## SESION 2026-06-19 (Cowork) -- FIX energy-balance HTTP 500 (v3->v1)
