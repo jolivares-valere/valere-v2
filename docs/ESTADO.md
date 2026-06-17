@@ -1,5 +1,36 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-18b - Prompt MVP FV v2 FINAL + migracion fv_planta_nota versionada (commit d9401af, PR pendiente merge). Esquema/enums incidencias verificados. Listo para Desktop fase 1.**
+
+## SESION 2026-06-18b (Cowork) -- PROMPT MVP FV v2 FINAL + VERSIONAR MIGRACION
+
+> Prompt para Desktop afinado con 4 correcciones verificadas contra el esquema real. Detectado y corregido que la migracion fv_planta_nota estaba en prod pero NO versionada en repo.
+
+### Correcciones incrustadas (verificadas via MCP)
+- Badges/contadores de queries reales: asignadas=empresa_id NOT NULL, sin asignar=empresa_id NULL, total=suma. 7+5=12.
+- Frescura: constante unica verde<6h / ambar 6-24h / rojo >24h o sin dato, sobre fv_kpi_realtime.actualizado_en.
+- Mapeo alarma->incidencia con enums REALES: severidad->prioridad (critica->critica, mayor->alta, menor->media, aviso->baja); estado inicial 'abierta'; si falta empresa_id NO inserta.
+- HALLAZGO: enum tipo_incidencia NO tiene valor FV. incidencias NO tiene columna origen ni FK a alarmas. Hoy NO se distinguen incidencias FV de comerciales -> tipo='otro', pestana Incidencias = empty state + proponer migracion (origen='fv' o fv_alarma_id).
+
+### Ficheros (commit d9401af, ya pusheado en claude/fv-mvp-prompt-y-migracion)
+- docs/PROMPT_MVP_FV_para_Desktop.md (prompt v2 final).
+- supabase/migrations/20260618_fv_mvp_notas_rls.sql (versiona fv_planta_nota).
+- PR PENDIENTE DE MERGE. La proxima sesion debe confirmar que esta en main antes de arrancar.
+
+### IMPORTANTE -- fv_planta_nota
+YA APLICADA EN PRODUCCION (via MCP, 2026-06-18). NO reaplicar. El .sql solo versiona.
+
+### Estado repo
+main = origin/main = a2bc6b9. Rama de trabajo: claude/fv-mvp-prompt-y-migracion (commit d9401af).
+
+### PENDIENTE (proxima sesion)
+- [ ] Mergear PR de claude/fv-mvp-prompt-y-migracion. Confirmar en main.
+- [ ] Lanzar docs/PROMPT_MVP_FV_para_Desktop.md en Claude Desktop -> MVP fase 1.
+- [ ] Frente paralelo: energy-balance HTTP 500. day-real-kpi 503 (intradia).
+
+---
+
+
 > **Ultima actualizacion: 2026-06-18 - FV MVP operativo: auditoria Supabase completada y migracion `fv_planta_nota` aplicada en produccion via MCP. Proximo paso: versionar migracion en repo y lanzar prompt MVP en Desktop.**
 
 ## SESION 2026-06-18 (Cowork) -- MODULO FV MVP OPERATIVO: AUDITORIA SUPABASE + NOTAS
