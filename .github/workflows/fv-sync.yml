@@ -21,6 +21,10 @@ on:
         description: "Dry-run (no escribe en BD)"
         type: boolean
         default: false
+      diag_eb:
+        description: "DIAG: sondear variantes del endpoint energy-balance (temporal)"
+        type: boolean
+        default: false
 
 concurrency:
   group: fv-sync
@@ -81,6 +85,8 @@ jobs:
           INPUT_CREDENCIAL_ID:  ${{ inputs.credencial_id }}
           INPUT_EMPRESA_ID:     ${{ inputs.empresa_id }}
           INPUT_DRY_RUN:        ${{ inputs.dry_run }}
+          # DIAG temporal: el codigo lee FV_DIAG_EB == "1". Mapeamos el boolean.
+          FV_DIAG_EB:           ${{ inputs.diag_eb == true && '1' || '0' }}
         run: |
           ARGS=""
           if [ -n "$INPUT_CREDENCIAL_ID" ]; then
