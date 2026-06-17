@@ -1,5 +1,72 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-18 - FV MVP operativo: auditoria Supabase completada y migracion `fv_planta_nota` aplicada en produccion via MCP. Proximo paso: versionar migracion en repo y lanzar prompt MVP en Desktop.**
+
+## SESION 2026-06-18 (Cowork) -- MODULO FV MVP OPERATIVO: AUDITORIA SUPABASE + NOTAS
+
+### Decision de arquitectura
+El modulo FV se abordara como MVP operativo primero, sin esperar a Huawei:
+- quitar mock automatico;
+- Centro de Operaciones FV;
+- alarmas gestionables;
+- detalle por planta;
+- notas por planta;
+- frescura de datos;
+- KPIs reales;
+- no abrir INSERT generico en `notificaciones`.
+
+En paralelo quedan los frentes tecnicos de fuente:
+- `energy-balance HTTP 500 / ROA_EXFRAME_EXCEPTION`;
+- `day-real-kpi 503/WAF`;
+- cruce Datadis/CUPS completo.
+
+### Auditoria Supabase realizada
+El esquema real ya estaba mas completo de lo previsto:
+- `fv_kpi_diario` ya cumple el rol de produccion diaria y tiene `energia_kwh`, `consumo_kwh`, `autoconsumo_kwh`, `excedente_kwh`, `compra_red_kwh`, `potencia_max_kw`, `ingresos_eur`.
+- No crear `fv_produccion_diaria`.
+- `fv_informe_mensual` ya existe.
+- `fv_alarma` ya existe con `severidad`, `descripcion`, `activa`, `iniciada_en`, `resuelta_en`.
+- Lo que faltaba realmente era `fv_planta_nota`.
+
+### Bug principal localizado
+En `src/features/seguimiento-fv/SeguimientoFVPage.tsx`, las pestanas Excedentes/Datadis, Incidencias e Informes usan fixtures directamente:
+- `FIXTURE_COMPARATIVA`;
+- `FIXTURE_INCIDENCIAS`;
+- `FIXTURE_INFORMES`.
+
+No es solo un fallback: esas pestanas nunca se conectaron a Supabase. Esto explica la mezcla de plantas reales con empresas ficticias.
+
+### Migracion aplicada en Supabase
+Aplicada en vivo via MCP:
+- tabla `fv_planta_nota`;
+- RLS activa;
+- policies `read`, `insert`, `update`, `delete` para `authenticated`;
+- trigger de `actualizado_en`;
+- funcion trigger corregida con `SET search_path = ''`.
+
+Pendiente: archivar/versionar la migracion en `supabase/migrations/20260618_fv_mvp_notas_rls.sql`.
+
+### Notificaciones / 403
+Causa del 403: tabla `notificaciones` tiene RLS activa y no tiene policy de INSERT.
+Decision: NO abrir policy generica de INSERT para `authenticated`.
+Las notificaciones automaticas FV deben nacer del sync/backend con `service_role`.
+El frontend solo debe leer/actualizar. Si hace falta creacion manual futura, usar RPC/Edge Function validada.
+
+### Duda 5 vs 7 plantas resuelta
+- `jolivares` minusculas: 5 plantas.
+- `JOLIVARES` mayusculas/instalador: 7 plantas.
+Ambos datos son correctos; no faltaban plantas.
+
+### Proximo paso
+1. Versionar migracion ya aplicada:
+   `supabase/migrations/20260618_fv_mvp_notas_rls.sql`
+2. Pasar `PROMPT_MVP_FV_para_Desktop.md` a Claude Desktop.
+3. Desktop debe implementar Fase 1:
+   quitar mock -> conectar pestanas reales -> Centro Operaciones -> alarmas gestionables -> detalle planta + notas -> frescura -> KPIs reales.
+
+---
+
+
 > **Ultima actualizacion: 2026-06-17 - FV Sync FusionSolar AUTH_REDIRECT/0-plantas RESUELTO. 3 fixes encadenados mergeados (PR #31 zona, #32 doble-browser, #33 host post-login). jolivares: 0 -> 5 plantas OK. Pendiente: energy-balance HTTP 500.**
 
 ## SESION 2026-06-17 (Cowork) -- FIX FV SYNC FUSIONSOLAR (zona dinamica uni003->uni004)
