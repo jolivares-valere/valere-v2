@@ -1,5 +1,34 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-17 - FV Sync FusionSolar AUTH_REDIRECT/0-plantas RESUELTO. 3 fixes encadenados mergeados (PR #31 zona, #32 doble-browser, #33 host post-login). jolivares: 0 -> 5 plantas OK. Pendiente: energy-balance HTTP 500.**
+
+## SESION 2026-06-17 (Cowork) -- FIX FV SYNC FUSIONSOLAR (zona dinamica uni003->uni004)
+
+> Depuracion del sync FV lanzado desde el CRM. La credencial jolivares fallaba con AUTH_REDIRECT y luego con 0 plantas. Causa raiz: zona/subdominio dinamico de FusionSolar (jolivares autentica en uni004eu5, no en el uni003eu5 guardado). 3 fixes encadenados.
+
+### MERGEADO en main
+| PR | Que |
+|---|---|
+| #31 | fix(fv): StorageStateClient detecta zona real post-login (actualiza base_url/_api_base_url) |
+| #32 | fix(fv): cerrar WebAuthClient antes de delegar (evita doble sync_playwright/asyncio) |
+| #33 | fix(fv): delegar StorageStateClient con host real post-login (jolivares uni004) |
+
+### Diagnostico (orden de descubrimiento)
+1. AUTH_REDIRECT en station-list de jolivares. Hipotesis: base_url fija uni003eu5 con sesion en uni004eu5.
+2. Tras #31+#32: la delegacion WebAuthClient->StorageStateClient reventaba con "Sync API inside the asyncio loop" (dos contextos Playwright sync a la vez). Se cerro el primero antes de abrir el segundo.
+3. Tras eso: sesion OK (check_session 200) pero 0 plantas. StorageStateClient se creaba con region_url de la credencial (uni003) y station-list devolvia vacio. Fix #33: usar client._page.url (host real post-login = uni004) como base.
+
+### Resultado verificado (run FV Sync 27681662657, 2026-06-17)
+- jolivares (cred 49064082): region_url real post-login uni003eu5 -> uni004eu5 -> 5 plantas encontradas -> OK 5 plantas, 20 alarmas. (Antes: 0 plantas / AUTH_REDIRECT.)
+- JOLIVARES (7 plantas) y FOAM_RESIDENCIAS (3 plantas): terminan en uni003, sin cambios. Sync global 3/3 OK.
+
+### PENDIENTE (tareas nuevas)
+- [ ] energy-balance HTTP 500 (ROA_EXFRAME_EXCEPTION) en v3/overview/energy-balance para TODAS las plantas. No tumba el sync (warning, KPIs diarios si entran) pero no trae balance energetico. Investigar (Huawei? navegacion previa? roarand?). Ver run 27681662657.
+- [ ] Verificar si jolivares son 5 o 7 plantas reales (memoria decia 7; el sync trajo 5).
+
+---
+
+
 > **Ultima actualizacion: 2026-06-15 - FV credenciales Fase 1 DESPLEGADA (PR #17, migracion + EF v6 en Supabase). Bug guardado resuelto. Pendiente Fase 3 FusionSolar/cookies.**
 
 > **Ultima actualizacion: 2026-06-14 (Dia 2 sprint) - Fase 1 piezas (menu Energia + anualizacion) MERGEADA (PR #12) y desplegada en Cloudflare. Git corrupto reparado. TSC 0 + 187 tests. Siguiente: Fase 2 PPTX.**
