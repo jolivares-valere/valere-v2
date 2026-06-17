@@ -824,6 +824,16 @@ def sync_credencial(
                     # FASE 4: consumo/autoconsumo/excedentes desde energy-balance (solo HOY).
                     # Defensivo: si falla o la planta no tiene medidor, no toca nada.
                     if dias_atras == 0 and not dry_run and hasattr(client, "get_energy_balance"):
+                        # DIAG TEMPORAL: si FV_DIAG_EB=1, sondea variantes del endpoint
+                        # energy-balance SOLO para la 1a planta del run.
+                        if (os.environ.get("FV_DIAG_EB") == "1"
+                                and not globals().get("_FV_DIAG_EB_HECHO")
+                                and hasattr(client, "diagnostico_energy_balance")):
+                            try:
+                                client.diagnostico_energy_balance(station_code, fecha)
+                            except Exception as _diag_err:
+                                logger.warning("  DIAG energy-balance fallo: %s", _diag_err)
+                            globals()["_FV_DIAG_EB_HECHO"] = True
                         try:
                             eb = client.get_energy_balance(station_code, fecha)
                             campos_eb = {k: eb.get(k) for k in
