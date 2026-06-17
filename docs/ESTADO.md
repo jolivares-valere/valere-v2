@@ -1,5 +1,34 @@
 ﻿# Estado actual del proyecto Valere v2
 
+> **Ultima actualizacion: 2026-06-19e - FASE 1 TAREA 1/6 implementada y mergeada (PR #47): 3 pestanas mock conectadas a Supabase real. tsc 0, 195 tests. Revisado Browser OK. Pendiente tareas 2-6.**
+
+## SESION 2026-06-19e (Cowork) -- FASE 1 TAREA 1: CONECTAR 3 PESTANAS A SUPABASE
+
+> Implementada desde Cowork (no Desktop, sin acceso). Metodo: scripts .py via PowerShell.
+
+### Hecho (PR #47, commit cfd3cc9) -- revisado por Browser, aprobado
+- api.ts: 3 hooks. useComparativaExcedentes (fv_kpi_diario.excedente_kwh real; Datadis=null; sin medidor->sin_datos). useInformesMensuales (fv_informe_mensual). useIncidenciasFV ([] FxIncidencia, empty state).
+- SeguimientoFVPage.tsx: sin FIXTURE_COMPARATIVA/INCIDENCIAS/INFORMES. Tambien limpia bloques mock del Resumen.
+- tsc 0 errores, 195 tests. Punto rojo #1 (cero mock) cumplido.
+
+### DEUDA anotada (corregir en tareas 2-6)
+- excedente_fv_kwh devuelve 0 en plantas sin medidor; deberia ser null (prompt: nunca 0 inventado). La UI usa estado=sin_datos, pero el dato es inconsistente. Corregir al construir ExcedentesTab real.
+- useIncidenciasFV importa FxIncidencia desde fixtures.ts; mover el tipo a un types.ts del modulo (acoplamiento).
+
+### PENDIENTE Fase 1 (tareas 2-6)
+- [ ] Tarea 2: Centro de Operaciones del dia.
+- [ ] Tarea 3: Alarmas FV gestionables (mapeo alarma->incidencia, enums).
+- [ ] Tarea 4: Detalle por planta + notas (fv_planta_nota).
+- [ ] Tarea 5: Frescura (constante unica verde<6h/ambar 6-24h/rojo>24h).
+- [ ] Tarea 6: KPIs/badges Resumen derivados de queries; normalizar estados.
+- Revisar cada PR con docs/CHECKLIST_REVISION_PR_DESKTOP_FASE1.md.
+
+### No bloqueante
+- compra_red_kwh NULL (revisar mainsUsePower v1). day-real-kpi 503 (intradia).
+
+---
+
+
 > **Ultima actualizacion: 2026-06-19c - Auditoria pre-Desktop MVP FV: Produccion/Excedentes ya muestran balance real; las 3 pestanas mock siguen pendientes. Prompt MVP v3 coherente (sin contradicciones energy-balance), listo para lanzar Fase 1.**
 
 ## SESION 2026-06-19c (Cowork) -- AUDITORIA PRE-DESKTOP MVP FV
