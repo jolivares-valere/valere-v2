@@ -615,7 +615,9 @@ class StorageStateClient(FusionSolarClient):
     _ALARM_LIST   = WebAuthClient._ALARM_LIST
     _DEV_LIST     = WebAuthClient._DEV_LIST
     _DAILY_KPI    = WebAuthClient._DAILY_KPI
-    _ENERGY_BALANCE = "/rest/pvms/web/station/v3/overview/energy-balance"
+    # v1 confirmado por diagnostico 2026-06-19: v3 da HTTP 500 (ROA_EXFRAME)
+    # en EU5; v1 GET devuelve 200 con todos los datos. NO volver a v3.
+    _ENERGY_BALANCE = "/rest/pvms/web/station/v1/overview/energy-balance"
 
     # ── Diagnóstico de cookies ──────────────────────────────
 
@@ -1049,52 +1051,6 @@ class StorageStateClient(FusionSolarClient):
             "compra_red_kwh":  _suma("mainsUsePower"),
         }
 
-    def diagnostico_energy_balance(self, station_code: str, day: date | None = None) -> None:
-        """DIAGNOSTICO TEMPORAL: sondea variantes del endpoint energy-balance.
-
-        v3/overview/energy-balance da HTTP 500 (ROA_EXFRAME_EXCEPTION) para todas
-        las plantas mientras day-real-kpi (POST) funciona. Probamos version
-        (v1/v2/v3), metodo (GET/POST) y timeDim (1=dia, 2=mes). Loguea status,
-        claves JSON vistas y body[:400]. NO lanza. Quitar tras identificar la buena.
-        """
-        import json as _json
-        if day is None:
-            day = date.today()
-        ts_ms = int(datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc).timestamp() * 1000)
-        nonce = int(time.time() * 1000)
-        base_qs = (f"stationDn={station_code}&queryTime={ts_ms}"
-                   f"&timeZone=2&timeZoneStr=Europe/Madrid&_={nonce}")
-        _pl = {"stationDn": station_code, "timeDim": 2, "queryTime": ts_ms,
-               "timeZone": 2, "timeZoneStr": "Europe/Madrid"}
-        variantes = [
-            ("v3 GET timeDim=2", "GET",  f"/rest/pvms/web/station/v3/overview/energy-balance?{base_qs}&timeDim=2", None),
-            ("v1 GET timeDim=2", "GET",  f"/rest/pvms/web/station/v1/overview/energy-balance?{base_qs}&timeDim=2", None),
-            ("v2 GET timeDim=2", "GET",  f"/rest/pvms/web/station/v2/overview/energy-balance?{base_qs}&timeDim=2", None),
-            ("v3 GET timeDim=1", "GET",  f"/rest/pvms/web/station/v3/overview/energy-balance?{base_qs}&timeDim=1", None),
-            ("v1 GET timeDim=1", "GET",  f"/rest/pvms/web/station/v1/overview/energy-balance?{base_qs}&timeDim=1", None),
-            ("v3 POST timeDim=2", "POST", "/rest/pvms/web/station/v3/overview/energy-balance", _pl),
-            ("v1 POST timeDim=2", "POST", "/rest/pvms/web/station/v1/overview/energy-balance", _pl),
-        ]
-        _claves = ("existMeter", "consumption", "selfUse", "onGrid", "buy",
-                   "productPower", "usePower", "selfUsePower", "onGridPower", "mainsUsePower")
-        logger.info("=== DIAG energy-balance %s (%s) host=%s ===", station_code, day, self.base_url)
-        for nombre, metodo, path, payload in variantes:
-            url = self._url_for_endpoint(path)
-            try:
-                if metodo == "GET":
-                    resp = self._context.request.get(url, headers=self._api_headers())
-                else:
-                    resp = self._context.request.post(
-                        url, headers=self._api_headers(),
-                        data=_json.dumps(payload) if payload is not None else "{}",
-                    )
-                body = resp.text()
-                claves_vistas = [k for k in _claves if k in body]
-                logger.info("DIAG [%s] %s HTTP %s | claves=%s | body[:400]=%s",
-                            nombre, metodo, resp.status, claves_vistas, body[:400])
-            except Exception as e:
-                logger.info("DIAG [%s] EXCEPCION: %s", nombre, e)
-        logger.info("=== FIN DIAG energy-balance ===")
 
     def get_station_kpi(self, station_code: str) -> dict:
         """Devuelve KPIs de la planta desde la caché del station-list (sin llamada extra).
