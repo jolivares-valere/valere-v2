@@ -302,6 +302,3 @@ function BandejaContent({
   )
 }
 }
-
-}
-}
