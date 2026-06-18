@@ -206,7 +206,7 @@ export function useComparativaExcedentes() {
           cups: row.planta?.cups?.codigo_cups ?? '-',
           fecha: row.fecha,
           produccion_fv_kwh: row.energia_kwh ?? 0,
-          excedente_fv_kwh: sinMedidor ? 0 : Number(exc),
+          excedente_fv_kwh: (sinMedidor ? null : Number(exc)) as number,
           excedente_datadis_kwh: null as number | null,
           diferencia_kwh: null as number | null,
           diferencia_pct: null as number | null,
