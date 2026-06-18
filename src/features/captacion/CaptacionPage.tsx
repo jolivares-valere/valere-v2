@@ -19,6 +19,7 @@ import SelectorVista, { loadViewMode, saveViewMode, type ViewMode } from './comp
 import TablaCaptacion from './components/TablaCaptacion'
 import MisLlamadasView from './components/MisLlamadasView'
 import RecordatorioModal from './components/RecordatorioModal'
+import CalendarioCaptacion from './components/CalendarioCaptacion'
 import { useAuth } from '../../core/hooks/useAuth'
 
 /**
@@ -162,6 +163,9 @@ export default function CaptacionPage() {
           <TabsTrigger value="historico">
             Histórico ({historicoFiltrado.length})
           </TabsTrigger>
+          <TabsTrigger value="calendario">
+            Calendario
+          </TabsTrigger>
           <TabsTrigger value="llamadas">
             Mis llamadas
           </TabsTrigger>
@@ -244,6 +248,11 @@ export default function CaptacionPage() {
           )}
         </TabsContent>
 
+        {/* Tab: Calendario (NUEVO sprint 2026-05-19 tarde, Hallazgo #1 Capa A) */}
+        <TabsContent value="calendario" className="mt-6">
+          <CalendarioCaptacion onAbrirCliente={setDrawerId} />
+        </TabsContent>
+
         {/* Tab: Mis llamadas (NUEVO sprint 2026-05-19) */}
         <TabsContent value="llamadas" className="mt-6">
           <MisLlamadasView onRowClick={setDrawerId} />
@@ -277,7 +286,6 @@ function BandejaContent({
     const ids = new Set(rows.map(r => r.id))
     const subset = historicoData.filter((r: any) => ids.has(r.id))
     return <TablaCaptacion data={subset} onRowClick={onClick} />
-  }
   if (rows.length === 0) {
     return (
       <div className="rounded-lg bg-slate-50 p-8 text-center">
@@ -292,4 +300,5 @@ function BandejaContent({
       ))}
     </div>
   )
+}
 }
