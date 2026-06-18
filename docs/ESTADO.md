@@ -1,6 +1,8 @@
 ﻿# Estado actual del proyecto Valere v2
 
-> **Ultima actualizacion: 2026-06-19e - FASE 1 TAREA 1/6 implementada y mergeada (PR #47): 3 pestanas mock conectadas a Supabase real. tsc 0, 195 tests. Revisado Browser OK. Pendiente tareas 2-6.**
+> **Última actualización: 2026-06-18 — Sprint Carolina Calendario Capa A desplegado en producción (commit e2c1445). Tab "Calendario" en /captacion con drag&drop bidireccional ficha↔calendario. 3 fixes BD aplicados directamente (RLS notificaciones, color en eventos, master visibility en v_mis_oportunidades). Ver `docs/SESIONES/2026-06-18-resumen.md` y `.cowork/outbox/2026-06-18T20-00-00-...md` para detalle. Pendiente: P2 cosméticos + Capa B Google Calendar (requiere OAuth setup por Juan).**
+
+> **Estado previo: 2026-06-19e — FASE 1 TAREA 1/6 implementada y mergeada (PR #47): 3 pestañas mock conectadas a Supabase real. tsc 0, 195 tests. Revisado Browser OK. Pendiente tareas 2-6.**
 
 ## SESION 2026-06-19e (Cowork) -- FASE 1 TAREA 1: CONECTAR 3 PESTANAS A SUPABASE
 
