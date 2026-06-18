@@ -171,8 +171,7 @@ export default function ProgramarLlamadaModal({
             {reagendar.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Guardando...
-              </>
+                Guarda              </>
             ) : esEdicion ? 'Guardar cambios' : 'Programar'}
           </Button>
         </DialogFooter>

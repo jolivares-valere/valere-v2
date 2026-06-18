@@ -289,7 +289,7 @@ function BandejaContent({
   if (rows.length === 0) {
     return (
       <div className="rounded-lg bg-slate-50 p-8 text-center">
-        <p className="text-slate-500">No tienes nada en esta bandeja</p>
+              <p className="text-slate-500">No tienes nada en esta bandeja</p>
       </div>
     )
   }
@@ -300,5 +300,8 @@ function BandejaContent({
       ))}
     </div>
   )
+}
+}
+
 }
 }

@@ -1,10 +1,7 @@
 import { useMemo, useState, useCallback } from 'react'
 import { Calendar as BigCalendar, dateFnsLocalizer, type View } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
-import format from 'date-fns/format'
-import parse from 'date-fns/parse'
-import startOfWeek from 'date-fns/startOfWeek'
-import getDay from 'date-fns/getDay'
+import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { useEventosCalendario, useReagendarEvento, type EventoCalendario } from '../useCalendario'
@@ -72,14 +69,9 @@ export default function CalendarioCaptacion({ onAbrirCliente }: Props) {
   const [modalEvento, setModalEvento] = useState<EventoCalendario | null>(null)
   const [modalFecha, setModalFecha] = useState<Date | null>(null)
 
-  // Adaptador para BigCalendar: necesita accessors estándar
-  const eventosCalendario = useMemo(() => eventos.map(ev => ({
-    ...ev,
-    start: ev.fecha_inicio,
-    end: ev.fecha_fin,
-    title: ev.empresa_nombre,
-    allDay: ev.tipo === 'vencimiento',
-  })), [eventos])
+  // BigCalendar usa los accessors (funciones) que apuntan a fecha_inicio/fecha_fin
+  // del propio EventoCalendario. No hace falta adaptar.
+  const eventosCalendario = useMemo(() => eventos, [eventos])
 
   const handleSelectEvent = useCallback((ev: any) => {
     // Click en evento existente → modal editar
@@ -192,10 +184,10 @@ export default function CalendarioCaptacion({ onAbrirCliente }: Props) {
             resizable
             eventPropGetter={eventPropGetter}
             popup
-            startAccessor="start"
-            endAccessor="end"
-            titleAccessor="title"
-            allDayAccessor="allDay"
+            startAccessor={(ev: any) => ev.fecha_inicio}
+            endAccessor={(ev: any) => ev.fecha_fin}
+            titleAccessor={(ev: any) => ev.empresa_nombre as string}
+            allDayAccessor={(ev: any) => ev.tipo === 'vencimiento'}
             views={['month', 'week', 'day', 'agenda']}
             step={30}
             timeslots={2}
@@ -204,11 +196,12 @@ export default function CalendarioCaptacion({ onAbrirCliente }: Props) {
       </div>
 
       <ProgramarLlamadaModal
-        open={modalOpen}
+             open={modalOpen}
         onOpenChange={setModalOpen}
         evento={modalEvento}
         fechaInicial={modalFecha}
       />
     </div>
   )
+}
 }
