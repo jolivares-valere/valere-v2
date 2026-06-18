@@ -3,12 +3,9 @@ import {
   Sun, LayoutDashboard, MapPin, BarChart2, ArrowLeftRight,
   AlertTriangle, KeyRound, UserX, FileText, FlaskConical,
 } from 'lucide-react'
-import { useTodasLasPlantas } from './api'
+import { useTodasLasPlantas, useComparativaExcedentes, useInformesMensuales, useIncidenciasFV } from './api'
 import AlarmasTab        from './components/AlarmasTab'
-import {
-  FIXTURE_PLANTAS, FIXTURE_PLANTAS_SIN_ASIGNAR,
-  FIXTURE_COMPARATIVA, FIXTURE_INCIDENCIAS, FIXTURE_CREDENCIALES, FIXTURE_INFORMES,
-} from './fixtures'
+import { FIXTURE_PLANTAS, FIXTURE_PLANTAS_SIN_ASIGNAR, FIXTURE_CREDENCIALES } from './fixtures'
 import ResumenTab        from './components/ResumenTab'
 import PlantasTab        from './components/PlantasTab'
 import ProduccionTab     from './components/ProduccionTab'
@@ -39,10 +36,9 @@ export default function SeguimientoFVPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const plantas: any[]  = usarFixtures ? FIXTURE_PLANTAS          : (plantasReales ?? [])
   const sinAsignar      = usarFixtures ? FIXTURE_PLANTAS_SIN_ASIGNAR : (plantasReales ?? []).filter((p: any) => !p.empresa_id)
-  const comparativa     = FIXTURE_COMPARATIVA
-  const incidencias     = FIXTURE_INCIDENCIAS
-  const informes        = FIXTURE_INFORMES
-
+  const { data: comparativa = [] } = useComparativaExcedentes()
+  const { data: incidencias = [] } = useIncidenciasFV()
+  const { data: informes = [] } = useInformesMensuales()
   const nIncidencias    = incidencias.filter(i => !i.resuelta).length
   const nCriticos       = comparativa.filter(c => c.estado === 'critico').length
   const nSinAsignar     = sinAsignar.length
