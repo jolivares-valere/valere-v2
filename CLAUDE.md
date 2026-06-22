@@ -343,3 +343,46 @@ El CRM tiene un widget flotante de ayuda (`AsistentePanel`) accesible desde toda
 4. Deploy: `supabase functions deploy ask-crm-docs`.
 
 Ver `docs/PLAN_ASISTENTE_RAG_CRM.md` para plan completo.
+
+### 🔄 Regla operativa: mantener el RAG actualizado al cerrar cada sesión
+
+**Toda sesión que añada o modifique una funcionalidad del CRM debe actualizar `docs/help/<modulo>/...md`** antes del commit final. Si no se actualiza, el asistente flotante del CRM no podrá explicar la feature a los usuarios cuando pregunten.
+
+**Checklist obligatorio en el protocolo de cierre de sesión**:
+
+1. Por cada feature nueva implementada en la sesión, crear o actualizar el archivo correspondiente en `docs/help/<modulo>/<nombre-feature>.md` con el formato estándar (front-matter YAML + secciones Qué es / Cómo acceder / Acciones / Si algo falla).
+2. Si la sesión solo ha hecho fixes (sin features nuevas) → no hace falta tocar `docs/help/`.
+3. Si la sesión ha cambiado el comportamiento de una feature existente (renombrado, nuevos botones, regla nueva) → editar el `.md` existente.
+4. Incluir `docs/help/**` en el commit final del sprint. El workflow `regenerate-help-embeddings.yml` regenera los embeddings automáticamente al ver el push.
+
+**Formato estándar de un archivo de help** (basado en `docs/help/captacion/crear-lead.md`):
+
+```yaml
+---
+title: <Título corto de la feature>
+section: <empresas | captacion | calendario | …>
+audience: <telemarketing | analista | asesor_senior | master | todos>
+keywords: [keyword1, keyword2, …]   # importante para que el RAG encuentre la doc
+related:
+  - <ruta a otro doc relacionado>
+---
+
+# <Título>
+
+## Qué es
+1-3 frases. Lenguaje natural, no técnico.
+
+## Cómo acceder
+Ruta exacta en el CRM (`/captacion` → pestaña X → botón Y).
+
+## Acciones / Pasos / Tablas
+Lo que el usuario puede hacer. Usar tablas si hay varias acciones.
+
+## Coordinación con otros tabs/módulos (si aplica)
+Cómo se relaciona con otras pantallas.
+
+## Si algo falla
+Errores típicos y cómo arreglarlos.
+```
+
+**Mantenimiento histórico cuando se elimina o cambia drásticamente una feature**: actualiza el `.md` correspondiente o márcalo como deprecado (`status: deprecated` en el front-matter) en lugar de borrarlo, para que el RAG no devuelva información obsoleta.
