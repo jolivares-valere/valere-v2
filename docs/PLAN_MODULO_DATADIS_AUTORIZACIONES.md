@@ -144,7 +144,7 @@ CREATE TABLE public.datadis_autorizaciones (
 ## 6. Fases de implementación propuestas
 
 **FASE 1 — Generación + registro (núcleo).**
-- Migración: `contactos.dni` + tabla `datadis_autorizaciones` (con RLS).
+- ✅ **Migración aplicada en producción (2026-06-27)**: `contactos.dni` + tabla `datadis_autorizaciones` (RLS patrón `datadis_tokens`, trigger `set_updated_at`, 4 índices, CHECK de estados/alcance/calidad/método). Fichero: `supabase/migrations/20260627_datadis_autorizaciones.sql`. Aplicada vía conector MCP (plan gratuito, sin branch; `supabase db push` falló por desajuste de historial de migraciones — pendiente reparar historial aparte).
 - Generador de PDF autorrellenado desde la ficha de empresa (premarcado todos los CUPS + Sí; anexo con CUPS del CRM).
 - Guardar el PDF generado en `documentos` y crear el registro en `datadis_autorizaciones` (estado `generada`).
 - UI mínima: botón "Generar autorización" en ficha de empresa + lista básica.
