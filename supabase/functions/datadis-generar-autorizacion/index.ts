@@ -70,9 +70,11 @@ serve(async (req) => {
   // Validar caller (JWT) y que sea admin
   const { data: userData, error: userErr } = await admin.auth.getUser(authHeader.replace('Bearer ', ''))
   if (userErr || !userData?.user) return json({ ok: false, error: 'JWT inválido' }, 401, cors)
-  const { data: perfil } = await admin.from('user_profiles').select('rol, role').eq('id', userData.user.id).single()
-  const rol = (perfil?.rol ?? perfil?.role ?? '') as string
-  if (rol !== 'admin' && rol !== 'master') {
+  // La columna real es 'role'. get_user_rol() mapea master/manager -> 'admin'.
+  const { data: perfil } = await admin.from('user_profiles').select('role').eq('id', userData.user.id).single()
+  const role = (perfil?.role ?? '') as string
+  const esAdmin = role === 'admin' || role === 'master' || role === 'manager'
+  if (!esAdmin) {
     return json({ ok: false, error: 'Solo un administrador puede generar autorizaciones.' }, 403, cors)
   }
 
@@ -147,10 +149,12 @@ serve(async (req) => {
     id: docId,
     entidad_tipo: 'empresa',
     entidad_id: empresa.id,
+    empresa_id: empresa.id,
     nombre: fileName,
+    nombre_archivo: fileName,
     tipo: 'pdf',
     ruta_storage: rutaStorage,
-    tamanio: pdfBytes.byteLength,
+    tamano_bytes: pdfBytes.byteLength,
     mime_type: 'application/pdf',
     descripcion: 'Autorización Datadis generada por el CRM',
     subido_por: userData.user.id,
