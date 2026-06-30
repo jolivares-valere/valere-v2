@@ -152,7 +152,7 @@ serve(async (req) => {
     empresa_id: empresa.id,
     nombre: fileName,
     nombre_archivo: fileName,
-    tipo: 'pdf',
+    tipo: 'autorizacion',
     ruta_storage: rutaStorage,
     tamano_bytes: pdfBytes.byteLength,
     mime_type: 'application/pdf',
