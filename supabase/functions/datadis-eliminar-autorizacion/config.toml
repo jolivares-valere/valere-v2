@@ -1,0 +1,5 @@
+# Edge Function datadis-eliminar-autorizacion
+# Borra una autorización Datadis completa (aut + documento + PDF storage).
+# Solo admin/master/manager (validado en el código).
+
+verify_jwt = true

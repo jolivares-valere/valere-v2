@@ -114,6 +114,26 @@ export function useGenerarAutorizacion() {
   })
 }
 
+export function useEliminarAutorizacion(empresaId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (autorizacionId: string): Promise<void> => {
+      const { data, error } = await supabase.functions.invoke('datadis-eliminar-autorizacion', {
+        body: { autorizacion_id: autorizacionId },
+      })
+      if (error) throw error
+      const res = data as { ok: boolean; error?: string }
+      if (!res?.ok) throw new Error(res?.error ?? 'No se pudo eliminar')
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [RESOURCE, empresaId] })
+      qc.invalidateQueries({ queryKey: ['documentos', 'empresa', empresaId] })
+      toast.success('Autorización eliminada')
+    },
+    onError: (e) => toast.error('Error al eliminar', { description: (e as Error).message }),
+  })
+}
+
 // Descargar el PDF de una autorización (signed URL del documento)
 export async function descargarDocumentoAutorizacion(documentoId: string): Promise<string | null> {
   const { data: doc, error } = await supabase

@@ -97,8 +97,11 @@ serve(async (req) => {
   }
 
   const { data: cupsRows } = await admin.from('cups')
-    .select('codigo_cups').eq('empresa_id', body.empresa_id).is('deleted_at', null)
-  const cupsList = (cupsRows ?? []).map((r: { codigo_cups: string }) => r.codigo_cups).filter(Boolean)
+    .select('id, codigo_cups').eq('empresa_id', body.empresa_id).is('deleted_at', null)
+    .order('codigo_cups', { ascending: true })
+  const cupsRowsArr = (cupsRows ?? []) as { id: string; codigo_cups: string }[]
+  const cupsList = cupsRowsArr.map((r) => r.codigo_cups).filter(Boolean)
+  const cupsIdsAll = cupsRowsArr.map((r) => r.id)
 
   // ── VALIDACIÓN de datos críticos (bloqueante) ──────────────────
   const faltan: FaltaDato[] = []
@@ -129,8 +132,8 @@ serve(async (req) => {
       calidadFirmante: calidad,
       alcanceCups: alcance,
       autoriza: true,                              // premarca Sí
-      cupsList: alcance === 'lista' ? cupsList : [],
-      incluirAnexo: alcance === 'lista' || cupsList.length > 1,
+      cupsList: cupsList,
+      incluirAnexo: cupsList.length > 1,
     })
   } catch (e) {
     return json({ ok: false, error: 'Error generando el PDF: ' + (e as Error).message }, 500, cors)
@@ -167,7 +170,7 @@ serve(async (req) => {
     contacto_firmante_id: body.contacto_firmante_id ?? null,
     calidad_firmante: calidad,
     alcance_cups: alcance,
-    cups_ids: body.cups_ids ?? [],
+    cups_ids: alcance === 'todos' ? cupsIdsAll : (body.cups_ids ?? []),
     estado: 'generada',
     documento_id: doc.id,
     finalidad: 'Prestación de servicios de consultoría y asesoramiento energético',
