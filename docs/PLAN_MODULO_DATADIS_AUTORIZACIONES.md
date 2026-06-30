@@ -145,9 +145,10 @@ CREATE TABLE public.datadis_autorizaciones (
 
 **FASE 1 — Generación + registro (núcleo).**
 - ✅ **Migración aplicada en producción (2026-06-27)**: `contactos.dni` + tabla `datadis_autorizaciones` (RLS patrón `datadis_tokens`, trigger `set_updated_at`, 4 índices, CHECK de estados/alcance/calidad/método). Fichero: `supabase/migrations/20260627_datadis_autorizaciones.sql`. Aplicada vía conector MCP (plan gratuito, sin branch; `supabase db push` falló por desajuste de historial de migraciones — pendiente reparar historial aparte).
-- Generador de PDF autorrellenado desde la ficha de empresa (premarcado todos los CUPS + Sí; anexo con CUPS del CRM).
-- Guardar el PDF generado en `documentos` y crear el registro en `datadis_autorizaciones` (estado `generada`).
-- UI mínima: botón "Generar autorización" en ficha de empresa + lista básica.
+- ✅ **Edge Function `datadis-generar-autorizacion` desplegada (2026-06-30)**: genera el PDF autorrellenado desde la ficha de empresa (premarcado todos los CUPS + Sí; mapea cargo→calidad firmante; anexo con CUPS del CRM), con **validación bloqueante de datos críticos** (razón social, CIF, firmante+DNI, ≥1 CUPS → devuelve `faltan[]`).
+- ✅ **Guarda el PDF en `documentos` (Storage bucket documentos) y crea el registro en `datadis_autorizaciones` (estado `generada`)**.
+- ✅ **UI en ficha de empresa (2026-06-30)**: tab "Datadis" con botón "Generar autorización" + panel "Faltan datos" (enlaces a completar) + lista con estados (StatusBadge) + descarga PDF. Archivos: `src/features/datadis/autorizaciones.api.ts`, `src/features/datadis/components/DatadisAutorizacionesTab.tsx`. Rama `claude/datadis-autorizaciones`.
+- ⏳ Pendiente: correr tests en terminal + commit frontend + PR.
 
 **FASE 2 — Envío + archivo + ciclo de estados.**
 - Edge Function de envío por email al cliente (Resend) → estado `enviada_cliente`.
