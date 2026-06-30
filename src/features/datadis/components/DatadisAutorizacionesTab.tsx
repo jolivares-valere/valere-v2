@@ -8,13 +8,15 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Download, AlertTriangle, Plus, ExternalLink } from 'lucide-react'
+import { FileText, Download, AlertTriangle, Plus, ExternalLink, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import StatusBadge, { type StatusVariant } from '../../../core/components/StatusBadge'
 import { formatDate } from '../../../core/utils/dates'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import {
   useAutorizaciones,
   useGenerarAutorizacion,
+  useEliminarAutorizacion,
   descargarDocumentoAutorizacion,
   type EstadoAutorizacion,
   type FaltaDato,
@@ -51,7 +53,9 @@ const ESTADO_VARIANT: Record<EstadoAutorizacion, StatusVariant> = {
 export default function DatadisAutorizacionesTab({ empresaId }: Props) {
   const { data: autorizaciones, isLoading } = useAutorizaciones(empresaId)
   const generar = useGenerarAutorizacion()
+  const eliminar = useEliminarAutorizacion(empresaId)
   const [faltan, setFaltan] = useState<FaltaDato[] | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   async function handleGenerar() {
     setFaltan(null)
@@ -164,16 +168,25 @@ export default function DatadisAutorizacionesTab({ empresaId }: Props) {
                   <td className="px-4 py-2 text-slate-600">{a.fecha_generacion ? formatDate(a.fecha_generacion) : '—'}</td>
                   <td className="px-4 py-2 text-slate-600">{a.fecha_vencimiento ? formatDate(a.fecha_vencimiento) : '—'}</td>
                   <td className="px-4 py-2 text-slate-600">{a.referencia_datadis ?? '—'}</td>
-                  <td className="px-4 py-2 text-right">
-                    {a.documento_id && (
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-end gap-2">
+                      {a.documento_id && (
+                        <button
+                          type="button"
+                          onClick={() => handleDescargar(a.documento_id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                        >
+                          <Download className="h-3 w-3" /> PDF
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => handleDescargar(a.documento_id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                        onClick={() => setConfirmDelete(a.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                       >
-                        <Download className="h-3 w-3" /> PDF
+                        <Trash2 className="h-3 w-3" /> Eliminar
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -181,6 +194,17 @@ export default function DatadisAutorizacionesTab({ empresaId }: Props) {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDelete !== null}
+        title="Eliminar autorización"
+        message="¿Seguro que quieres eliminar esta autorización? Se borrará también su PDF. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={eliminar.isPending}
+        onConfirm={async () => { if (confirmDelete) { await eliminar.mutateAsync(confirmDelete); setConfirmDelete(null) } }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }
