@@ -1,0 +1,5 @@
+# Edge Function datadis-generar-autorizacion
+# Genera el PDF de autorización Datadis autorrellenado desde el CRM.
+# Solo usuarios autenticados (y admin/master, validado en el código).
+
+verify_jwt = true
