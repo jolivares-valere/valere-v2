@@ -86,6 +86,7 @@ export interface Contacto {
   telefono: string | null
   movil: string | null
   cargo: string | null
+  dni: string | null
   departamento: string | null
   es_decisor: boolean
   es_firmante: boolean
