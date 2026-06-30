@@ -11,6 +11,7 @@ const schema = z.object({
   nombre: z.string().min(1, 'Obligatorio').max(100),
   apellidos: z.string().max(255).or(z.literal('')).transform((v) => v || null),
   cargo: z.string().max(255).or(z.literal('')).transform((v) => v || null),
+  dni: z.string().max(20).or(z.literal('')).transform((v) => v || null),
   departamento: z.string().max(255).or(z.literal('')).transform((v) => v || null),
   email: z.string().email('Email inválido').or(z.literal('')).transform((v) => v || null),
   telefono: z.string().max(50).or(z.literal('')).transform((v) => v || null),
@@ -54,6 +55,7 @@ export default function ContactoForm({ defaultValues, onSubmit, onCancel, submit
       nombre: defaultValues?.nombre ?? '',
       apellidos: defaultValues?.apellidos ?? '',
       cargo: defaultValues?.cargo ?? '',
+      dni: (defaultValues as { dni?: string | null })?.dni ?? '',
       departamento: defaultValues?.departamento ?? '',
       email: defaultValues?.email ?? '',
       telefono: defaultValues?.telefono ?? '',
@@ -79,6 +81,7 @@ export default function ContactoForm({ defaultValues, onSubmit, onCancel, submit
       nombre: string
       apellidos: string | null
       cargo: string | null
+      dni: string | null
       departamento: string | null
       email: string | null
       telefono: string | null
@@ -92,6 +95,7 @@ export default function ContactoForm({ defaultValues, onSubmit, onCancel, submit
       nombre: v.nombre,
       apellidos: v.apellidos,
       cargo: v.cargo,
+      dni: v.dni,
       departamento: v.departamento,
       email: v.email,
       telefono: v.telefono,
@@ -136,6 +140,7 @@ export default function ContactoForm({ defaultValues, onSubmit, onCancel, submit
         {field('nombre', 'Nombre *')}
         {field('apellidos', 'Apellidos')}
         {field('cargo', 'Cargo')}
+        {field('dni', 'DNI / NIE')}
         {field('departamento', 'Departamento')}
         {field('email', 'Email', 'email')}
         {field('telefono', 'Teléfono')}

@@ -10,6 +10,7 @@ const schema = z.object({
   telefono: z.string().optional().transform((v) => v || null),
   movil: z.string().optional().transform((v) => v || null),
   cargo: z.string().optional().transform((v) => v || null),
+  dni: z.string().optional().transform((v) => v || null),
   departamento: z.string().optional().transform((v) => v || null),
   es_decisor: z.boolean().default(false),
   es_firmante: z.boolean().default(false),
@@ -36,6 +37,7 @@ export default function ContactoForm({ empresaId, defaultValues, onSubmit, onCan
       telefono: defaultValues?.telefono ?? '',
       movil: defaultValues?.movil ?? '',
       cargo: defaultValues?.cargo ?? '',
+      dni: (defaultValues as { dni?: string | null })?.dni ?? '',
       departamento: defaultValues?.departamento ?? '',
       es_decisor: defaultValues?.es_decisor ?? false,
       es_firmante: defaultValues?.es_firmante ?? false,
@@ -52,6 +54,7 @@ export default function ContactoForm({ empresaId, defaultValues, onSubmit, onCan
       telefono: (values as unknown as { telefono: string | null }).telefono ?? null,
       movil: (values as unknown as { movil: string | null }).movil ?? null,
       cargo: (values as unknown as { cargo: string | null }).cargo ?? null,
+      dni: (values as unknown as { dni: string | null }).dni ?? null,
       departamento: (values as unknown as { departamento: string | null }).departamento ?? null,
       es_decisor: values.es_decisor ?? false,
       es_firmante: values.es_firmante ?? false,
@@ -87,6 +90,7 @@ export default function ContactoForm({ empresaId, defaultValues, onSubmit, onCan
         {input('telefono', 'Teléfono')}
         {input('movil', 'Móvil')}
         {input('cargo', 'Cargo')}
+        {input('dni', 'DNI / NIE')}
         {input('departamento', 'Departamento')}
       </div>
       <div className="flex gap-6">
