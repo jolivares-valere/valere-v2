@@ -5,6 +5,8 @@ import { puedeAccederRuta, rutaDefaultSegunFunciones } from './core/auth/permiss
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
 import SignupPage from './features/auth/SignupPage'
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage'
+import ResetPasswordPage from './features/auth/ResetPasswordPage'
 import PendingApprovalPage from './features/auth/PendingApprovalPage'
 import { ErrorBoundary } from './core/components/ErrorBoundary'
 
@@ -39,6 +41,7 @@ const AsistentePanel = lazy(() => import('./features/asistente-crm/AsistentePane
 const SeguimientoFVPage = lazy(() => import('./features/seguimiento-fv/SeguimientoFVPage'))
 const DatadisPage = lazy(() => import('./features/datadis/DatadisPage'))
 const SupplyDetailPage = lazy(() => import('./features/datadis/SupplyDetailPage'))
+const SuministrosPage = lazy(() => import('./features/suministros/SuministrosPage'))
 const CaptacionPage = lazy(() => import('./features/captacion/CaptacionPage'))
 const AnalisisCaptacionPage = lazy(() => import('./features/captacion/AnalisisPage'))
 const CarteraSeniorPage = lazy(() => import('./features/captacion/CarteraSeniorPage'))
@@ -127,6 +130,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/pending-approval" element={<PendingApprovalRoute />} />
 
       <Route path="/" element={<AuthGuard><Navigate to="/dashboard" replace /></AuthGuard>} />
@@ -136,6 +141,7 @@ export default function App() {
       <Route path="/empresas" element={<AuthGuard><EmpresasPage /></AuthGuard>} />
       <Route path="/empresas/:id" element={<AuthGuard><EmpresaDetailPage /></AuthGuard>} />
       <Route path="/contactos" element={<AuthGuard><ContactosPage /></AuthGuard>} />
+      <Route path="/suministros" element={<AuthGuard><SuministrosPage /></AuthGuard>} />
       <Route path="/contratos" element={<AuthGuard><ContratosPage /></AuthGuard>} />
       <Route path="/contratos/:id" element={<AuthGuard><ContratoDetailPage /></AuthGuard>} />
       <Route path="/oportunidades" element={<AuthGuard><OportunidadesPage /></AuthGuard>} />

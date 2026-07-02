@@ -84,7 +84,7 @@ export default function SignupPage() {
       const message = err instanceof Error ? err.message : 'Error al crear la cuenta'
       // Mensajes amigables para errores comunes
       if (/already registered|already exists|duplicate/i.test(message)) {
-        setError('Este email ya está registrado. Si olvidaste la contraseña, contacta con el administrador.')
+        setError('Este email ya está registrado. Si olvidaste la contraseña, usa «¿Olvidaste tu contraseña?» en la pantalla de inicio de sesión.')
       } else if (/rate limit/i.test(message)) {
         setError('Demasiados intentos en poco tiempo. Espera unos minutos y vuelve a probar.')
       } else {

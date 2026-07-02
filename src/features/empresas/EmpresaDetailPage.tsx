@@ -14,9 +14,10 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import CustomFieldsPanel from '../../core/components/CustomFieldsPanel'
 import PlantaFVTab from '../seguimiento-fv/components/PlantaFVTab'
 import DatadisAutorizacionesTab from '../datadis/components/DatadisAutorizacionesTab'
+import SuministrosTab from '../suministros/components/SuministrosTab'
 import type { EmpresaUpdate, ContactoInsert, TipoActividad } from '../../core/types/entities'
 
-type Tab = 'resumen' | 'contactos' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos' | 'plantas-fv' | 'datadis'
+type Tab = 'resumen' | 'contactos' | 'suministros' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos' | 'plantas-fv' | 'datadis'
 
 export default function EmpresaDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -91,6 +92,7 @@ export default function EmpresaDetailPage() {
                   </div>
                 )}
                 {tab === 'contactos' && <ContactosSection empresaId={empresa.id} />}
+                {tab === 'suministros' && <SuministrosTab empresaId={empresa.id} />}
                 {tab === 'documentos' && <DocumentosTab entidadTipo="empresa" entidadId={empresa.id} />}
                 {tab === 'campos' && <CustomFieldsPanel entidad_tipo="empresa" entidad_id={empresa.id} />}
                 {tab === 'plantas-fv' && <PlantaFVTab empresaId={empresa.id} />}
@@ -134,6 +136,7 @@ export default function EmpresaDetailPage() {
 const TAB_LABELS: Record<Tab, string> = {
   resumen:      'Resumen',
   contactos:    'Contactos',
+  suministros:  '⚡ Suministros',
   contratos:    'Contratos',
   actividades:  'Actividades',
   documentos:   'Documentos',
@@ -144,7 +147,7 @@ const TAB_LABELS: Record<Tab, string> = {
 }
 
 function TabsNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const tabs: Tab[] = ['resumen', 'contactos', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
+  const tabs: Tab[] = ['resumen', 'contactos', 'suministros', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
   return (
     <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
       {tabs.map((t) => (
