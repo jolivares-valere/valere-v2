@@ -1,0 +1,113 @@
+import { Link } from 'react-router-dom'
+import { Sun, CheckCircle2, XCircle } from 'lucide-react'
+import type { SuministroRow } from '../api'
+
+function tarifaBadge(t: string | null) {
+  if (!t) return <span className="text-xs text-slate-400">—</span>
+  const color =
+    t.startsWith('6') ? 'bg-purple-50 text-purple-700' :
+    t.startsWith('3') ? 'bg-blue-50 text-blue-700' :
+    'bg-slate-50 text-slate-600'
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{t}</span>
+}
+
+function estadoBadge(estado: string) {
+  const base = 'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize'
+  if (estado === 'activo') return <span className={`${base} bg-emerald-50 text-emerald-700`}>{estado}</span>
+  if (estado === 'baja') return <span className={`${base} bg-red-50 text-red-700`}>{estado}</span>
+  return <span className={`${base} bg-slate-100 text-slate-600`}>{estado}</span>
+}
+
+/** Tabla de suministros (CUPS) reutilizada por la pestaña y por la página global. */
+export default function SuministrosTable({
+  rows,
+  showEmpresa = false,
+}: {
+  rows: SuministroRow[]
+  showEmpresa?: boolean
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+        Sin suministros registrados.
+      </p>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            {showEmpresa && <th className="px-3 py-2">Empresa</th>}
+            <th className="px-3 py-2">CUPS</th>
+            <th className="px-3 py-2">Tarifa</th>
+            <th className="px-3 py-2 text-center">Pot. (kW)</th>
+            <th className="px-3 py-2">Dirección suministro</th>
+            <th className="px-3 py-2">Comercializadora</th>
+            <th className="px-3 py-2 text-center">FV</th>
+            <th className="px-3 py-2 text-center">Datadis</th>
+            <th className="px-3 py-2">Estado</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((r) => {
+            const pot = r.p1_kw ?? r.p6_kw
+            const tieneFV = r.potencia_fv_kwp != null || !!r.modelo_autoconsumo
+            return (
+              <tr key={r.id} className="hover:bg-slate-50/50">
+                {showEmpresa && (
+                  <td className="max-w-[160px] truncate px-3 py-2">
+                    <Link
+                      to={`/empresas/${r.empresa_id}`}
+                      className="font-medium text-slate-800 hover:text-valere-blue-dark hover:underline"
+                      title={r.empresa_nombre}
+                    >
+                      {r.empresa_nombre}
+                    </Link>
+                  </td>
+                )}
+                <td className="px-3 py-2 font-mono text-xs text-slate-600">{r.codigo_cups}</td>
+                <td className="px-3 py-2">{tarifaBadge(r.tarifa_acceso)}</td>
+                <td className="px-3 py-2 text-center text-slate-600">
+                  {pot != null ? Number(pot).toFixed(0) : '—'}
+                </td>
+                <td
+                  className="max-w-[240px] truncate px-3 py-2 text-xs text-slate-500"
+                  title={r.direccion_suministro ?? undefined}
+                >
+                  {r.direccion_suministro ?? r.denominacion ?? '—'}
+                </td>
+                <td className="px-3 py-2 text-xs text-slate-600">{r.comercializadora_actual ?? '—'}</td>
+                <td className="px-3 py-2 text-center">
+                  {tieneFV ? (
+                    <span
+                      className="inline-flex"
+                      title={r.potencia_fv_kwp != null ? `FV ${r.potencia_fv_kwp} kWp` : 'Con autoconsumo FV'}
+                    >
+                      <Sun className="h-4 w-4 text-amber-500" />
+                    </span>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {r.datadis_sincronizado ? (
+                    <span className="inline-flex" title="Sincronizado con Datadis">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </span>
+                  ) : (
+                    <span className="inline-flex" title="Sin sincronizar">
+                      <XCircle className="h-4 w-4 text-slate-300" />
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-2">{estadoBadge(r.estado)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}

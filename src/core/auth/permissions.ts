@@ -43,6 +43,7 @@ export const FUNCION_RUTAS_PERMITIDAS: Record<string, RegExp[]> = {
   asesor_senior: [
     /^\/cartera-senior(\/|$)/,
     /^\/empresas(\/|$)/,
+    /^\/suministros(\/|$)/,
     /^\/contactos(\/|$)/,
     /^\/contratos(\/|$)/,
     /^\/oportunidades(\/|$)/,

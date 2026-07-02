@@ -20,6 +20,7 @@ const crmItems: Item[] = [
   { to: '/dashboard',      label: 'Dashboard',     icon: LayoutDashboard },
   { to: '/empresas',       label: 'Empresas',      icon: Building2 },
   { to: '/contactos',      label: 'Contactos',     icon: Users },
+  { to: '/suministros',    label: 'Suministros',   icon: Zap },
   { to: '/actividades',    label: 'Actividades',   icon: Activity },
   { to: '/calendario',     label: 'Calendario',    icon: Calendar },
   { to: '/contratos',      label: 'Contratos',     icon: FileText },

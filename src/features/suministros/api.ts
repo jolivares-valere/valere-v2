@@ -1,0 +1,82 @@
+import { supabase } from '@/core/supabase/client'
+
+/**
+ * Feature "Suministros" (CUPS) para el CRM comercial.
+ *
+ * No crea datos nuevos: lee de la tabla `cups` (compartida con Potencias, FV y
+ * Datadis) y la expone en el CRM comercial (pestaña en la ficha de empresa +
+ * página global).
+ */
+export interface SuministroRow {
+  id: string
+  codigo_cups: string
+  tarifa_acceso: string | null
+  estado: string
+  distribuidor: string | null
+  comercializadora_actual: string | null
+  direccion_suministro: string | null
+  ciudad_suministro: string | null
+  denominacion: string | null
+  p1_kw: number | null
+  p6_kw: number | null
+  potencia_fv_kwp: number | null
+  modelo_autoconsumo: string | null
+  datadis_sincronizado: boolean | null
+  empresa_id: string
+  empresa_nombre: string
+}
+
+const SELECT = `
+  id, codigo_cups, tarifa_acceso, estado, distribuidor, comercializadora_actual,
+  direccion_suministro, ciudad_suministro, denominacion,
+  p1_kw, p6_kw, potencia_fv_kwp, modelo_autoconsumo, datadis_sincronizado,
+  empresa_id, empresas ( nombre )
+`
+
+function mapRow(r: Record<string, unknown>): SuministroRow {
+  const empresas = r.empresas as { nombre?: string } | null
+  return {
+    id: r.id as string,
+    codigo_cups: r.codigo_cups as string,
+    tarifa_acceso: (r.tarifa_acceso as string | null) ?? null,
+    estado: r.estado as string,
+    distribuidor: (r.distribuidor as string | null) ?? null,
+    comercializadora_actual: (r.comercializadora_actual as string | null) ?? null,
+    direccion_suministro: (r.direccion_suministro as string | null) ?? null,
+    ciudad_suministro: (r.ciudad_suministro as string | null) ?? null,
+    denominacion: (r.denominacion as string | null) ?? null,
+    p1_kw: (r.p1_kw as number | null) ?? null,
+    p6_kw: (r.p6_kw as number | null) ?? null,
+    potencia_fv_kwp: (r.potencia_fv_kwp as number | null) ?? null,
+    modelo_autoconsumo: (r.modelo_autoconsumo as string | null) ?? null,
+    datadis_sincronizado: (r.datadis_sincronizado as boolean | null) ?? null,
+    empresa_id: r.empresa_id as string,
+    empresa_nombre: empresas?.nombre ?? '—',
+  }
+}
+
+/** CUPS de una empresa concreta (para la pestaña en la ficha). */
+export async function fetchSuministrosByEmpresa(empresaId: string): Promise<SuministroRow[]> {
+  const { data, error } = await supabase
+    .from('cups')
+    .select(SELECT)
+    .eq('empresa_id', empresaId)
+    .is('deleted_at', null)
+    .order('codigo_cups', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []).map((r) => mapRow(r as Record<string, unknown>))
+}
+
+/** Todos los CUPS (para la página global del menú comercial). */
+export async function fetchAllSuministros(): Promise<SuministroRow[]> {
+  const { data, error } = await supabase
+    .from('cups')
+    .select(SELECT)
+    .is('deleted_at', null)
+    .order('empresa_id', { ascending: true })
+    .order('codigo_cups', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []).map((r) => mapRow(r as Record<string, unknown>))
+}

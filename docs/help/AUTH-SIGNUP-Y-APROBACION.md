@@ -27,7 +27,7 @@ Depende del administrador. Lo habitual es minutos u horas. Si pasados 7 días tu
 
 ### He intentado registrarme y dice "este email ya está registrado"
 
-Ya tienes una cuenta (puede que no aprobada). Si has olvidado la contraseña, contacta con el administrador para que te la resetee — no hay todavía un flujo de "olvidé mi contraseña" público en signup.
+Ya tienes una cuenta (puede que no aprobada). Si has olvidado la contraseña, usa **«¿Olvidaste tu contraseña?»** en la pantalla de login para restablecerla tú mismo. Ver [Recuperar la contraseña](auth/recuperar-contrasena.md).
 
 ## Para el administrador: aprobar o rechazar solicitudes
 

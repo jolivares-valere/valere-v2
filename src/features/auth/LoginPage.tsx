@@ -74,6 +74,12 @@ export default function LoginPage() {
         </button>
 
         <p className="text-center text-xs text-slate-500">
+          <Link to="/forgot-password" className="font-medium text-slate-900 underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+
+        <p className="text-center text-xs text-slate-500">
           ¿No tienes cuenta?{' '}
           <Link to="/signup" className="font-medium text-slate-900 underline">
             Solicitar acceso
