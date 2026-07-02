@@ -41,3 +41,7 @@ __pycache__/
 
 supabase/.temp/
 tsc_output.txt
+
+COMMIT_*.ps1
+REPARAR_*.ps1
+scripts/fv-sync/*.png
