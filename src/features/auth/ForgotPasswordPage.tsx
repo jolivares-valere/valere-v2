@@ -24,22 +24,18 @@ export default function ForgotPasswordPage() {
 
     setSubmitting(true)
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        parsed.data,
-        { redirectTo: `${window.location.origin}/reset-password` },
-      )
+      // Enviamos el correo de recuperación a través de la Edge Function
+      // `send-password-reset` (Resend), no del SMTP por defecto de Supabase.
+      const { error: fnError } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: parsed.data },
+      })
 
-      // No filtramos si el email existe o no (seguridad). Salvo rate limit,
-      // siempre mostramos el mismo mensaje de confirmación.
-      if (resetError && /rate limit/i.test(resetError.message)) {
-        setError('Demasiados intentos en poco tiempo. Espera unos minutos y vuelve a probar.')
-        logError(resetError, 'ForgotPasswordPage.resetPasswordForEmail')
-        return
-      }
-      if (resetError) {
-        logError(resetError, 'ForgotPasswordPage.resetPasswordForEmail')
+      if (fnError) {
+        logError(fnError, 'ForgotPasswordPage.sendPasswordReset')
       }
 
+      // No filtramos si el email existe o no (seguridad): siempre mostramos
+      // el mismo mensaje de confirmación.
       setSent(true)
     } catch (err) {
       logError(err, 'ForgotPasswordPage.onSubmit')
