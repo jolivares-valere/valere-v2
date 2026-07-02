@@ -1,0 +1,5 @@
+# Edge Function send-password-reset
+# Envía el correo de recuperación de contraseña vía Resend (reutiliza RESEND_API_KEY).
+# PÚBLICA: se llama desde /forgot-password sin sesión, por eso verify_jwt = false.
+
+verify_jwt = false
