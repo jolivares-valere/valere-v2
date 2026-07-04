@@ -26,6 +26,9 @@ type EditingState = ContratoConEmpresa | 'new' | null
 export default function ContratosPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const vencimientoMode = searchParams.get('vencimiento') === '1'
+  // H1 (auditoría enlaces F2): el Dashboard enlaza con ?estado=activo|incidencia.
+  // Antes este parámetro se descartaba en silencio; ahora filtra de verdad.
+  const estadoFilter = searchParams.get('estado')
 
   const { data, isLoading } = useContratos()
   const porVencer = useContratosPorVencer(100)
@@ -36,6 +39,12 @@ export default function ContratosPage() {
   const crearTarea = useCrearTareaDesdeContrato()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const clearEstado = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('estado')
+    setSearchParams(next)
+  }
 
   const toggleVencimiento = () => {
     const next = new URLSearchParams(searchParams)
@@ -70,7 +79,8 @@ export default function ContratosPage() {
   }
 
   const submitting = createMut.isPending || updateMut.isPending
-  const lista = data?.data ?? []
+  const todos = data?.data ?? []
+  const lista = estadoFilter ? todos.filter((c) => c.estado === estadoFilter) : todos
   const aBorrar = lista.find((c) => c.id === confirmDeleteId)
 
   return (
@@ -126,6 +136,17 @@ export default function ContratosPage() {
           Próximos a vencer
           {vencimientoMode && <X className="ml-1 h-3 w-3" />}
         </button>
+        {estadoFilter && (
+          <button
+            type="button"
+            onClick={clearEstado}
+            className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-800 ring-1 ring-blue-300 transition hover:bg-blue-200"
+            title="Quitar filtro de estado"
+          >
+            Estado: {estadoFilter}
+            <X className="ml-1 h-3 w-3" />
+          </button>
+        )}
       </div>
 
       {vencimientoMode && resumen.data && resumen.data.total > 0 && (

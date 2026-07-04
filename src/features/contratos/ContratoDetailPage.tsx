@@ -1,5 +1,6 @@
 ﻿import { useParams } from 'react-router-dom'
 import BackButton from '../../core/components/BackButton'
+import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
 import { useContratoById } from './api'
 import EstadoBadge from './components/EstadoBadge'
 import PrioridadBadge from './components/PrioridadBadge'
@@ -13,7 +14,7 @@ export default function ContratoDetailPage() {
   const { data, isLoading } = useContratoById(id)
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando…</div>
-  if (!data) return <div className="p-8 text-slate-500">Contrato no encontrado</div>
+  if (!data) return <EntidadNoEncontrada entidad="contrato" backTo="/contratos" backLabel="Volver a Contratos" />
 
   const { contrato, cups } = data
   const dias = calcDiasVencimiento(contrato.fecha_fin)
