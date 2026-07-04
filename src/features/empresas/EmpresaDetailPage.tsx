@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Pencil, Plus, Trash2, X, Phone, Mail, Users, CheckSquare, Activity } from 'lucide-react'
 import BackButton from '../../core/components/BackButton'
+import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
@@ -30,7 +31,7 @@ export default function EmpresaDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando…</div>
-  if (!empresa) return <div className="p-8 text-slate-500">Empresa no encontrada</div>
+  if (!empresa) return <EntidadNoEncontrada entidad="empresa" backTo="/empresas" backLabel="Volver a Empresas" />
 
   const onSave = async (values: EmpresaUpdate) => {
     await updateMut.mutateAsync({ id: empresa.id, patch: values })

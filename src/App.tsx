@@ -46,6 +46,7 @@ const SuministrosPage = lazy(() => import('./features/suministros/SuministrosPag
 const CaptacionPage = lazy(() => import('./features/captacion/CaptacionPage'))
 const AnalisisCaptacionPage = lazy(() => import('./features/captacion/AnalisisPage'))
 const CarteraSeniorPage = lazy(() => import('./features/captacion/CarteraSeniorPage'))
+const NotFoundPage = lazy(() => import('./core/components/NotFoundPage'))
 
 /** FASE 2 — telemetría: registra cada cambio de ruta (evento route_change). */
 function TelemetryTracker() {
@@ -193,7 +194,8 @@ export default function App() {
       <Route path="/analisis-captacion" element={<AuthGuard><AnalisisCaptacionPage /></AuthGuard>} />
       <Route path="/cartera-senior" element={<AuthGuard><CarteraSeniorPage /></AuthGuard>} />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* H5 — 404 propia con telemetría en vez de rebote silencioso a "/" */}
+      <Route path="*" element={<AuthGuard><NotFoundPage /></AuthGuard>} />
     </Routes>
     </>
   )

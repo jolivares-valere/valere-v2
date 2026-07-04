@@ -6,6 +6,7 @@ import {
   Loader2, Save, Edit2, X, Plus
 } from 'lucide-react'
 import { supabase } from '@/core/supabase/client'
+import EntidadNoEncontrada from '@/core/components/EntidadNoEncontrada'
 import { useSupabaseQuery } from '@/core/hooks/useSupabaseQuery'
 import { toast } from 'sonner'
 import { getNormativa, getNormativaOptions } from './normativas.config'
@@ -641,12 +642,7 @@ export default function ExpedienteDetailPage() {
 
   if (!exp) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-8">
-        <p className="text-slate-500">Expediente no encontrado.</p>
-        <Link to="/potencias/expedientes" className="text-sm text-blue-600 hover:underline">
-          ← Volver a Expedientes
-        </Link>
-      </div>
+      <EntidadNoEncontrada entidad="expediente" backTo="/potencias/expedientes" backLabel="Volver a Expedientes" />
     )
   }
 

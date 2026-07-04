@@ -39,6 +39,7 @@ export type TelemetryEventType =
   | 'supabase_query'
   | 'route_change'
   | 'web_vital'
+  | 'custom'
 
 interface TelemetryEvent {
   event_type: TelemetryEventType
@@ -114,8 +115,8 @@ function devLog(...args: unknown[]): void {
 
 function signatureOf(type: TelemetryEventType, payload: Record<string, unknown>): string | null {
   // Solo deduplicamos eventos de error (una tormenta de route_change no existe).
-  if (type === 'error' || type === 'unhandled_rejection' || type === 'error_boundary' || type === 'supabase_query') {
-    return `${type}|${String(payload.message ?? payload.label ?? '')}|${String(payload.path ?? '')}|${String(payload.status ?? '')}`
+  if (type === 'error' || type === 'unhandled_rejection' || type === 'error_boundary' || type === 'supabase_query' || type === 'custom') {
+    return `${type}|${String(payload.message ?? payload.label ?? payload.tipo ?? '')}|${String(payload.path ?? '')}|${String(payload.status ?? '')}`
   }
   return null
 }
@@ -365,6 +366,15 @@ export function trackErrorBoundary(error: Error, moduleName?: string): void {
     module: moduleName ?? 'desconocido',
     path: currentPath(),
   })
+}
+
+/**
+ * Evento custom (H5/H6 auditoría de enlaces): rutas no encontradas,
+ * entidades no encontradas, y cualquier señal ad-hoc futura.
+ * `tipo` viaja dentro del payload; el event_type de la tabla es 'custom'.
+ */
+export function trackCustom(tipo: string, extra: Record<string, unknown> = {}): void {
+  emit('custom', { tipo, path: currentPath(), ...extra })
 }
 
 /** Devuelve el buffer actual (debug). */
