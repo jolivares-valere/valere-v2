@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { trackErrorBoundary } from '../utils/telemetry';
 
 interface Props {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error(`[ErrorBoundary] ${this.props.moduleName || 'Module'} crashed:`, error, errorInfo);
+    trackErrorBoundary(error, this.props.moduleName);
   }
 
   render() {

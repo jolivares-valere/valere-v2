@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { trackRouteChange } from './core/utils/telemetry'
 import { useAuth } from './core/hooks/useAuth'
 import { puedeAccederRuta, rutaDefaultSegunFunciones } from './core/auth/permissions'
 import AppShell from './components/layout/AppShell'
@@ -45,6 +46,21 @@ const SuministrosPage = lazy(() => import('./features/suministros/SuministrosPag
 const CaptacionPage = lazy(() => import('./features/captacion/CaptacionPage'))
 const AnalisisCaptacionPage = lazy(() => import('./features/captacion/AnalisisPage'))
 const CarteraSeniorPage = lazy(() => import('./features/captacion/CarteraSeniorPage'))
+
+/** FASE 2 — telemetría: registra cada cambio de ruta (evento route_change). */
+function TelemetryTracker() {
+  const { pathname } = useLocation()
+  const prevPath = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (prevPath.current !== pathname) {
+      trackRouteChange(pathname, prevPath.current ?? undefined)
+      prevPath.current = pathname
+    }
+  }, [pathname])
+
+  return null
+}
 
 function LoadingScreen() {
   return (
@@ -127,6 +143,8 @@ function PendingApprovalRoute() {
 
 export default function App() {
   return (
+    <>
+    <TelemetryTracker />
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/signup" element={<SignupPage />} />
@@ -177,5 +195,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }

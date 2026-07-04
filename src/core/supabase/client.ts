@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database'
 import { logError } from '../utils/logger'
+import { telemetryFetch } from '../utils/telemetry'
 import { IS_DEMO } from '../demo'
 import { mockSupabase } from '../demo/mock-supabase'
 
@@ -30,5 +31,10 @@ export const supabase: SupabaseClient<Database> = IS_DEMO
   : createClient<Database>(
       url ?? '',
       anonKey ?? '',
-      { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } },
+      {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        // FASE 2: instrumentación de red — reporta 4xx/5xx y queries lentas
+        // a client_telemetry (excluye la propia tabla, anti-bucle).
+        global: { fetch: telemetryFetch },
+      },
     )
