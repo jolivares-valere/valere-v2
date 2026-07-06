@@ -39,6 +39,17 @@ const PRIORIDAD_ORDEN: Record<PrioridadRenovacion, number> = {
 const normalizar = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
+// CUPS de la renovación (vía su contrato). Puede haber varios; tomamos el primero.
+const cupsCode = (r: RenovacionConRelaciones): string | null =>
+  r.contrato?.cups?.[0]?.codigo_cups ?? null
+
+// Identidad de CUPS: los primeros 20 dígitos. Un CUPS de 20 y otro de 22 que
+// coinciden en los 20 primeros son el MISMO punto de suministro (no duplicar).
+const cupsNorm = (r: RenovacionConRelaciones): string | null => {
+  const c = cupsCode(r)
+  return c ? c.slice(0, 20) : null
+}
+
 const ESTADO_VARIANT: Record<EstadoRenovacion, StatusVariant> = {
   detectada: 'info',
   contactado: 'accent',
@@ -132,7 +143,7 @@ export default function RenovacionesPage() {
     if (q) {
       rows = rows.filter((r) =>
         normalizar(
-          `${r.empresa?.nombre ?? ''} ${r.contrato?.compania ?? ''} ${r.contrato?.numero_contrato ?? ''}`,
+          `${r.empresa?.nombre ?? ''} ${r.contrato?.compania ?? ''} ${r.contrato?.numero_contrato ?? ''} ${cupsCode(r) ?? ''}`,
         ).includes(q),
       )
     }
@@ -162,6 +173,33 @@ export default function RenovacionesPage() {
     })
   }, [listaCompleta, busqueda, sortField, sortAsc])
 
+  // Estado de rotación por CUPS, calculado sobre TODO el conjunto cargado (las
+  // 507), no sobre la página filtrada: por cada CUPS con varias renovaciones,
+  // la del contrato con fecha_inicio más reciente = 'vigente'; el resto =
+  // 'historico' (rotación pasada, visible sin tocar datos).
+  const cupsStatus = useMemo(() => {
+    const grupos = new Map<string, RenovacionConRelaciones[]>()
+    for (const r of listaCompleta) {
+      const code = cupsNorm(r)
+      if (!code) continue
+      const arr = grupos.get(code) ?? []
+      arr.push(r)
+      grupos.set(code, arr)
+    }
+    const status = new Map<string, 'vigente' | 'historico'>()
+    for (const arr of grupos.values()) {
+      if (arr.length < 2) continue // CUPS con una sola renovación → sin badge
+      let masReciente = arr[0]
+      for (const r of arr) {
+        if ((r.contrato?.fecha_inicio ?? '') > (masReciente.contrato?.fecha_inicio ?? '')) {
+          masReciente = r
+        }
+      }
+      for (const r of arr) status.set(r.id, r.id === masReciente.id ? 'vigente' : 'historico')
+    }
+    return status
+  }, [listaCompleta])
+
   const aBorrar = lista.find((r) => r.id === confirmDeleteId)
   const k = kpi.data
   const total = data?.count ?? 0
@@ -188,6 +226,7 @@ export default function RenovacionesPage() {
               { header: 'Empresa', value: (r) => r.empresa?.nombre },
               { header: 'Nº contrato', value: (r) => r.contrato?.numero_contrato },
               { header: 'Compañía', value: (r) => r.contrato?.compania },
+              { header: 'CUPS', value: (r) => cupsCode(r) },
               { header: 'Vencimiento', value: (r) => formatDate(r.fecha_vencimiento_contrato) },
               { header: 'Estado', value: (r) => ESTADO_LABEL[r.estado] },
               { header: 'Prioridad', value: (r) => PRIORIDAD_LABEL[r.prioridad] },
@@ -265,6 +304,7 @@ export default function RenovacionesPage() {
                 <tr>
                   <th className="px-4 py-3">Empresa</th>
                   <th className="px-4 py-3">Contrato</th>
+                  <th className="px-4 py-3">CUPS</th>
                   <th className="px-4 py-3">Vencimiento</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3">Prioridad</th>
@@ -272,7 +312,7 @@ export default function RenovacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}
+                {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={7} />)}
               </tbody>
             </table>
           </div>
@@ -304,6 +344,7 @@ export default function RenovacionesPage() {
                 <tr>
                   <SortableTh label="Empresa" field="empresa" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
                   <SortableTh label="Contrato" field="contrato" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <th className="px-4 py-3">CUPS</th>
                   <SortableTh label="Vencimiento" field="vencimiento" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
                   <SortableTh label="Estado" field="estado" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
                   <SortableTh label="Prioridad" field="prioridad" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
@@ -320,6 +361,26 @@ export default function RenovacionesPage() {
                       {ren.contrato?.numero_contrato ?? '—'}
                       {ren.contrato?.compania && (
                         <div className="text-slate-400">{ren.contrato.compania}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {cupsCode(ren) ? (
+                        <div className="flex items-center gap-1.5">
+                          <span title={cupsCode(ren) ?? ''} className="font-mono text-slate-600">{cupsNorm(ren)}</span>
+                          {cupsStatus.get(ren.id) === 'vigente' && (
+                            <StatusBadge variant="success" size="sm">Vigente</StatusBadge>
+                          )}
+                          {cupsStatus.get(ren.id) === 'historico' && (
+                            <StatusBadge variant="neutral" size="sm">Histórico</StatusBadge>
+                          )}
+                          {(ren.contrato?.cups?.length ?? 0) > 1 && (
+                            <span title="Este contrato tiene varios CUPS" className="text-amber-600">
+                              +{(ren.contrato?.cups?.length ?? 1) - 1}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{formatDate(ren.fecha_vencimiento_contrato)}</td>
@@ -364,6 +425,13 @@ export default function RenovacionesPage() {
                         {PRIORIDAD_LABEL[ren.prioridad]}
                       </StatusBadge>
                     </div>
+                    {cupsCode(ren) && (
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                        <span className="font-mono" title={cupsCode(ren) ?? ''}>{cupsNorm(ren)}</span>
+                        {cupsStatus.get(ren.id) === 'vigente' && <StatusBadge variant="success" size="sm">Vigente</StatusBadge>}
+                        {cupsStatus.get(ren.id) === 'historico' && <StatusBadge variant="neutral" size="sm">Histórico</StatusBadge>}
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-slate-400">Vence: {formatDate(ren.fecha_vencimiento_contrato)}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
