@@ -29,6 +29,20 @@ Muestra contratos en ventana de 0-90 días antes del vencimiento, ordenados por 
 
 Columnas: empresa, compañía actual, fecha fin, semáforo, comercial, estado renovación (pendiente / en curso / ganada / perdida).
 
+## Buscar y ordenar el listado
+
+- **Cuadro de búsqueda** (arriba a la izquierda de los filtros): escribe 2-3 letras del nombre de la empresa, de la compañía o del nº de contrato y la lista se filtra al instante. No distingue mayúsculas ni tildes. El contador muestra "X registros (de Y)" mientras filtras.
+- **Ordenar por columnas**: haz clic en cualquier encabezado (Empresa, Contrato, Vencimiento, Estado, Prioridad) para ordenar ascendente; segundo clic invierte a descendente. La flecha ▲/▼ indica la columna y sentido activos. Al ordenar por Vencimiento, las renovaciones **sin fecha** van siempre al final.
+- El botón **Limpiar** borra a la vez la búsqueda y los filtros de estado/prioridad.
+
+## Bandeja "sin fecha"
+
+Tras la carga del libro de ventas, muchas renovaciones existen **sin fecha de vencimiento documentada** (aparecen con vencimiento vacío y prioridad alta). No son errores: son contratos cuya fecha fin nadie tiene por escrito — los candidatos a estar rodando en renovación tácita. Al trabajarlas: consigue la fecha real (factura del cliente o comercializadora), edita la renovación y rellénala.
+
+## Selector de empresa con filtro (al crear/editar)
+
+En el formulario de renovación, sobre el desplegable de Empresa hay un campo "Escribe para filtrar empresas…": tecleando parte del nombre, el desplegable se reduce a las coincidencias (ordenadas alfabéticamente).
+
 ## Flujo típico de renovación
 
 ### 1. Detectar el contrato a renovar

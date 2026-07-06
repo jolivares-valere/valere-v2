@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -21,6 +22,9 @@ const PRIORIDADES: { value: PrioridadRenovacion; label: string }[] = [
   { value: 'ok', label: 'OK' },
 ]
 
+const normalizar = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
 const schema = z.object({
   contrato_id: z.string().uuid('Selecciona un contrato'),
   empresa_id: z.string().uuid('Selecciona una empresa'),
@@ -41,7 +45,8 @@ interface Props {
 }
 
 export default function RenovacionForm({ defaultValues, onSubmit, onCancel, submitting }: Props) {
-  const empresas = useEmpresas({ pageSize: 500 })
+  const empresas = useEmpresas({ pageSize: 1000 })
+  const [filtroEmpresa, setFiltroEmpresa] = useState('')
   const {
     register,
     handleSubmit,
@@ -57,6 +62,18 @@ export default function RenovacionForm({ defaultValues, onSubmit, onCancel, subm
   })
 
   const estadoWatched = watch('estado')
+  const empresaSeleccionada = watch('empresa_id')
+
+  const empresasVisibles = useMemo(() => {
+    const todas = [...(empresas.data?.data ?? [])].sort((a, b) =>
+      a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }),
+    )
+    const q = normalizar(filtroEmpresa.trim())
+    if (!q) return todas
+    // La empresa ya seleccionada se mantiene visible aunque no case con el filtro,
+    // para que el <select> no pierda su valor.
+    return todas.filter((e) => normalizar(e.nombre).includes(q) || e.id === empresaSeleccionada)
+  }, [empresas.data, filtroEmpresa, empresaSeleccionada])
 
   return (
     <form
@@ -75,15 +92,29 @@ export default function RenovacionForm({ defaultValues, onSubmit, onCancel, subm
     >
       <div>
         <label className="block text-xs font-medium text-slate-600">Empresa *</label>
+        <input
+          type="text"
+          value={filtroEmpresa}
+          onChange={(e) => setFiltroEmpresa(e.target.value)}
+          placeholder="Escribe para filtrar empresas…"
+          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          aria-label="Filtrar empresas"
+        />
         <select
           {...register('empresa_id')}
-          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          size={filtroEmpresa.trim() ? Math.min(Math.max(empresasVisibles.length, 2), 6) : undefined}
         >
           <option value="">— Seleccionar —</option>
-          {(empresas.data?.data ?? []).map((e) => (
+          {empresasVisibles.map((e) => (
             <option key={e.id} value={e.id}>{e.nombre}</option>
           ))}
         </select>
+        {filtroEmpresa.trim() && (
+          <p className="mt-1 text-xs text-slate-400">
+            {empresasVisibles.length} empresa{empresasVisibles.length === 1 ? '' : 's'} coincide{empresasVisibles.length === 1 ? '' : 'n'}
+          </p>
+        )}
         {errors.empresa_id && <p className="mt-1 text-xs text-red-600">{errors.empresa_id.message}</p>}
       </div>
 
