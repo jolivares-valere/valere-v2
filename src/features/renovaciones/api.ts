@@ -16,7 +16,14 @@ const RESOURCE = 'renovaciones'
 
 export interface RenovacionConRelaciones extends Renovacion {
   empresa?: { id: string; nombre: string; nif: string | null } | null
-  contrato?: { id: string; numero_contrato: string | null; fecha_fin: string | null; compania: string } | null
+  contrato?: {
+    id: string
+    numero_contrato: string | null
+    fecha_fin: string | null
+    fecha_inicio: string | null
+    compania: string
+    cups?: { codigo_cups: string }[] | null
+  } | null
   asignado?: { id: string; full_name: string | null } | null
 }
 
@@ -53,7 +60,7 @@ export function useRenovaciones(options?: QueryOptions) {
       let q = supabase
         .from('renovaciones' as never)
         .select(
-          '*, empresa:empresas!renovaciones_empresa_id_fkey(id, nombre, nif), contrato:contratos!renovaciones_contrato_id_fkey(id, numero_contrato, fecha_fin, compania), asignado:user_profiles!renovaciones_asignado_a_fkey(id, full_name)',
+          '*, empresa:empresas!renovaciones_empresa_id_fkey(id, nombre, nif), contrato:contratos!renovaciones_contrato_id_fkey(id, numero_contrato, fecha_fin, fecha_inicio, compania, cups(codigo_cups)), asignado:user_profiles!renovaciones_asignado_a_fkey(id, full_name)',
           { count: 'exact' },
         )
         .is('deleted_at' as never, null)
@@ -83,7 +90,7 @@ export async function fetchRenovacionesForExport(filter?: {
   let q = supabase
     .from('renovaciones' as never)
     .select(
-      '*, empresa:empresas!renovaciones_empresa_id_fkey(id, nombre, nif), contrato:contratos!renovaciones_contrato_id_fkey(id, numero_contrato, fecha_fin, compania), asignado:user_profiles!renovaciones_asignado_a_fkey(id, full_name)',
+      '*, empresa:empresas!renovaciones_empresa_id_fkey(id, nombre, nif), contrato:contratos!renovaciones_contrato_id_fkey(id, numero_contrato, fecha_fin, fecha_inicio, compania, cups(codigo_cups)), asignado:user_profiles!renovaciones_asignado_a_fkey(id, full_name)',
     )
     .is('deleted_at' as never, null)
 
