@@ -133,6 +133,7 @@ export default function EmpresasPage() {
         <div className="flex gap-2">
           <ExportButton<Empresa>
             filename="empresas"
+            sortByHeader="Nombre"
             fetchRows={() => fetchEmpresasForExport({ search, tipo: tipo || undefined, comercial_id: comercialFiltro || undefined })}
             columns={[
               { header: 'Nombre', value: (e) => e.nombre },
