@@ -3,11 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import type { Empresa, EmpresaInsert } from '../../../core/types/entities'
 import { normalizarNIF } from '../../../core/utils/energy'
+import { TIPO_EMPRESA_OPTIONS } from '../tipos'
 
 const schema = z.object({
   nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   nif: z.string().optional().transform((v) => (v ? normalizarNIF(v) : null)),
-  tipo: z.enum(['empresa', 'autonomo', 'comunidad_propietarios', 'cooperativa', 'asociacion']).nullable().optional().or(z.literal('')).transform((v) => v || null),
+  tipo: z.enum(['empresa', 'autonomo', 'comunidad_propietarios', 'cooperativa', 'asociacion', 'residencial']).nullable().optional().or(z.literal('')).transform((v) => v || null),
   segmento: z.enum(['industrial', 'comercial', 'servicios', 'agricola', 'residencial_colectivo']).nullable().optional().or(z.literal('')).transform((v) => v || null),
   email_principal: z.string().email('Email inválido').optional().or(z.literal('')).transform((v) => v || null),
   telefono_principal: z.string().optional().transform((v) => v || null),
@@ -96,11 +97,9 @@ export default function EmpresaForm({ defaultValues, onSubmit, onCancel, submitt
           <span className="mb-1 block text-sm font-medium text-slate-700">Tipo</span>
           <select {...form.register('tipo')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
             <option value="">—</option>
-            <option value="empresa">Empresa</option>
-            <option value="autonomo">Autónomo</option>
-            <option value="comunidad_propietarios">Comunidad propietarios</option>
-            <option value="cooperativa">Cooperativa</option>
-            <option value="asociacion">Asociación</option>
+            {TIPO_EMPRESA_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
         </label>
         <label className="block">
