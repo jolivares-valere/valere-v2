@@ -22,6 +22,12 @@ type EditingState = RenovacionConRelaciones | 'new' | null
 
 type SortField = 'empresa' | 'contrato' | 'vencimiento' | 'estado' | 'prioridad'
 
+// Las renovaciones caben en una sola carga (~507 filas), así que las traemos
+// todas de golpe y la búsqueda/orden client-side operan sobre el total, no
+// sobre una página. Si algún día el volumen crece mucho, migrar a paginación
+// real con controles (tarea futura del backlog de Renovaciones).
+const LISTA_PAGE_SIZE = 1000
+
 const PRIORIDAD_ORDEN: Record<PrioridadRenovacion, number> = {
   critica: 0,
   alta: 1,
@@ -74,6 +80,7 @@ export default function RenovacionesPage() {
 
   const { data, isLoading } = useRenovaciones({
     filter: { estado: filterEstado, prioridad: filterPrioridad },
+    pageSize: LISTA_PAGE_SIZE,
   })
   const kpi = useRenovacionesKPI()
   const createMut = useCreateRenovacion()
@@ -157,6 +164,8 @@ export default function RenovacionesPage() {
 
   const aBorrar = lista.find((r) => r.id === confirmDeleteId)
   const k = kpi.data
+  const total = data?.count ?? 0
+  const cargadas = listaCompleta.length
 
   return (
     <div className="p-4 md:p-8">
@@ -164,7 +173,11 @@ export default function RenovacionesPage() {
         <div>
           <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Renovaciones</h1>
           <p className="text-sm text-slate-500">
-            {lista.length} registros{busqueda.trim() ? ` (de ${listaCompleta.length})` : ''}
+            {busqueda.trim()
+              ? `${lista.length} de ${cargadas} cargadas`
+              : cargadas < total
+                ? `${cargadas} de ${total} — aumenta el límite para verlas todas`
+                : `${total} renovaciones`}
           </p>
         </div>
         <div className="flex gap-2">
