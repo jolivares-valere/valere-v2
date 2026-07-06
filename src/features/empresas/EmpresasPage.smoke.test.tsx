@@ -7,6 +7,8 @@ import React from 'react'
 vi.mock('./api', () => ({
   useEmpresas: () => ({ data: { data: [], count: 0 }, isLoading: false, error: null, refetch: vi.fn(), isFetching: false }),
   useCreateEmpresa: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateEmpresa: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useComerciales: () => ({ data: [], isLoading: false }),
   fetchEmpresasForExport: vi.fn(),
 }))
 vi.mock('../contactos/api', () => ({

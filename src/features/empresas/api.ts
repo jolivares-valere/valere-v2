@@ -95,6 +95,31 @@ export async function fetchEmpresasForExport(filter?: {
   return (data ?? []) as unknown as Empresa[]
 }
 
+export interface ComercialOption {
+  id: string
+  full_name: string | null
+}
+
+/** Usuarios asignables como comercial/canal de una empresa. */
+export function useComerciales() {
+  return useQuery({
+    queryKey: ['user_profiles', 'comerciales'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<ComercialOption[]> => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name')
+        .order('full_name', { ascending: true })
+
+      if (error) {
+        logError(error, 'useComerciales')
+        throw error
+      }
+      return (data ?? []) as ComercialOption[]
+    },
+  })
+}
+
 export function useEmpresaById(id: string | undefined) {
   return useQuery({
     queryKey: [RESOURCE, 'byId', id],

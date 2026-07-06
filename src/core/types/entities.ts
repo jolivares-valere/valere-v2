@@ -4,7 +4,8 @@
  */
 
 export type RolUsuario = 'master' | 'manager' | 'client'
-export type TipoEmpresa = 'empresa' | 'autonomo' | 'comunidad_propietarios' | 'cooperativa' | 'asociacion'
+// 'residencial' añadido 2026-07-06 (MEJORAS UI): pendiente ampliar CHECK en BBDD.
+export type TipoEmpresa = 'empresa' | 'autonomo' | 'comunidad_propietarios' | 'cooperativa' | 'asociacion' | 'residencial'
 export type SegmentoEmpresa = 'industrial' | 'comercial' | 'servicios' | 'agricola' | 'residencial_colectivo'
 export type TipoEnergia = 'electrica' | 'gas' | 'dual'
 export type TipoPrecio = 'fijo' | 'indexado' | 'mixto'
