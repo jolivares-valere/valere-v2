@@ -24,6 +24,7 @@ export default function EmpresasPage() {
   const pageSize = 20
   const search = params.get('q') ?? ''
   const tipo = params.get('tipo') ?? ''
+  const comercialFiltro = params.get('comercial') ?? ''
   const sortParam = params.get('sort') ?? ''
   const sortField: SortField = (SORTABLE_FIELDS as readonly string[]).includes(sortParam)
     ? (sortParam as SortField)
@@ -37,7 +38,7 @@ export default function EmpresasPage() {
   const { data, isLoading, error, refetch, isFetching } = useEmpresas({
     page,
     pageSize,
-    filter: { search, tipo: tipo || undefined },
+    filter: { search, tipo: tipo || undefined, comercial_id: comercialFiltro || undefined },
     sort: { field: sortField, direction: sortDir },
   })
 
@@ -132,7 +133,7 @@ export default function EmpresasPage() {
         <div className="flex gap-2">
           <ExportButton<Empresa>
             filename="empresas"
-            fetchRows={() => fetchEmpresasForExport({ search, tipo: tipo || undefined })}
+            fetchRows={() => fetchEmpresasForExport({ search, tipo: tipo || undefined, comercial_id: comercialFiltro || undefined })}
             columns={[
               { header: 'Nombre', value: (e) => e.nombre },
               { header: 'NIF', value: (e) => e.nif },
@@ -179,6 +180,18 @@ export default function EmpresasPage() {
           <option value="">Todos los tipos</option>
           {TIPO_EMPRESA_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <select
+          value={comercialFiltro}
+          onChange={(e) => updateParam('comercial', e.target.value)}
+          aria-label="Filtrar por comercial asignado"
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Todos los comerciales</option>
+          <option value="sin_asignar">Sin asignar</option>
+          {comerciales?.map((c) => (
+            <option key={c.id} value={c.id}>{c.full_name ?? c.id}</option>
           ))}
         </select>
       </div>
