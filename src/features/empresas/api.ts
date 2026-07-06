@@ -44,7 +44,9 @@ export function useEmpresas(options?: QueryOptions) {
       if (options?.filter?.tipo) q = q.eq('tipo', options.filter.tipo as never)
       if (options?.filter?.segmento) q = q.eq('segmento', options.filter.segmento as never)
       if (options?.filter?.comercial_id) {
-        q = q.eq('comercial_id', options.filter.comercial_id as string)
+        const cid = options.filter.comercial_id as string
+        // 'sin_asignar' filtra empresas sin comercial (comercial_id IS NULL)
+        q = cid === 'sin_asignar' ? q.is('comercial_id', null) : q.eq('comercial_id', cid)
       }
 
       const sortField = options?.sort?.field ?? 'created_at'
@@ -85,7 +87,9 @@ export async function fetchEmpresasForExport(filter?: {
   }
   if (filter?.tipo) q = q.eq('tipo', filter.tipo as never)
   if (filter?.segmento) q = q.eq('segmento', filter.segmento as never)
-  if (filter?.comercial_id) q = q.eq('comercial_id', filter.comercial_id)
+  if (filter?.comercial_id) {
+    q = filter.comercial_id === 'sin_asignar' ? q.is('comercial_id', null) : q.eq('comercial_id', filter.comercial_id)
+  }
 
   const { data, error } = await q.order('created_at', { ascending: false }).limit(10000)
   if (error) {

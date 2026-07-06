@@ -12,16 +12,17 @@
 
 ## Entradas
 
-- [empresas] Quitar columna Segmento del listado (mantener en export/form) · Juan · S · 📦 v1
-- [empresas] Ordenación por columna clicando encabezado (asc/desc, indicador visual) — API ya soporta `sort` · Juan · M · 📦 v1
-- [empresas] Etiquetas legibles de Tipo en tabla y filtro (hoy sale el valor raw `comunidad_propietarios`); renombrar "Comunidad" → "CCPP" · Juan · S · 📦 v1
-- [empresas] Añadir tipo "Residencial" al filtro y formularios · Juan · S · 📦 v1 ⚠️ requiere ampliar CHECK de `empresas.tipo` en BBDD → tarea derivada
-- [empresas] Columna "Comercial" con desplegable editable inline (lista de `user_profiles`), guarda en `empresas.comercial_id`, sincroniza vía invalidación react-query en todo el CRM · Juan · M · 📦 v1
+- [empresas] Quitar columna Segmento del listado (mantener en export/form) · Juan · S · ✅ PR #58
+- [empresas] Ordenación por columna clicando encabezado (asc/desc, indicador visual) — API ya soporta `sort` · Juan · M · ✅ PR #58
+- [empresas] Etiquetas legibles de Tipo en tabla y filtro (hoy sale el valor raw `comunidad_propietarios`); renombrar "Comunidad" → "CCPP" · Juan · S · ✅ PR #58
+- [empresas] Añadir tipo "Residencial" al filtro y formularios · Juan · S · ✅ PR #58 (UI) ⚠️ CHECK BBDD pendiente → derivada
+- [empresas] Columna "Comercial" con desplegable editable inline (lista de `user_profiles`), guarda en `empresas.comercial_id`, sincroniza vía invalidación react-query en todo el CRM · Juan · M · ✅ PR #58
+- [empresas] Paginación completa (⏮⏭, números con elipsis, salto directo) — componente `core/components/Pagination.tsx` reutilizable · Juan · S · ✅ PR #58
+- [empresas] Filtro por comercial en el listado (desplegable «Todos los comerciales» / comercial concreto / «Sin asignar»), export respeta el filtro · Juan · S · 📦 v1.1
 - [empresas] DATOS: backfill de `tipo` en clientes existentes según conocimiento de carpetas · Juan · M · 🔀 derivada a workstream datos
 - [empresas] DATOS: backfill de `ciudad` desde facturas/documentación · Juan · M · 🔀 derivada a workstream datos
 - [empresas] Concepto "canal" como asignable (además de comerciales): no existe en el esquema actual — pendiente decisión de modelado · Juan · L · ❓ pendiente aclarar
 - [empresas] Alta de empresa con subida de PDF/Excel (facturas, CIF, listados): extraer datos y prerrellenar el formulario automáticamente, campos siempre editables antes de guardar · Juan · L · 📥 ⚠️ la extracción necesitará backend (Edge Function IA) → parte derivada
-- [empresas] Paginación completa: flechas primero/último (⏮ ⏭), números de página clicables con elipsis (1 2 3 … 12) y cuadro para saltar a página concreta · Juan · S · 📥 (candidato a componente compartido en core para reutilizar en otros listados)
 
 ---
 
@@ -29,7 +30,7 @@
 
 ### v1 — EMPRESAS · presentación (rama prevista: `claude/ui-empresas-presentacion`)
 Alcance: quitar Segmento · ordenación por encabezados · etiquetas Tipo legibles + CCPP + opción Residencial · columna Comercial editable inline · paginación completa (componente `core/components/Pagination.tsx` reutilizable).
-Estado: 👀 código escrito (2026-07-06), pendiente ejecutar `APLICAR_UI_EMPRESAS_V1.ps1` en terminal de Juan (H4 + tsc + tests + push) → PR → paseo preview Cloudflare.
+Estado: ✅ **MERGEADO — PR #58 (squash 5fbfa90, 2026-07-06)**. Checks 5/5, H4 limpio (12 ficheros). Pendiente: paseo funcional en producción.
 Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, necesita Edge Function).
 
 ### Tareas derivadas (fuera de este workstream)

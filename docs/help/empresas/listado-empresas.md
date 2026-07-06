@@ -23,6 +23,7 @@ Menú lateral → **Empresas** (`/empresas`).
 | Cambiar de página | Flechas ⏮ ◀ ▶ ⏭ (primera/anterior/siguiente/última), clic directo en un número de página, o escribir el número en el cuadro y pulsar «Ir». |
 | Asignar o cambiar comercial | Desplegable en la columna **Comercial** de cada fila. El cambio se guarda al instante y se refleja en el resto del CRM (ficha, informes). |
 | Filtrar por tipo | Desplegable «Todos los tipos»: Empresa, Autónomo, CCPP, Cooperativa, Asociación, Residencial. |
+| Filtrar por comercial | Desplegable «Todos los comerciales»: elige un comercial concreto o «Sin asignar» para ver las empresas sin comercial. El export CSV respeta este filtro. |
 | Buscar | Cuadro de búsqueda por nombre o NIF. |
 
 ## Coordinación con otros módulos
