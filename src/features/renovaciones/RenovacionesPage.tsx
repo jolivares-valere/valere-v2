@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, X, RefreshCw } from 'lucide-react'
+import { ArrowDown, ArrowUp, Plus, Pencil, Trash2, X, RefreshCw, Search } from 'lucide-react'
 import {
   useRenovaciones,
   useRenovacionesKPI,
@@ -19,6 +19,19 @@ import { formatDate } from '../../core/utils/dates'
 import type { RenovacionInsert, EstadoRenovacion, PrioridadRenovacion } from '../../core/types/entities'
 
 type EditingState = RenovacionConRelaciones | 'new' | null
+
+type SortField = 'empresa' | 'contrato' | 'vencimiento' | 'estado' | 'prioridad'
+
+const PRIORIDAD_ORDEN: Record<PrioridadRenovacion, number> = {
+  critica: 0,
+  alta: 1,
+  media: 2,
+  baja: 3,
+  ok: 4,
+}
+
+const normalizar = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 const ESTADO_VARIANT: Record<EstadoRenovacion, StatusVariant> = {
   detectada: 'info',
@@ -68,6 +81,18 @@ export default function RenovacionesPage() {
   const deleteMut = useDeleteRenovacion()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [busqueda, setBusqueda] = useState('')
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortAsc, setSortAsc] = useState(true)
+
+  const onSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortAsc((prev) => !prev)
+    } else {
+      setSortField(field)
+      setSortAsc(true)
+    }
+  }
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams)
@@ -92,7 +117,44 @@ export default function RenovacionesPage() {
   }
 
   const submitting = createMut.isPending || updateMut.isPending
-  const lista = data?.data ?? []
+  const listaCompleta = data?.data ?? []
+
+  const lista = useMemo(() => {
+    let rows = listaCompleta
+    const q = normalizar(busqueda.trim())
+    if (q) {
+      rows = rows.filter((r) =>
+        normalizar(
+          `${r.empresa?.nombre ?? ''} ${r.contrato?.compania ?? ''} ${r.contrato?.numero_contrato ?? ''}`,
+        ).includes(q),
+      )
+    }
+    if (!sortField) return rows
+    const dir = sortAsc ? 1 : -1
+    return [...rows].sort((a, b) => {
+      switch (sortField) {
+        case 'empresa':
+          return dir * (a.empresa?.nombre ?? '').localeCompare(b.empresa?.nombre ?? '', 'es', { sensitivity: 'base' })
+        case 'contrato':
+          return dir * (a.contrato?.compania ?? '').localeCompare(b.contrato?.compania ?? '', 'es', { sensitivity: 'base' })
+        case 'vencimiento': {
+          const fa = a.fecha_vencimiento_contrato
+          const fb = b.fecha_vencimiento_contrato
+          if (!fa && !fb) return 0
+          if (!fa) return 1 // sin fecha siempre al final
+          if (!fb) return -1
+          return dir * fa.localeCompare(fb)
+        }
+        case 'estado':
+          return dir * ESTADO_LABEL[a.estado].localeCompare(ESTADO_LABEL[b.estado], 'es', { sensitivity: 'base' })
+        case 'prioridad':
+          return dir * (PRIORIDAD_ORDEN[a.prioridad] - PRIORIDAD_ORDEN[b.prioridad])
+        default:
+          return 0
+      }
+    })
+  }, [listaCompleta, busqueda, sortField, sortAsc])
+
   const aBorrar = lista.find((r) => r.id === confirmDeleteId)
   const k = kpi.data
 
@@ -101,7 +163,9 @@ export default function RenovacionesPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Renovaciones</h1>
-          <p className="text-sm text-slate-500">{lista.length} registros</p>
+          <p className="text-sm text-slate-500">
+            {lista.length} registros{busqueda.trim() ? ` (de ${listaCompleta.length})` : ''}
+          </p>
         </div>
         <div className="flex gap-2">
           <ExportButton<RenovacionConRelaciones>
@@ -137,7 +201,18 @@ export default function RenovacionesPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar empresa, compañía o nº contrato…"
+            className="w-72 rounded-xl border border-slate-300 py-1.5 pl-8 pr-3 text-xs"
+            aria-label="Buscar renovaciones"
+          />
+        </div>
         <select
           value={filterEstado ?? ''}
           onChange={(e) => setFilter('estado', e.target.value || null)}
@@ -158,10 +233,10 @@ export default function RenovacionesPage() {
             <option key={p} value={p}>{PRIORIDAD_LABEL[p]}</option>
           ))}
         </select>
-        {(filterEstado || filterPrioridad) && (
+        {(filterEstado || filterPrioridad || busqueda.trim()) && (
           <button
             type="button"
-            onClick={() => setSearchParams({})}
+            onClick={() => { setSearchParams({}); setBusqueda('') }}
             className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
           >
             <X className="h-3 w-3" /> Limpiar
@@ -195,14 +270,18 @@ export default function RenovacionesPage() {
       ) : lista.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
           <RefreshCw className="mx-auto mb-2 h-8 w-8 text-slate-400" />
-          <p className="mb-3 text-sm text-slate-500">Sin renovaciones registradas</p>
-          <button
-            type="button"
-            onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
-          >
-            <Plus className="h-3.5 w-3.5" /> Crear la primera
-          </button>
+          <p className="mb-3 text-sm text-slate-500">
+            {busqueda.trim() ? 'Sin resultados para esta búsqueda' : 'Sin renovaciones registradas'}
+          </p>
+          {!busqueda.trim() && (
+            <button
+              type="button"
+              onClick={() => setEditing('new')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+            >
+              <Plus className="h-3.5 w-3.5" /> Crear la primera
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -210,11 +289,11 @@ export default function RenovacionesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Empresa</th>
-                  <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Vencimiento</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Prioridad</th>
+                  <SortableTh label="Empresa" field="empresa" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <SortableTh label="Contrato" field="contrato" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <SortableTh label="Vencimiento" field="vencimiento" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <SortableTh label="Estado" field="estado" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <SortableTh label="Prioridad" field="prioridad" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -324,6 +403,35 @@ export default function RenovacionesPage() {
         onCancel={() => setConfirmDeleteId(null)}
       />
     </div>
+  )
+}
+
+function SortableTh({
+  label,
+  field,
+  sortField,
+  sortAsc,
+  onSort,
+}: {
+  label: string
+  field: SortField
+  sortField: SortField | null
+  sortAsc: boolean
+  onSort: (field: SortField) => void
+}) {
+  const activo = sortField === field
+  return (
+    <th className="px-4 py-3">
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-slate-900 ${activo ? 'text-slate-900' : ''}`}
+        aria-label={`Ordenar por ${label}`}
+      >
+        {label}
+        {activo && (sortAsc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </button>
+    </th>
   )
 }
 
