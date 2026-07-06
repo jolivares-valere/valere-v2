@@ -35,3 +35,39 @@ export function exportToExcel<T extends Record<string, unknown>>(
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
   XLSX.writeFile(wb, fileName)
 }
+
+/**
+ * Exporta una matriz (cabeceras + filas) a .xlsx con columnas reales,
+ * anchos de columna auto-ajustados y autofilter (desplegables de filtro).
+ * Pensado para ExportButton: el archivo abre directo en columnas sin depender
+ * de la configuración regional de Excel (que rompe el CSV separado por comas).
+ */
+export function downloadMatrixAsExcel(
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+  fileName = 'export.xlsx',
+  sheetName = 'Datos',
+): void {
+  const aoa: (string | number)[][] = [
+    headers,
+    ...rows.map(r => r.map(v => (v == null ? '' : v))),
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  // Ancho por columna = mayor longitud de contenido (con margen y tope 8..50)
+  ws['!cols'] = headers.map((h, i) => {
+    const maxLen = Math.max(
+      h.length,
+      ...rows.map(r => String(r[i] ?? '').length),
+    )
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 50) }
+  })
+
+  // Autofilter sobre todo el rango (fila 1 = cabeceras)
+  const lastCol = XLSX.utils.encode_col(headers.length - 1)
+  ws['!autofilter'] = { ref: `A1:${lastCol}${aoa.length}` }
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+  XLSX.writeFile(wb, fileName)
+}
