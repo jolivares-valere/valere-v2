@@ -1,0 +1,3 @@
+# Edge Function datadis-sync — worker de sincronización Datadis → CRM (modelo agregado partner).
+# Se despliega temporalmente con verify_jwt=false para pruebas/cron; endurecer según diseño.
+verify_jwt = false
