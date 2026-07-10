@@ -15,6 +15,7 @@ import {
   type OportunidadEstancada,
 } from './api'
 import { useResumenVencimientos } from '../contratos/api'
+import IncidenciasDatadisCard from './components/IncidenciasDatadisCard'
 import StatusBadge from '../../core/components/StatusBadge'
 import { formatDate } from '../../core/utils/dates'
 
@@ -114,6 +115,9 @@ export default function DashboardPage() {
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </Link>
       )}
+
+      {/* Alarma incidencias Datadis (CUPS por dar de alta / que no coinciden) */}
+      <IncidenciasDatadisCard />
 
       {/* KPIs fila 1 */}
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

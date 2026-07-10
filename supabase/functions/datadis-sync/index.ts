@@ -10,20 +10,26 @@
 //       get-supplies?authorizedNif=<NIF empresa>
 //         · 200 → CUPS que ese cliente ha autorizado a Valere en Datadis.
 //         · 403 "No authorized supplies" / 404 → cliente sin autorización activa (se omite).
-//   - Como consultamos por NIF, sabemos a qué empresa pertenece cada CUPS:
-//     mapeo directo empresa→cups (por código dentro de esa empresa).
+//
+// EMPAREJAMIENTO CUPS (fix 2026-07-10):
+//   - El CUPS tiene 20 caracteres base + a veces 2 de "frontera" (0F, 1P, 0P…).
+//   - Emparejamos por los 20 caracteres BASE en ambos lados, para que cuadre
+//     tanto si el CRM guarda el corto y Datadis el largo como al revés.
+//
+// INCIDENCIAS DE DATOS (2026-07-10):
+//   El worker escribe en `datadis_incidencias` (refresco total en cada run):
+//     · 'cups_falta_en_crm' → Datadis autoriza un CUPS que el CRM no tiene.
+//     · 'cups_no_coincide'  → empresa autorizada pero ningún CUPS del CRM cuadra.
+//   Autorreparable: al corregir el dato, la incidencia desaparece al siguiente run.
 //
 // PROTECCIÓN DE OTRAS FASES (regla 2026-07-06, exigida por Juan):
 //   - Campos propios de Datadis (datadis_*): se escriben SIEMPRE.
-//   - Campos COMPARTIDOS con el libro de ventas / Potencias
-//     (distribuidor, direccion_suministro, ciudad_suministro):
+//   - Campos COMPARTIDOS (distribuidor, direccion_suministro, ciudad_suministro):
 //     SOLO se rellenan si están VACÍOS. Nunca se sobreescribe dato existente.
 //   - NUNCA toca empresa_id, contrato_id, ni ningún vínculo.
-//   - CUPS que Datadis conoce y el CRM no → se reportan, no se crean a ciegas.
 //
 // dry_run=true por defecto. Para escribir: { dry_run:false }.
-// Opcional: { nifs:["G41065566",...] } para limitar a ciertos NIF (por defecto,
-// todas las empresas con NIF y ≥1 CUPS en el CRM).
+// Opcional: { nifs:["G41065566",...] } para limitar a ciertos NIF.
 // ═══════════════════════════════════════════════════════════════════
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
@@ -58,8 +64,6 @@ async function login(): Promise<string> {
   return j
 }
 
-// get-supplies por NIF autorizado. Devuelve { status, supplies } — status para
-// distinguir 200 (autorizado) de 403/404 (sin autorización) sin lanzar.
 async function getSuppliesByNif(jwt: string, nif: string): Promise<{ status: number; supplies: DS[] }> {
   const r = await fetch(`${BASE}/api-private/api/get-supplies?authorizedNif=${encodeURIComponent(nif)}`, {
     headers: { Authorization: 'Bearer ' + jwt, Accept: 'application/json' },
@@ -73,16 +77,23 @@ async function getSuppliesByNif(jwt: string, nif: string): Promise<{ status: num
   return { status: r.status, supplies }
 }
 
-function normCups(c: string): string {
-  return (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 22)
+// Clave de emparejamiento = 20 caracteres base del CUPS (sin frontera).
+function base20(c: string): string {
+  return (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
 }
 
 interface CupsRow {
-  id: string; distribuidor: string | null; direccion_suministro: string | null; ciudad_suministro: string | null
+  id: string; codigo: string
+  distribuidor: string | null; direccion_suministro: string | null; ciudad_suministro: string | null
 }
 interface EmpresaGroup {
   empresa_id: string; nombre: string; nif: string
-  cupsByCode: Map<string, CupsRow>
+  cupsByBase: Map<string, CupsRow>
+}
+interface Incidencia {
+  empresa_id: string; nif: string; tipo: 'cups_falta_en_crm' | 'cups_no_coincide'
+  cups_codigo: string | null; distribuidora: string | null; direccion: string | null
+  municipio: string | null; provincia: string | null; detalle: string | null
 }
 
 serve(async (req) => {
@@ -126,16 +137,16 @@ serve(async (req) => {
       if (nifsFilter && !nifsFilter.includes(nif)) continue
       let g = groups.get(r.empresa_id)
       if (!g) {
-        g = { empresa_id: r.empresa_id, nombre: r.empresas?.nombre ?? r.empresa_id, nif, cupsByCode: new Map() }
+        g = { empresa_id: r.empresa_id, nombre: r.empresas?.nombre ?? r.empresa_id, nif, cupsByBase: new Map() }
         groups.set(r.empresa_id, g)
       }
-      g.cupsByCode.set(normCups(r.codigo_cups), {
-        id: r.id, distribuidor: r.distribuidor,
+      g.cupsByBase.set(base20(r.codigo_cups), {
+        id: r.id, codigo: r.codigo_cups, distribuidor: r.distribuidor,
         direccion_suministro: r.direccion_suministro, ciudad_suministro: r.ciudad_suministro,
       })
     }
 
-    // Deduplicar por NIF (una llamada por NIF, aunque haya varias empresas con el mismo).
+    // Deduplicar por NIF (una llamada por NIF).
     const nifToGroups = new Map<string, EmpresaGroup[]>()
     for (const g of groups.values()) {
       const arr = nifToGroups.get(g.nif) ?? []
@@ -148,61 +159,102 @@ serve(async (req) => {
     const jwt = await login()
     out.cuenta = U
 
-    const autorizados: Record<string, number> = {}   // nombre empresa → CUPS enriquecidos
-    const sinAutorizacion: string[] = []              // "NOMBRE (NIF): http"
-    const sinMatch: { empresa: string; cups_tail: string }[] = []
+    const autorizados: Record<string, number> = {}
+    const sinAutorizacion: string[] = []
     let actualizados = 0
     let camposComercialesProtegidos = 0
+    const incidencias: Incidencia[] = []
+    const processedEmpresaIds = new Set<string>()
 
-    // Batches de 4 NIF en paralelo para no exceder tiempos ni saturar Datadis.
     const nifList = [...nifToGroups.keys()]
     const BATCH = 4
     for (let i = 0; i < nifList.length; i += BATCH) {
       const slice = nifList.slice(i, i + BATCH)
       await Promise.all(slice.map(async (nif) => {
         const gs = nifToGroups.get(nif)!
+        for (const g of gs) processedEmpresaIds.add(g.empresa_id)
+        const empresaIdRef = gs[0].empresa_id
+        const nombreRef = gs[0].nombre
+        const totalCrmCups = gs.reduce((n, g) => n + g.cupsByBase.size, 0)
+
         let res: { status: number; supplies: DS[] }
         try { res = await getSuppliesByNif(jwt, nif) }
-        catch (e) { sinAutorizacion.push(`${gs[0].nombre} (${nif}): err ${(e as Error).message}`); return }
+        catch (e) { sinAutorizacion.push(`${nombreRef} (${nif}): err ${(e as Error).message}`); return }
 
         if (res.status !== 200 || res.supplies.length === 0) {
-          sinAutorizacion.push(`${gs[0].nombre} (${nif}): http ${res.status}`)
+          sinAutorizacion.push(`${nombreRef} (${nif}): http ${res.status}`)
           return
         }
-        // Índice de CUPS del CRM para este NIF (unión de todas las empresas con ese NIF).
-        const codeToRow = new Map<string, { row: CupsRow; nombre: string }>()
-        for (const g of gs) for (const [code, row] of g.cupsByCode) codeToRow.set(code, { row, nombre: g.nombre })
 
+        // Índice CRM por base20 (unión de todas las empresas con ese NIF).
+        const baseToRow = new Map<string, { row: CupsRow; nombre: string }>()
+        for (const g of gs) for (const [b, row] of g.cupsByBase) baseToRow.set(b, { row, nombre: g.nombre })
+
+        let matchedNif = 0
         for (const s of res.supplies) {
-          const key = normCups(s.cups)
-          const found = codeToRow.get(key) ?? codeToRow.get(key.slice(0, 20))
-          if (!found) { sinMatch.push({ empresa: gs[0].nombre, cups_tail: '…' + key.slice(-6) }); continue }
-          autorizados[found.nombre] = (autorizados[found.nombre] ?? 0) + 1
-          if (!dryRun) {
-            const patch: Record<string, unknown> = {
-              datadis_distributor_code: s.distributorCode ?? null,
-              datadis_distribuidor_cod: s.distributorCode ?? null,
-              datadis_point_type: s.pointType ?? null,
-              datadis_punto_tipo: s.pointType ?? null,
-              datadis_sincronizado: true,
-              datadis_ultima_sync: new Date().toISOString(),
-              datadis_ultimo_fetch: new Date().toISOString(),
-            }
-            if (!found.row.distribuidor && s.distributor) patch.distribuidor = s.distributor
-            else if (found.row.distribuidor && s.distributor && found.row.distribuidor !== s.distributor) camposComercialesProtegidos++
-            if (!found.row.direccion_suministro && s.address) patch.direccion_suministro = s.address
-            if (!found.row.ciudad_suministro && s.municipality) patch.ciudad_suministro = s.municipality
+          const key = base20(s.cups)
+          const found = baseToRow.get(key)
+          if (found) {
+            matchedNif++
+            autorizados[found.nombre] = (autorizados[found.nombre] ?? 0) + 1
+            if (!dryRun) {
+              const patch: Record<string, unknown> = {
+                datadis_distributor_code: s.distributorCode ?? null,
+                datadis_distribuidor_cod: s.distributorCode ?? null,
+                datadis_point_type: s.pointType ?? null,
+                datadis_punto_tipo: s.pointType ?? null,
+                datadis_sincronizado: true,
+                datadis_ultima_sync: new Date().toISOString(),
+                datadis_ultimo_fetch: new Date().toISOString(),
+              }
+              if (!found.row.distribuidor && s.distributor) patch.distribuidor = s.distributor
+              else if (found.row.distribuidor && s.distributor && found.row.distribuidor !== s.distributor) camposComercialesProtegidos++
+              if (!found.row.direccion_suministro && s.address) patch.direccion_suministro = s.address
+              if (!found.row.ciudad_suministro && s.municipality) patch.ciudad_suministro = s.municipality
 
-            const { error: uErr } = await sb.from('cups').update(patch).eq('id', found.row.id)
-            if (!uErr) actualizados++
+              const { error: uErr } = await sb.from('cups').update(patch).eq('id', found.row.id)
+              if (!uErr) actualizados++
+            }
+          } else {
+            // CUPS que Datadis autoriza y el CRM no tiene → incidencia para alta.
+            incidencias.push({
+              empresa_id: empresaIdRef, nif, tipo: 'cups_falta_en_crm',
+              cups_codigo: s.cups ?? null, distribuidora: s.distributor ?? null,
+              direccion: s.address ?? null, municipio: s.municipality ?? null, provincia: s.province ?? null,
+              detalle: 'Datadis autoriza este CUPS pero no existe en el CRM. Darlo de alta.',
+            })
           }
+        }
+
+        // Empresa autorizada pero ningún CUPS del CRM cuadra → CUPS mal cargado.
+        if (matchedNif === 0 && totalCrmCups > 0) {
+          const codigosCrm: string[] = []
+          for (const g of gs) for (const row of g.cupsByBase.values()) codigosCrm.push(row.codigo)
+          incidencias.push({
+            empresa_id: empresaIdRef, nif, tipo: 'cups_no_coincide',
+            cups_codigo: codigosCrm[0] ?? null, distribuidora: null, direccion: null, municipio: null, provincia: null,
+            detalle: `Empresa autorizada en Datadis pero ningún CUPS del CRM coincide. Revisar CUPS en el CRM: ${codigosCrm.join(', ')}`,
+          })
         }
       }))
     }
 
+    // Refrescar incidencias de las empresas procesadas (borra y reinserta → autorreparable).
+    if (!dryRun && processedEmpresaIds.size > 0) {
+      const ids = [...processedEmpresaIds]
+      const CHUNK = 200
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        await sb.from('datadis_incidencias').delete().in('empresa_id', ids.slice(i, i + CHUNK))
+      }
+      if (incidencias.length > 0) {
+        await sb.from('datadis_incidencias').insert(incidencias)
+      }
+    }
+
     out.autorizados_por_empresa = autorizados
     out.sin_autorizacion = sinAutorizacion
-    out.sin_match_en_crm = sinMatch
+    out.incidencias = incidencias.length
+    out.incidencias_detalle = incidencias
     out.actualizados = dryRun ? '(dry-run, 0)' : actualizados
     out.campos_comerciales_protegidos = camposComercialesProtegidos
   } catch (e) {
