@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Pencil, Plus, Trash2, X, Phone, Mail, Users, CheckSquare, Activity } from 'lucide-react'
 import BackButton from '../../core/components/BackButton'
 import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
@@ -27,7 +27,10 @@ export default function EmpresaDetailPage() {
   const updateMut = useUpdateEmpresa()
   const deleteMut = useDeleteEmpresa()
   const [editing, setEditing] = useState(false)
-  const [tab, setTab] = useState<Tab>('resumen')
+  const [searchParams] = useSearchParams()
+  const TABS_VALIDAS: Tab[] = ['resumen', 'contactos', 'suministros', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
+  const tabParam = searchParams.get('tab') as Tab | null
+  const [tab, setTab] = useState<Tab>(tabParam && TABS_VALIDAS.includes(tabParam) ? tabParam : 'resumen')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando…</div>
