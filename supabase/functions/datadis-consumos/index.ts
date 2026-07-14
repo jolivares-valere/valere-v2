@@ -270,20 +270,29 @@ serve(async (req) => {
           llamadas++
           if (status !== 200) continue
           const pts = asArray(body, 'timeCurveList')
-          const rows = pts.map((p) => {
+          const rows: Record<string, unknown>[] = []
+          let descartadas = 0; let ejemplo = ''
+          for (const p of pts) {
             const hourStr = String(p['hour'] ?? p['time'] ?? '01:00')
-            const hora = Math.max(0, Math.min(24, parseInt(hourStr.split(':')[0], 10) - 1)) // DST: 0..24
+            const hora = parseInt(hourStr.split(':')[0], 10) - 1
+            const fecha = normFecha(p['date'])
+            // R1 (auditoría): la hora fuera de rango se DESCARTA (no se recorta con clamp).
+            // Un payload malformado colapsaría dos horas sobre la misma clave del UNIQUE
+            // y el upsert sobreescribiría en silencio → corrupción sin rastro. Que haga ruido.
+            if (fecha == null || !Number.isFinite(hora) || hora < 0 || hora > 24) {
+              descartadas++; if (!ejemplo) ejemplo = `hour="${hourStr}" fecha="${String(p['date'])}"`
+              continue
+            }
             const met = String(p['metodoObtencion'] ?? p['obtainMethod'] ?? 'Real')
-            return {
-              cups_id: item.cups_id,
-              fecha: normFecha(p['date']),
-              hora,
+            rows.push({
+              cups_id: item.cups_id, fecha, hora,
               consumo_kwh: n(p['measureMagnitudeActive'] ?? p['consumptionKWh']) ?? 0,
               excedente_kwh: n(p['energyPoured'] ?? p['surplusEnergyKWh']) ?? 0,
               metodo_obtencion: (met === 'Real' || met === '1') ? 'real' : 'estimada',
               origen: 'datadis',
-            }
-          }).filter((r) => r.fecha != null && Number.isFinite(r.hora))
+            })
+          }
+          if (descartadas > 0) errores.push({ cups: item.codigo, etapa: 'consumo_hora_invalida', error: `${descartadas} filas descartadas (ej: ${ejemplo})` })
           if (!dryRun && rows.length) {
             for (let i = 0; i < rows.length; i += 1000) {
               const { error } = await sb.from('datadis_consumptions')

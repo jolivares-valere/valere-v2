@@ -46,6 +46,7 @@ create or replace view public.v_datadis_consumos_cursor as
   from public.datadis_consumptions
   group by cups_id;
 
--- Nota: las vistas heredan la RLS de la tabla base (security_invoker por defecto
--- en PG15+ para vistas nuevas no es automático; datadis_consumptions ya tiene RLS
--- y el worker usa service_role, que la ignora). El frontend no consulta esta vista.
+-- R2 (auditoría): la vista no es security_invoker → un usuario authenticated podría
+-- saltarse la RLS de la tabla base. Higiene de Fase 0: revocar acceso (el worker usa
+-- service_role, que no se ve afectado; el frontend no consulta esta vista).
+revoke all on public.v_datadis_consumos_cursor from anon, authenticated;
