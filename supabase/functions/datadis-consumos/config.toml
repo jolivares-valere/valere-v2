@@ -1,0 +1,3 @@
+# Edge Function datadis-consumos — worker pesado (curva+maximetro+contrato).
+# verify_jwt=false: protegido por x-cron-secret (RPC de Vault), patrón esios/datadis-sync.
+verify_jwt = false
