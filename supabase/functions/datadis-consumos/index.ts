@@ -393,15 +393,21 @@ serve(async (req) => {
             if (prev['metodo_obtencion'] !== 'real' && row['metodo_obtencion'] === 'real') porClave.set(k, row)
           }
           const rowsDedup = [...porClave.values()]
+          let abortarCups = false
           if (!dryRun && rowsDedup.length) {
             for (let i = 0; i < rowsDedup.length; i += 1000) {
               const { error } = await sb.from('datadis_consumptions')
                 .upsert(rowsDedup.slice(i, i + 1000), { onConflict: 'cups_id,fecha,hora' })
-              if (error) { errores.push({ cups: item.codigo, etapa: 'consumo_upsert', error: error.message }); break }
+              if (error) { errores.push({ cups: item.codigo, etapa: 'consumo_upsert', error: error.message }); abortarCups = true; break }
             }
           }
           filas += rowsDedup.length
-        } catch (e) { errores.push({ cups: item.codigo, etapa: 'consumo', error: (e as Error).message }) }
+          // v5 (F3): un fallo en un tramo rompe la invariante "los datos de un CUPS son un
+          // prefijo contiguo" de la que depende el cursor max(fecha) → islas. Abortamos el
+          // CUPS ENTERO (no seguimos al tramo siguiente) para no dejar huecos. Aplica tanto
+          // al error de upsert como a la excepción del catch (misma invariante).
+          if (abortarCups) break
+        } catch (e) { errores.push({ cups: item.codigo, etapa: 'consumo', error: (e as Error).message }); break }
       }
     }
 
