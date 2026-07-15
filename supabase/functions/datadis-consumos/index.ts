@@ -130,7 +130,7 @@ serve(async (req) => {
 
   const out: Record<string, unknown> = { dry_run: dryRun, max_cups: maxCups, max_seconds: maxSeconds }
   let runId: string | null = null
-  let llamadas = 0, filas = 0, cupsProc = 0
+  let llamadas = 0, filas = 0, cupsProc = 0, dedupeLote = 0
   const errores: { cups: string; etapa: string; error: string }[] = []
   // Instrumentación (auditoría): distribución de status HTTP por etapa + muestras de 200 vacío.
   const statusStats = { contrato: {} as Record<string, number>, maximetro: {} as Record<string, number>, consumo: {} as Record<string, number> }
@@ -378,14 +378,29 @@ serve(async (req) => {
             })
           }
           if (descartadas > 0) errores.push({ cups: item.codigo, etapa: 'consumo_hora_invalida', error: `${descartadas} filas descartadas (ej: ${ejemplo})` })
-          if (!dryRun && rows.length) {
-            for (let i = 0; i < rows.length; i += 1000) {
+          // F1 (run real #1): E-Distribución (dist 2) codifica la hora repetida del día de
+          // 25h de octubre como (fecha,hora) DUPLICADA (dos "03:00"), no como hora 25. Dos
+          // filas con la misma clave del UNIQUE en un solo INSERT..ON CONFLICT → "cannot affect
+          // row a second time" → se perdía el lote entero. Deduplicamos por (fecha,hora)
+          // preferiendo 'real' sobre 'estimada'. La hora extra colapsa a una (Datadis no permite
+          // distinguirlas cuando llegan con la misma etiqueta). Se cuenta en resumen.dedupe_lote.
+          const porClave = new Map<string, Record<string, unknown>>()
+          for (const row of rows) {
+            const k = `${row.fecha}|${row.hora}`
+            const prev = porClave.get(k)
+            if (!prev) { porClave.set(k, row); continue }
+            dedupeLote++
+            if (prev['metodo_obtencion'] !== 'real' && row['metodo_obtencion'] === 'real') porClave.set(k, row)
+          }
+          const rowsDedup = [...porClave.values()]
+          if (!dryRun && rowsDedup.length) {
+            for (let i = 0; i < rowsDedup.length; i += 1000) {
               const { error } = await sb.from('datadis_consumptions')
-                .upsert(rows.slice(i, i + 1000), { onConflict: 'cups_id,fecha,hora' })
+                .upsert(rowsDedup.slice(i, i + 1000), { onConflict: 'cups_id,fecha,hora' })
               if (error) { errores.push({ cups: item.codigo, etapa: 'consumo_upsert', error: error.message }); break }
             }
           }
-          filas += rows.length
+          filas += rowsDedup.length
         } catch (e) { errores.push({ cups: item.codigo, etapa: 'consumo', error: (e as Error).message }) }
       }
     }
@@ -396,6 +411,7 @@ serve(async (req) => {
     out.errores = errores.length
     out.status_por_etapa = statusStats
     out.consumo_vacios = consumoVacios
+    out.dedupe_lote = dedupeLote
     out.ok = true
   } catch (e) {
     out.ok = false
@@ -411,7 +427,7 @@ serve(async (req) => {
         cups_procesados: cupsProc, llamadas, filas_insertadas: filas,
         errores, resumen: {
           parado_por: out.parado_por ?? 'fin', candidatos: out.candidatos ?? null,
-          status_por_etapa: statusStats, consumo_vacios: consumoVacios,
+          status_por_etapa: statusStats, consumo_vacios: consumoVacios, dedupe_lote: dedupeLote,
         },
       }).eq('id', runId)
     } catch { /* no bloquea */ }
