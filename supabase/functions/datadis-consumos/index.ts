@@ -41,6 +41,9 @@ const CORS = {
 // ── helpers de fecha ────────────────────────────────────────────────
 function ymd(d: Date): string { return d.toISOString().slice(0, 10) }              // YYYY-MM-DD
 function toDatadis(d: Date): string { return ymd(d).replace(/-/g, '/') }            // YYYY/MM/DD
+function toMonth(d: Date): string { return d.toISOString().slice(0, 7).replace(/-/g, '/') } // YYYY/MM
+function firstOfMonth(d: Date): Date { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)) }
+function lastOfMonth(d: Date): Date { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)) }
 function addDays(d: Date, n: number): Date { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x }
 function addMonths(d: Date, n: number): Date { const x = new Date(d); x.setUTCMonth(x.getUTCMonth() + n); return x }
 // Trocea [desde..hasta] en tramos de <=12 meses (minimiza nº de llamadas).
@@ -108,6 +111,7 @@ serve(async (req) => {
   // Parámetros (con defaults conservadores; el primer dry-run mide tiempos reales).
   let dryRun = true, maxCups = 12, maxSeconds = 120, meses = 24
   let prioridad: string[] = []
+  let sondaCups = '' // diagnóstico: si viene, corre SOLO la sonda de matriz de API sobre ese CUPS
   try {
     const b = await req.json()
     if (b && b.dry_run === false) dryRun = false
@@ -115,6 +119,7 @@ serve(async (req) => {
     if (b && Number.isFinite(b.max_seconds)) maxSeconds = Math.max(10, Math.min(280, b.max_seconds))
     if (b && Number.isFinite(b.meses_ventana)) meses = Math.max(1, Math.min(36, b.meses_ventana))
     if (b && Array.isArray(b.prioridad_cups)) prioridad = b.prioridad_cups.map((x: string) => (x || '').toUpperCase())
+    if (b && typeof b.sonda_cups === 'string') sondaCups = b.sonda_cups.toUpperCase()
   } catch { /* defaults */ }
 
   const t0 = Date.now()
@@ -124,6 +129,10 @@ serve(async (req) => {
   let runId: string | null = null
   let llamadas = 0, filas = 0, cupsProc = 0
   const errores: { cups: string; etapa: string; error: string }[] = []
+  // Instrumentación (auditoría): distribución de status HTTP por etapa + muestras de 200 vacío.
+  const statusStats = { contrato: {} as Record<string, number>, maximetro: {} as Record<string, number>, consumo: {} as Record<string, number> }
+  const consumoVacios: Record<string, unknown>[] = []
+  const bump = (m: Record<string, number>, s: number) => { const k = String(s); m[k] = (m[k] ?? 0) + 1 }
 
   // C1 · abrir run
   try {
@@ -136,6 +145,70 @@ serve(async (req) => {
     const hoy = new Date()
     const hasta = addDays(hoy, -1)              // Datadis publica con retraso → hasta ayer
     const ventanaMin = addMonths(hoy, -meses)   // tope de la ventana rodante
+
+    // ═══ SONDA DE MATRIZ (diagnóstico) ═══════════════════════════════
+    // Auditoría dry_run#1: la API pública devolvió 0 filas de curva. Antes de
+    // cambiar el troceado a ciegas, probamos 4 variantes de formato/rango sobre
+    // UN CUPS conocido y registramos status + nº de puntos + cabeza del cuerpo.
+    // No escribe nada; short-circuit del run normal.
+    if (sondaCups) {
+      const { data: crow } = await sb.from('cups')
+        .select('id, codigo_cups, datadis_distributor_code, datadis_point_type, empresas!inner(nif)')
+        .eq('codigo_cups', sondaCups).is('deleted_at', null).limit(1).maybeSingle()
+      const cr = crow as unknown as {
+        id: string; codigo_cups: string; datadis_distributor_code: string | null
+        datadis_point_type: number | null; empresas?: { nif?: string }
+      } | null
+      if (!cr || !cr.datadis_distributor_code || cr.datadis_point_type == null || !cr.empresas?.nif) {
+        throw new Error('sonda: CUPS no encontrado o sin datos auxiliares: ' + sondaCups)
+      }
+      const dist = encodeURIComponent(cr.datadis_distributor_code)
+      const cupsQ = encodeURIComponent(cr.codigo_cups)
+      const authNif = encodeURIComponent((cr.empresas.nif ?? '').toUpperCase())
+      const pt = cr.datadis_point_type
+      // Mes de referencia publicado: dos meses hacia atrás
+      const mesRef = firstOfMonth(addMonths(hoy, -2))
+      const mesRefEnd = lastOfMonth(mesRef)
+      const doceStart = firstOfMonth(addMonths(mesRef, -11))
+      const variantes = [
+        { id: 'A_mes_1m', sd: toMonth(mesRef), ed: toMonth(mesRef) },
+        { id: 'B_mes_12m', sd: toMonth(doceStart), ed: toMonth(mesRef) },
+        { id: 'C_dia_1m', sd: toDatadis(mesRef), ed: toDatadis(mesRefEnd) },
+        { id: 'D_dia_12m', sd: toDatadis(doceStart), ed: toDatadis(mesRefEnd) },
+      ]
+      const jwt = await login()
+      const resultados: Record<string, unknown>[] = []
+      for (const v of variantes) {
+        const path = `get-consumption-data?cups=${cupsQ}&distributorCode=${dist}` +
+          `&startDate=${encodeURIComponent(v.sd)}&endDate=${encodeURIComponent(v.ed)}` +
+          `&measurementType=0&pointType=${pt}&authorizedNif=${authNif}`
+        let status = 0, nPuntos = 0, head = ''
+        try {
+          const r = await getJson(jwt, path)
+          llamadas++
+          status = r.status
+          const pts = asArray(r.body, 'timeCurveList')
+          nPuntos = pts.length
+          if (nPuntos === 0) head = (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)).slice(0, 200)
+        } catch (e) { head = 'EXC: ' + (e as Error).message }
+        resultados.push({ variante: v.id, startDate: v.sd, endDate: v.ed, status, n_puntos: nPuntos, cuerpo_vacio: head })
+      }
+      out.sonda = { cups: cr.codigo_cups, distributorCode: cr.datadis_distributor_code, pointType: pt, resultados }
+      out.candidatos = 1
+      out.cups_procesados = 1
+      out.llamadas = llamadas
+      out.ok = true
+      if (runId) {
+        try {
+          await sb.from('datadis_runs').update({
+            finished_at: new Date().toISOString(), cups_procesados: 1, llamadas,
+            filas_insertadas: 0, errores: [], resumen: { modo: 'sonda_matriz', sonda: out.sonda },
+          }).eq('id', runId)
+        } catch { /* no bloquea */ }
+      }
+      return j(out, 200)
+    }
+    // ═════════════════════════════════════════════════════════════════
 
     // CUPS autorizados con distribuidora y tipo de punto
     const { data: cupsCrm, error: cErr } = await sb
@@ -199,7 +272,7 @@ serve(async (req) => {
       // ── Contrato (snapshot: delete+insert por CUPS) ─────────────────
       try {
         const { status, body } = await getJson(jwt, `get-contract-detail?cups=${cupsQ}&distributorCode=${dist}&authorizedNif=${authNif}`)
-        llamadas++
+        llamadas++; bump(statusStats.contrato, status)
         if (status === 200) {
           const arr = asArray(body)
           const rows = arr.map((r) => {
@@ -240,7 +313,7 @@ serve(async (req) => {
       // ── Maxímetro (histórico para optimizador de potencia) ──────────
       try {
         const { status, body } = await getJson(jwt, `get-max-power?cups=${cupsQ}&distributorCode=${dist}&startDate=${toDatadis(item.desde)}&endDate=${toDatadis(item.hasta)}&authorizedNif=${authNif}`)
-        llamadas++
+        llamadas++; bump(statusStats.maximetro, status)
         if (status === 200) {
           const arr = asArray(body)
           const rows = arr.map((r) => ({
@@ -267,9 +340,12 @@ serve(async (req) => {
             `&startDate=${toDatadis(tramo.start)}&endDate=${toDatadis(tramo.end)}` +
             `&measurementType=0&pointType=${item.pointType}&authorizedNif=${authNif}`
           const { status, body } = await getJson(jwt, path)
-          llamadas++
+          llamadas++; bump(statusStats.consumo, status)
           if (status !== 200) continue
           const pts = asArray(body, 'timeCurveList')
+          if (pts.length === 0 && consumoVacios.length < 6) {
+            consumoVacios.push({ cups: item.codigo, startDate: toDatadis(tramo.start), endDate: toDatadis(tramo.end), status, cuerpo: (typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 200) })
+          }
           const rows: Record<string, unknown>[] = []
           let descartadas = 0; let ejemplo = ''
           for (const p of pts) {
@@ -309,6 +385,8 @@ serve(async (req) => {
     out.llamadas = llamadas
     out.filas = filas
     out.errores = errores.length
+    out.status_por_etapa = statusStats
+    out.consumo_vacios = consumoVacios
     out.ok = true
   } catch (e) {
     out.ok = false
@@ -322,7 +400,10 @@ serve(async (req) => {
       await sb.from('datadis_runs').update({
         finished_at: new Date().toISOString(),
         cups_procesados: cupsProc, llamadas, filas_insertadas: filas,
-        errores, resumen: { parado_por: out.parado_por ?? 'fin', candidatos: out.candidatos ?? null },
+        errores, resumen: {
+          parado_por: out.parado_por ?? 'fin', candidatos: out.candidatos ?? null,
+          status_por_etapa: statusStats, consumo_vacios: consumoVacios,
+        },
       }).eq('id', runId)
     } catch { /* no bloquea */ }
   }
