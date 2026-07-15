@@ -30,6 +30,7 @@ Sin esto no va nada. Es la capa que hoy falta.
   - **Índice `(cups_id, fecha)` desde el día 1** (consulta típica: curva de un CUPS en un rango) — ya creado en la migración.
   - **RGPD:** consumos horarios de personas físicas = dato personal → minimización + retención definida (24 meses) documentada.
   - Implementación: el worker S0.2 sincroniza ventana de 24 meses; job de mantenimiento (cron) purga/agrega lo anterior a 24 meses. · **S**
+  - **ENMIENDA (auditoría 2026-07-14, tras sonda de matriz):** el ALCANCE de ingesta hacia atrás se acota a **23 meses**, no 24. Datadis `get-consumption-data` rechaza con HTTP 400 fecha inicio "superior a dos años"; el mes 24 histórico es inalcanzable por API. La **retención/purga sigue siendo 24 meses** (esta decisión NO cambia): solo se documenta que el mes más antiguo de la ventana no se puede ingerir. Además, el worker usa formato de fecha **`YYYY/MM`** (no `YYYY/MM/DD`, que da 400) y tolera 12 meses/llamada (8760 pts) → 23m de backfill = 2 llamadas de curva por CUPS.
 
 ## SPRINT 1 — Monitorización (la pieza que se ve) · **M**
 - **S1.1** Ficha de CUPS con pestañas (Consumo / Potencia / Contrato / Facturas), leyendo de BD. · **M**

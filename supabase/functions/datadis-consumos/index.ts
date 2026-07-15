@@ -109,7 +109,10 @@ serve(async (req) => {
   }
 
   // Parámetros (con defaults conservadores; el primer dry-run mide tiempos reales).
-  let dryRun = true, maxCups = 12, maxSeconds = 120, meses = 24
+  // meses=23 (no 24): Datadis rechaza fecha inicio "superior a dos años" (400). El mes 24
+  // histórico es inalcanzable por API → alcance de ingesta = 23m. NO cambia la retención
+  // S0.5 (purga a 24m), solo el alcance hacia atrás. Ver ROADMAP_MODULO_ENERGIA_V2 (enmienda).
+  let dryRun = true, maxCups = 12, maxSeconds = 120, meses = 23
   let prioridad: string[] = []
   let sondaCups = '' // diagnóstico: si viene, corre SOLO la sonda de matriz de API sobre ese CUPS
   try {
@@ -143,8 +146,8 @@ serve(async (req) => {
 
   try {
     const hoy = new Date()
-    const hasta = addDays(hoy, -1)              // Datadis publica con retraso → hasta ayer
-    const ventanaMin = addMonths(hoy, -meses)   // tope de la ventana rodante
+    const hasta = addDays(hoy, -1)                          // Datadis publica con retraso → hasta ayer
+    const ventanaMin = firstOfMonth(addMonths(hoy, -meses)) // primero de mes, 23m atrás (tope API 2 años)
 
     // ═══ SONDA DE MATRIZ (diagnóstico) ═══════════════════════════════
     // Auditoría dry_run#1: la API pública devolvió 0 filas de curva. Antes de
@@ -238,11 +241,12 @@ serve(async (req) => {
       const nif = (r.empresas?.nif ?? '').toUpperCase()
       if (!dist || pt == null || !nif) continue // sin datos auxiliares no se puede consultar
       const ultima = ultimaPorCups.get(r.id) ?? null
-      // Arranca EN la última fecha guardada (no en la siguiente): re-ingiere ese día
-      // completo (idempotente por UNIQUE cups_id,fecha,hora). Evita que un run frenado
-      // a mitad deje un día incompleto que el cursor daría por terminado (hueco intradía).
-      let desde = ultima ? new Date(ultima + 'T00:00:00Z') : new Date(ventanaMin)
-      if (desde < ventanaMin) desde = new Date(ventanaMin) // respeta ventana rodante
+      // Granularidad de MES (pedimos por YYYY/MM): arranca en el PRIMERO DEL MES de la
+      // última fecha guardada → re-ingiere ese mes completo (~720 filas idempotentes por
+      // UNIQUE cups_id,fecha,hora). Barato y seguro: si un run se frenó a mitad de mes, el
+      // siguiente reingiere el mes entero y no deja hueco que el cursor daría por cerrado.
+      let desde = ultima ? firstOfMonth(new Date(ultima + 'T00:00:00Z')) : new Date(ventanaMin)
+      if (desde < ventanaMin) desde = new Date(ventanaMin) // respeta ventana rodante (tope 2 años)
       if (desde > hasta) continue // al día
       worklist.push({ cups_id: r.id, codigo: r.codigo_cups, distributorCode: dist, pointType: pt, nif, desde, hasta, ultima })
     }
@@ -311,8 +315,10 @@ serve(async (req) => {
       if (deadline()) { out.parado_por = 'tiempo'; break }
 
       // ── Maxímetro (histórico para optimizador de potencia) ──────────
+      // Formato YYYY/MM (hipótesis: mismo requisito que get-consumption-data). La
+      // instrumentación de status por etapa dirá en el run real si respondía 200 o 400.
       try {
-        const { status, body } = await getJson(jwt, `get-max-power?cups=${cupsQ}&distributorCode=${dist}&startDate=${toDatadis(item.desde)}&endDate=${toDatadis(item.hasta)}&authorizedNif=${authNif}`)
+        const { status, body } = await getJson(jwt, `get-max-power?cups=${cupsQ}&distributorCode=${dist}&startDate=${toMonth(item.desde)}&endDate=${toMonth(item.hasta)}&authorizedNif=${authNif}`)
         llamadas++; bump(statusStats.maximetro, status)
         if (status === 200) {
           const arr = asArray(body)
@@ -332,19 +338,22 @@ serve(async (req) => {
         }
       } catch (e) { errores.push({ cups: item.codigo, etapa: 'maximetro', error: (e as Error).message }) }
 
-      // ── Curva de consumo (troceada por año) ─────────────────────────
+      // ── Curva de consumo (formato YYYY/MM; tramos de 12 meses) ──────
+      // Datadis get-consumption-data EXIGE fecha YYYY/MM (mes). Con formato mes tolera
+      // rangos de 12 meses → 8760 pts/llamada; 24m de backfill = 2 llamadas. (Verificado
+      // con sonda de matriz 2026-07-14: YYYY/MM/DD → 400 "Formato de fechas YYYY/MM".)
       for (const tramo of chunksAnuales(item.desde, item.hasta)) {
         if (deadline()) { out.parado_por = 'tiempo'; break }
         try {
           const path = `get-consumption-data?cups=${cupsQ}&distributorCode=${dist}` +
-            `&startDate=${toDatadis(tramo.start)}&endDate=${toDatadis(tramo.end)}` +
+            `&startDate=${toMonth(tramo.start)}&endDate=${toMonth(tramo.end)}` +
             `&measurementType=0&pointType=${item.pointType}&authorizedNif=${authNif}`
           const { status, body } = await getJson(jwt, path)
           llamadas++; bump(statusStats.consumo, status)
           if (status !== 200) continue
           const pts = asArray(body, 'timeCurveList')
           if (pts.length === 0 && consumoVacios.length < 6) {
-            consumoVacios.push({ cups: item.codigo, startDate: toDatadis(tramo.start), endDate: toDatadis(tramo.end), status, cuerpo: (typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 200) })
+            consumoVacios.push({ cups: item.codigo, startDate: toMonth(tramo.start), endDate: toMonth(tramo.end), status, cuerpo: (typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 200) })
           }
           const rows: Record<string, unknown>[] = []
           let descartadas = 0; let ejemplo = ''
