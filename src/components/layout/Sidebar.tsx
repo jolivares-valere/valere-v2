@@ -31,6 +31,7 @@ const crmItems: Item[] = [
   { to: '/importador',     label: 'Importador',    icon: Upload },
   { to: '/seguimiento-fv', label: 'Plantas FV',    icon: Sun },
   { to: '/datadis',        label: 'Datadis',       icon: Database },
+  { to: '/buscador-cups',  label: 'Buscador CUPS', icon: FileSearch },
 ]
 
 const captacionItems: Item[] = [
