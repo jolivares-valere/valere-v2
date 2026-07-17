@@ -53,8 +53,9 @@ Cruce de `docs/analisis_plataformas_junio/DOC2_MEJORAS_PRIORIZADAS_CRM_VALERE.md
 - [empresas] Cabecera: fallback del chip Comercial al comercial dominante de los contratos cuando `empresas.comercial_id` es nulo (estilo "heredado"), o alternativa: acción rápida "asignar comercial" desde el propio chip · auditor (cuadre PR-1.1) · S · 📥 pendiente decisión Juan en paseo PR-1.1
 - [empresas] Cabecera: el chip de renovación debe contar lo URGENTE, no solo lo próximo — añadir aviso compacto "⚠ N vencidas" (renovaciones con fecha pasada no gestionadas, caso PAZ Y BIEN: badge "13/04/2027 · Baja" sobre 4 críticas vencidas) y tratar el caso BLUENET "— · 18 sin fecha" · auditor (paseo PR-1.3) · S · 📥 decidir tras verlo pintado
 - [empresas] Ficha: hacer explícita la persistencia de pestaña entre fichas sincronizándola a `?tab=` en la URL (hoy funciona por accidente de React Router — aceptado como decisión en paseo PR-1.1; el sync además haría los enlaces compartibles) · auditor · S · 📥
-- [contratos] Detalle: unificar fuente de prioridad — hoy calcula por días restantes (`calcPrioridad`) y discrepa de `renovaciones.prioridad` (canónica) en pantallas contiguas; que lea la renovación viva con fallback "estimada" · auditor (paseo PR-1.2) · S · 📥 resolver con PR-1.3
-- [contratos] Detalle: no pintar "(0d)" cuando fecha_fin es null (línea 52 ContratoDetailPage, sufijo incondicional) · auditor (paseo PR-1.2) · S · 📥 colar con la anterior
+- [contratos] Detalle: unificar fuente de prioridad — leer renovación viva con fallback "estimada" · auditor (paseo PR-1.2) · S · ✅ PR #69
+- [contratos] Detalle: no pintar "(0d)" cuando fecha_fin es null (línea 52 ContratoDetailPage, sufijo incondicional) · auditor (paseo PR-1.2) · S · ✅ PR #69
+- [contratos] Detalle: tabla CUPS junta visualmente Estado y Dirección ("…EB1Factivo") — falta padding/separación entre columnas · auditor (paseo PR-1.3) · S · 📥 cosmética mínima
 - [contratos] Alta por factura (OCR) como paso 0 del asistente PR-3.2 — reutilizar importador calculadora · auditor/DOC2 #3 · M · 📥 anotado en PR-3.2 (semana 3), si no cabe → backlog v2
 
 ---
