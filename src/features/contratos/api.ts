@@ -120,6 +120,32 @@ export async function fetchContratosForExport(filter?: {
   return (data ?? []) as unknown as ContratoConEmpresa[]
 }
 
+export interface ContratoConCups extends Contrato {
+  cups?: Pick<Cups, 'id' | 'codigo_cups'>[] | null
+}
+
+/**
+ * Contratos de una empresa con sus CUPS embebidos, para la pestaña
+ * Contratos de la ficha de empresa (PR-1.2, semana 1 CRM ÚTIL). Solo lectura.
+ */
+export function useContratosPorEmpresa(empresaId: string | undefined) {
+  return useQuery({
+    queryKey: [RESOURCE, 'porEmpresa', empresaId],
+    enabled: Boolean(empresaId),
+    queryFn: async (): Promise<ContratoConCups[]> => {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select('*, cups(id, codigo_cups)')
+        .eq('empresa_id', empresaId!)
+        .is('deleted_at', null)
+        .is('cups.deleted_at', null)
+        .order('fecha_fin', { ascending: true, nullsFirst: false })
+      if (error) { logError(error, 'useContratosPorEmpresa'); throw error }
+      return (data ?? []) as unknown as ContratoConCups[]
+    },
+  })
+}
+
 export function useContratoById(id: string | undefined) {
   return useQuery({
     queryKey: [RESOURCE, 'byId', id],
