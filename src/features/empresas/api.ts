@@ -8,6 +8,7 @@ import type {
   Empresa,
   EmpresaInsert,
   EmpresaUpdate,
+  PrioridadRenovacion,
 } from '../../core/types/entities'
 
 const RESOURCE = 'empresas'
@@ -142,6 +143,67 @@ export function useEmpresaById(id: string | undefined) {
       }
 
       return (data as Empresa | null) ?? null
+    },
+  })
+}
+
+export interface EmpresaCabeceraData {
+  comercialNombre: string | null
+  contratosActivos: number
+  proximaRenovacion: { fecha: string; prioridad: PrioridadRenovacion } | null
+  incidenciasDatadis: number
+}
+
+/**
+ * Datos agregados para la cabecera de la ficha de empresa (PR-1.1):
+ * comercial, nº contratos activos, próxima renovación e incidencias Datadis.
+ * Solo lecturas; una query paralela por bloque.
+ */
+export function useEmpresaCabecera(empresaId: string | undefined, comercialId?: string | null) {
+  return useQuery({
+    queryKey: [RESOURCE, 'cabecera', empresaId, comercialId ?? null],
+    enabled: Boolean(empresaId),
+    queryFn: async (): Promise<EmpresaCabeceraData> => {
+      // Cast: datadis_incidencias y renovaciones no están en los tipos generados.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any
+      const [contratosRes, renovRes, incidRes, comercialRes] = await Promise.all([
+        sb.from('contratos')
+          .select('id', { count: 'exact', head: true })
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null)
+          .eq('estado', 'activo'),
+        sb.from('renovaciones')
+          .select('fecha_vencimiento_contrato, prioridad')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null)
+          .gte('fecha_vencimiento_contrato', new Date().toISOString())
+          .order('fecha_vencimiento_contrato', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        sb.from('datadis_incidencias')
+          .select('id', { count: 'exact', head: true })
+          .eq('empresa_id', empresaId),
+        comercialId
+          ? sb.from('user_profiles').select('full_name').eq('id', comercialId).maybeSingle()
+          : Promise.resolve({ data: null, error: null, count: null }),
+      ])
+
+      for (const r of [contratosRes, renovRes, incidRes, comercialRes]) {
+        if (r.error) {
+          logError(r.error, 'useEmpresaCabecera')
+          throw r.error
+        }
+      }
+
+      return {
+        comercialNombre: comercialRes.data?.full_name ?? null,
+        contratosActivos: contratosRes.count ?? 0,
+        proximaRenovacion: renovRes.data
+          ? { fecha: renovRes.data.fecha_vencimiento_contrato, prioridad: renovRes.data.prioridad }
+          : null,
+        incidenciasDatadis: incidRes.count ?? 0,
+      }
     },
   })
 }
