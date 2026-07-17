@@ -2,6 +2,7 @@
 import BackButton from '../../core/components/BackButton'
 import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
 import { useContratoById } from './api'
+import { useRenovacionViva } from '../renovaciones/api'
 import EstadoBadge from './components/EstadoBadge'
 import PrioridadBadge from './components/PrioridadBadge'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
@@ -12,13 +13,17 @@ import { formatDate } from '../../core/utils/dates'
 export default function ContratoDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading } = useContratoById(id)
+  const renovacionViva = useRenovacionViva(id)
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando…</div>
   if (!data) return <EntidadNoEncontrada entidad="contrato" backTo="/contratos" backLabel="Volver a Contratos" />
 
   const { contrato, cups } = data
   const dias = calcDiasVencimiento(contrato.fecha_fin)
-  const prioridad = calcPrioridad(dias)
+  // Fuente única de prioridad (PR-1.3): manda renovaciones.prioridad.
+  // Solo si el contrato no tiene renovación viva se estima por días.
+  const prioridad = renovacionViva.data?.prioridad ?? calcPrioridad(dias)
+  const prioridadEstimada = !renovacionViva.isLoading && !renovacionViva.data
 
   return (
     <div className="p-8">
@@ -36,6 +41,14 @@ export default function ContratoDetailPage() {
         <div className="flex items-center gap-2">
           <EstadoBadge estado={contrato.estado} />
           <PrioridadBadge prioridad={prioridad} />
+          {prioridadEstimada && (
+            <span
+              className="text-[10px] italic text-slate-400"
+              title="Sin renovación registrada: prioridad estimada por días al vencimiento"
+            >
+              estimada
+            </span>
+          )}
         </div>
       </div>
 
@@ -49,7 +62,7 @@ export default function ContratoDetailPage() {
             <Row k="Tipo precio" v={contrato.tipo_precio ?? '—'} />
             <Row k="Fecha firma" v={formatDate(contrato.fecha_firma)} />
             <Row k="Inicio" v={formatDate(contrato.fecha_inicio)} />
-            <Row k="Vencimiento" v={`${formatDate(contrato.fecha_fin)} (${dias}d)`} />
+            <Row k="Vencimiento" v={contrato.fecha_fin ? `${formatDate(contrato.fecha_fin)} (${dias}d)` : '—'} />
             <Row k="Duración" v={contrato.duracion_meses ? `${contrato.duracion_meses} meses` : '—'} />
             <Row k="Consumo SIPS" v={contrato.consumo_sips_kwh ? `${contrato.consumo_sips_kwh} kWh` : '—'} />
             <Row k="Potencia" v={contrato.potencia_contratada ? `${contrato.potencia_contratada} kW` : '—'} />
