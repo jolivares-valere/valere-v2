@@ -10,6 +10,28 @@
 
 ---
 
+## CRUCE DOC2 ↔ BACKLOG (2026-07-17 · única re-priorización admitida, semana 1)
+
+Cruce de `docs/analisis_plataformas_junio/DOC2_MEJORAS_PRIORIZADAS_CRM_VALERE.md` con este backlog y el plan `PLAN_CRM_UTIL_4SEMANAS.md`. **Veredicto: la lista de la semana 1 queda CERRADA como está en el plan (PR-1.1 → PR-1.5), sin ampliaciones.**
+
+| DOC2 | Encaje en el mes CRM ÚTIL | Decisión |
+|---|---|---|
+| #1 Autorrelleno por CUPS (SIPS+Datadis) | Autorrelleno ya diferido a Suministros it. 2; SIPS F1 aparcado en rama `claude/f1-sips-cups` | Backlog v2 (post-mes) |
+| #2 Buscador de CUPS standalone | YA CABLEADO en rama aparcada `claude/f1-sips-cups` | No entra; retomar la rama en backlog v2 |
+| #3 Alta por factura (OCR) | Candidato auditor: **semilla del asistente PR-3.2** (semana 3). El importador OCR de la calculadora ya existe; PR-3.2 puede añadir "empezar desde factura" como paso 0 opcional SI cabe en <300 líneas; si no, backlog v2 | Anotado en PR-3.2, sin ampliar su CA |
+| #4 Recordatorios renovación + bandeja | CUBIERTO por semana 2 (PR-2.2/2.4/2.5) y semana 4 (PR-4.2 push lunes) | Ya en plan, sin duplicar |
+| #5 Rentabilidad €/% cartera | Depende de #6 comisiones (workstream comisiones/Holded propio) | Backlog v2, tras módulo comisiones |
+| #6-#11 (P1) | Fuera del alcance del mes por definición del plan | Backlog v2 |
+| #12-#15 (P2) | Ídem; #14 mapa de calor conecta con PR-4.1 (curva) pero NO se adelanta | Backlog v2 |
+| #16-#17 (P3) | Planes propios (telemedida DOC3) | Sin cambio |
+| Hardening transversal | Ya regla del proyecto (RLS estricto en toda tabla nueva); aplica a PR-3.3 (RLS bucket) y PR-4.2 | Sin PR propio |
+
+**Candidatos del auditor (paseo Zoco 16-jul):**
+- Buscador global multi-entidad → **ya existe** (`src/components/search/GlobalSearch.tsx`: empresas, contactos, contratos por CUPS, oportunidades). Mejora incremental (añadir renovaciones/incidencias, buscar contrato por nombre de empresa, revisar filtro `estado_relacion='cliente'`) → entrada nueva 📥 abajo, **backlog v2** — semana 1 no va sobrada (día 1).
+- Alta por factura → semilla anotada en PR-3.2 (ver tabla), no toca semana 1.
+
+---
+
 ## Entradas
 
 - [empresas] Quitar columna Segmento del listado (mantener en export/form) · Juan · S · ✅ PR #58
@@ -27,6 +49,9 @@
 - [renovaciones] Para renovaciones sin CUPS visible (rotación/enlace perdido): mostrar "sin CUPS" o el nº de contrato como identificador, para que nunca haya dos filas indistinguibles · Juan · S · 📥
 - [renovaciones] (Opcional) Agrupar por empresa con las sedes/CUPS desplegables (estilo árbol): BLUENET ocupa 1 fila que despliega sus 18 · Juan · L · 📥
 - [renovaciones] Búsqueda rápida + orden por encabezados + selector de empresa filtrable (código ya preparado en `APLICAR_RENOVACIONES_UX.ps1`, pendiente aplicar) · Juan · M · 📦
+- [search] Buscador global multi-entidad v2: añadir renovaciones e incidencias Datadis a `GlobalSearch`, buscar contratos por nombre de empresa, revisar filtro `estado_relacion='cliente'` (hoy excluye leads) · auditor (paseo Zoco 16-jul) · M · 📥 backlog v2
+- [empresas] Cabecera: fallback del chip Comercial al comercial dominante de los contratos cuando `empresas.comercial_id` es nulo (estilo "heredado"), o alternativa: acción rápida "asignar comercial" desde el propio chip · auditor (cuadre PR-1.1) · S · 📥 pendiente decisión Juan en paseo PR-1.1
+- [contratos] Alta por factura (OCR) como paso 0 del asistente PR-3.2 — reutilizar importador calculadora · auditor/DOC2 #3 · M · 📥 anotado en PR-3.2 (semana 3), si no cabe → backlog v2
 
 ---
 
@@ -49,4 +74,4 @@ Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, neces
 - Telemetría en producción (`client_telemetry`): route_change → módulos más usados primero; errores → fricciones reales.
 - Feedback del equipo.
 
-> Última actualización: 2026-07-06
+> Última actualización: 2026-07-17 (cruce DOC2 ↔ backlog, semana 1 cerrada)
