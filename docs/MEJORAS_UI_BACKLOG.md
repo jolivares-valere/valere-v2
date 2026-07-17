@@ -51,6 +51,7 @@ Cruce de `docs/analisis_plataformas_junio/DOC2_MEJORAS_PRIORIZADAS_CRM_VALERE.md
 - [renovaciones] Búsqueda rápida + orden por encabezados + selector de empresa filtrable (código ya preparado en `APLICAR_RENOVACIONES_UX.ps1`, pendiente aplicar) · Juan · M · 📦
 - [search] Buscador global multi-entidad v2: añadir renovaciones e incidencias Datadis a `GlobalSearch`, buscar contratos por nombre de empresa, revisar filtro `estado_relacion='cliente'` (hoy excluye leads) · auditor (paseo Zoco 16-jul) · M · 📥 backlog v2
 - [empresas] Cabecera: fallback del chip Comercial al comercial dominante de los contratos cuando `empresas.comercial_id` es nulo (estilo "heredado"), o alternativa: acción rápida "asignar comercial" desde el propio chip · auditor (cuadre PR-1.1) · S · 📥 pendiente decisión Juan en paseo PR-1.1
+- [empresas] Ficha: hacer explícita la persistencia de pestaña entre fichas sincronizándola a `?tab=` en la URL (hoy funciona por accidente de React Router — aceptado como decisión en paseo PR-1.1; el sync además haría los enlaces compartibles) · auditor · S · 📥
 - [contratos] Alta por factura (OCR) como paso 0 del asistente PR-3.2 — reutilizar importador calculadora · auditor/DOC2 #3 · M · 📥 anotado en PR-3.2 (semana 3), si no cabe → backlog v2
 
 ---
