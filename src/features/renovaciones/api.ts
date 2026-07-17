@@ -103,6 +103,31 @@ export async function fetchRenovacionesForExport(filter?: {
   return (data ?? []) as unknown as RenovacionConRelaciones[]
 }
 
+/**
+ * Renovación "viva" de un contrato (no renovada, no perdida, no borrada),
+ * la más reciente. Fuente ÚNICA de prioridad para el detalle de contrato
+ * (PR-1.3): si existe, su `prioridad` manda sobre el cálculo por días.
+ */
+export function useRenovacionViva(contratoId: string | undefined) {
+  return useQuery({
+    queryKey: [RESOURCE, 'viva', contratoId],
+    enabled: Boolean(contratoId),
+    queryFn: async (): Promise<Renovacion | null> => {
+      const { data, error } = await supabase
+        .from('renovaciones' as never)
+        .select('*')
+        .eq('contrato_id' as never, contratoId! as never)
+        .is('deleted_at' as never, null)
+        .not('estado' as never, 'in', '(renovado,perdido)')
+        .order('created_at' as never, { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) { logError(error, 'useRenovacionViva'); throw error }
+      return (data as Renovacion | null) ?? null
+    },
+  })
+}
+
 export function useCreateRenovacion() {
   const qc = useQueryClient()
   return useMutation({

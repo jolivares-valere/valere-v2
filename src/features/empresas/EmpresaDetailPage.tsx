@@ -7,6 +7,7 @@ import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
 import EmpresaCabecera from './components/EmpresaCabecera'
 import ContratosTab from './components/ContratosTab'
+import RenovacionesTab from './components/RenovacionesTab'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
 import DocumentosTab from '../documentos/components/DocumentosTab'
 import { useContactosPorEmpresa, useCreateContacto } from '../contactos/api'
@@ -20,7 +21,7 @@ import DatadisAutorizacionesTab from '../datadis/components/DatadisAutorizacione
 import SuministrosTab from '../suministros/components/SuministrosTab'
 import type { EmpresaUpdate, ContactoInsert, TipoActividad } from '../../core/types/entities'
 
-type Tab = 'resumen' | 'contactos' | 'suministros' | 'contratos' | 'actividades' | 'documentos' | 'propuestas' | 'campos' | 'plantas-fv' | 'datadis'
+type Tab = 'resumen' | 'contactos' | 'suministros' | 'contratos' | 'renovaciones' | 'actividades' | 'documentos' | 'propuestas' | 'campos' | 'plantas-fv' | 'datadis'
 
 export default function EmpresaDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,7 +31,7 @@ export default function EmpresaDetailPage() {
   const deleteMut = useDeleteEmpresa()
   const [editing, setEditing] = useState(false)
   const [searchParams] = useSearchParams()
-  const TABS_VALIDAS: Tab[] = ['resumen', 'contactos', 'suministros', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
+  const TABS_VALIDAS: Tab[] = ['resumen', 'contactos', 'suministros', 'contratos', 'renovaciones', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
   const tabParam = searchParams.get('tab') as Tab | null
   const [tab, setTab] = useState<Tab>(tabParam && TABS_VALIDAS.includes(tabParam) ? tabParam : 'resumen')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -103,6 +104,7 @@ export default function EmpresaDetailPage() {
                 {tab === 'plantas-fv' && <PlantaFVTab empresaId={empresa.id} />}
                 {tab === 'datadis' && <DatadisAutorizacionesTab empresaId={empresa.id} />}
                 {tab === 'contratos' && <ContratosTab empresaId={empresa.id} />}
+                {tab === 'renovaciones' && <RenovacionesTab empresaId={empresa.id} />}
                 {tab === 'propuestas' && (
                   <p className="text-sm text-slate-500">
                     Sección "propuestas" — próximas iteraciones.
@@ -144,6 +146,7 @@ const TAB_LABELS: Record<Tab, string> = {
   contactos:    'Contactos',
   suministros:  '⚡ Suministros',
   contratos:    'Contratos',
+  renovaciones: 'Renovaciones',
   actividades:  'Actividades',
   documentos:   'Documentos',
   propuestas:   'Propuestas',
@@ -153,7 +156,7 @@ const TAB_LABELS: Record<Tab, string> = {
 }
 
 function TabsNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const tabs: Tab[] = ['resumen', 'contactos', 'suministros', 'contratos', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
+  const tabs: Tab[] = ['resumen', 'contactos', 'suministros', 'contratos', 'renovaciones', 'actividades', 'documentos', 'propuestas', 'campos', 'plantas-fv', 'datadis']
   return (
     <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
       {tabs.map((t) => (
