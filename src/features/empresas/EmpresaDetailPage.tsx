@@ -6,6 +6,7 @@ import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
 import EmpresaCabecera from './components/EmpresaCabecera'
+import ContratosTab from './components/ContratosTab'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
 import DocumentosTab from '../documentos/components/DocumentosTab'
 import { useContactosPorEmpresa, useCreateContacto } from '../contactos/api'
@@ -101,9 +102,10 @@ export default function EmpresaDetailPage() {
                 {tab === 'campos' && <CustomFieldsPanel entidad_tipo="empresa" entidad_id={empresa.id} />}
                 {tab === 'plantas-fv' && <PlantaFVTab empresaId={empresa.id} />}
                 {tab === 'datadis' && <DatadisAutorizacionesTab empresaId={empresa.id} />}
-                {(tab === 'contratos' || tab === 'propuestas') && (
+                {tab === 'contratos' && <ContratosTab empresaId={empresa.id} />}
+                {tab === 'propuestas' && (
                   <p className="text-sm text-slate-500">
-                    Sección "{tab}" — próximas iteraciones.
+                    Sección "propuestas" — próximas iteraciones.
                   </p>
                 )}
               </div>
