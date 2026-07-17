@@ -5,6 +5,7 @@ import BackButton from '../../core/components/BackButton'
 import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
 import { useEmpresaById, useUpdateEmpresa, useDeleteEmpresa } from './api'
 import EmpresaForm from './components/EmpresaForm'
+import EmpresaCabecera from './components/EmpresaCabecera'
 import ActividadTimeline from '../actividades/components/ActividadTimeline'
 import DocumentosTab from '../documentos/components/DocumentosTab'
 import { useContactosPorEmpresa, useCreateContacto } from '../contactos/api'
@@ -54,9 +55,8 @@ export default function EmpresaDetailPage() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-display font-bold text-valere-blue-dark">{empresa.nombre}</h1>
-          <p className="text-sm text-slate-500">
-            {empresa.nif ?? 'Sin NIF'} · {empresa.tipo ?? 'Sin tipo'}
-          </p>
+          <p className="text-sm text-slate-500">{empresa.tipo ?? 'Sin tipo'}</p>
+          <EmpresaCabecera empresa={empresa} onVerIncidencias={() => setTab('suministros')} />
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => setEditing(!editing)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
