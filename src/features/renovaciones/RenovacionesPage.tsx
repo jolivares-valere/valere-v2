@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowDown, ArrowUp, Plus, Pencil, Trash2, X, RefreshCw, Search } from 'lucide-react'
 import {
   useRenovaciones,
@@ -355,7 +355,11 @@ export default function RenovacionesPage() {
                 {lista.map((ren) => (
                   <tr key={ren.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-900">
-                      {ren.empresa?.nombre ?? '—'}
+                      {ren.empresa ? (
+                        <Link to={`/empresas/${ren.empresa.id}`} className="hover:underline">
+                          {ren.empresa.nombre}
+                        </Link>
+                      ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">
                       {ren.contrato?.numero_contrato ?? '—'}
@@ -415,7 +419,13 @@ export default function RenovacionesPage() {
               <li key={ren.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-slate-900">{ren.empresa?.nombre ?? '—'}</p>
+                    {ren.empresa ? (
+                      <Link to={`/empresas/${ren.empresa.id}`} className="font-medium text-slate-900 hover:underline">
+                        {ren.empresa.nombre}
+                      </Link>
+                    ) : (
+                      <p className="font-medium text-slate-900">—</p>
+                    )}
                     <p className="mt-0.5 text-xs text-slate-500">{ren.contrato?.numero_contrato} · {ren.contrato?.compania}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <StatusBadge variant={ESTADO_VARIANT[ren.estado]} size="sm">
