@@ -11,6 +11,30 @@ function tarifaBadge(t: string | null) {
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{t}</span>
 }
 
+// Umbral de frescura de curva: si la última fecha tiene más de 45 días,
+// la curva existe pero está incompleta/parada → 🟡 honesto (patrón L3).
+const CURVA_FRESCA_DIAS = 45
+
+function curvaBadge(ultimaFecha: string | null | undefined) {
+  if (!ultimaFecha) {
+    return <span className="text-xs text-slate-400" title="Sin curva de consumo en el CRM">—</span>
+  }
+  const dias = Math.floor((Date.now() - new Date(ultimaFecha).getTime()) / 86_400_000)
+  const fecha = new Date(ultimaFecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  if (dias <= CURVA_FRESCA_DIAS) {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700" title={`Curva horaria disponible hasta ${fecha}`}>
+        🟢 hasta {fecha}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700" title={`Curva incompleta: última fecha ${fecha} (hace ${dias} días)`}>
+      🟡 hasta {fecha}
+    </span>
+  )
+}
+
 function estadoBadge(estado: string) {
   const base = 'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize'
   if (estado === 'activo') return <span className={`${base} bg-emerald-50 text-emerald-700`}>{estado}</span>
@@ -22,9 +46,12 @@ function estadoBadge(estado: string) {
 export default function SuministrosTable({
   rows,
   showEmpresa = false,
+  curva,
 }: {
   rows: SuministroRow[]
   showEmpresa?: boolean
+  /** Mapa cups_id → última fecha con curva; si se pasa, pinta la columna Curva. */
+  curva?: Record<string, string | null>
 }) {
   if (rows.length === 0) {
     return (
@@ -47,6 +74,7 @@ export default function SuministrosTable({
             <th className="px-3 py-2">Comercializadora</th>
             <th className="px-3 py-2 text-center">FV</th>
             <th className="px-3 py-2 text-center">Datadis</th>
+            {curva && <th className="px-3 py-2">Curva</th>}
             <th className="px-3 py-2">Estado</th>
           </tr>
         </thead>
@@ -102,6 +130,7 @@ export default function SuministrosTable({
                     </span>
                   )}
                 </td>
+                {curva && <td className="px-3 py-2">{curvaBadge(curva[r.id])}</td>}
                 <td className="px-3 py-2">{estadoBadge(r.estado)}</td>
               </tr>
             )

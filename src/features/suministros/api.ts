@@ -55,6 +55,29 @@ function mapRow(r: Record<string, unknown>): SuministroRow {
   }
 }
 
+/**
+ * Última fecha con curva de consumo por CUPS (PR-1.5, "curva disponible sí/no"
+ * honesto). Lee `datadis_consumptions` (RLS: authenticated select). Una query
+ * ligera por CUPS (limit 1, solo fecha); pensado para la pestaña de una
+ * empresa (pocos CUPS), NO para la página global.
+ */
+export async function fetchCurvaUltimaFecha(cupsIds: string[]): Promise<Record<string, string | null>> {
+  const entries = await Promise.all(
+    cupsIds.map(async (id) => {
+      const { data, error } = await supabase
+        .from('datadis_consumptions' as never)
+        .select('fecha' as never)
+        .eq('cups_id' as never, id as never)
+        .order('fecha' as never, { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      return [id, (data as { fecha?: string } | null)?.fecha ?? null] as const
+    }),
+  )
+  return Object.fromEntries(entries)
+}
+
 /** CUPS de una empresa concreta (para la pestaña en la ficha). */
 export async function fetchSuministrosByEmpresa(empresaId: string): Promise<SuministroRow[]> {
   const { data, error } = await supabase

@@ -29,7 +29,11 @@ Hay dos sitios:
 | Comercializadora | Compañía que factura el suministro |
 | FV | ☀️ si el punto tiene instalación fotovoltaica/autoconsumo |
 | Datadis | ✅ si está sincronizado con Datadis |
+| Curva (solo en la pestaña de la ficha de empresa) | 🟢 con fecha = curva horaria de consumo disponible y al día · 🟡 con fecha = la curva existe pero está incompleta (parada en esa fecha) · "—" = sin curva en el CRM |
 | Estado | Activo / baja / pendiente |
+
+## Incidencias Datadis en la pestaña
+Si la empresa tiene incidencias de datos con Datadis (CUPS autorizados que faltan en el CRM, o empresa autorizada sin CUPS coincidente), la pestaña Suministros de su ficha las muestra en un panel rojo encima de la tabla — el mismo aviso que la alarma del Dashboard y el chip rojo de la cabecera.
 
 ## De dónde salen los datos
 Los CUPS se dan de alta desde Captura de datos (módulo Energía), desde Potencias, o cargándolos a partir de contratos/facturas. La pestaña y la lista solo los muestran; no se crean datos nuevos aquí.
