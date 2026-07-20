@@ -63,6 +63,7 @@ Así queda trazado y puede buscarse después por cliente, tipo o estado.
 - Se pueden registrar **actividades** asociadas (llamadas al cliente, gestiones con comercializadora) desde la ficha de la incidencia.
 - Adjuntar **documentos** relevantes (foto del contador, emails, PDFs de factura incorrecta).
 - Cambiar **estado** a medida que avanza.
+- En el listado, el **nombre de la empresa es un enlace** a su ficha completa — un clic y estás en el contexto del cliente.
 
 ## Filtros útiles
 

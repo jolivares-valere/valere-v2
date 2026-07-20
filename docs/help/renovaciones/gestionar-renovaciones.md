@@ -29,6 +29,8 @@ Muestra contratos en ventana de 0-90 días antes del vencimiento, ordenados por 
 
 Columnas: empresa, compañía actual, fecha fin, semáforo, comercial, estado renovación (pendiente / en curso / ganada / perdida).
 
+El **nombre de la empresa es un enlace**: al pulsarlo se abre su ficha completa (con sus pestañas de Contratos, Renovaciones y Suministros), sin pasar por el buscador.
+
 ## Buscar y ordenar el listado
 
 - **Cuadro de búsqueda** (arriba a la izquierda de los filtros): escribe 2-3 letras del nombre de la empresa, de la compañía o del nº de contrato y la lista se filtra al instante. No distingue mayúsculas ni tildes. El contador muestra "X registros (de Y)" mientras filtras.
