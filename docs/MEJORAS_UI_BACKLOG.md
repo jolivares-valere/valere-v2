@@ -57,6 +57,8 @@ Cruce de `docs/analisis_plataformas_junio/DOC2_MEJORAS_PRIORIZADAS_CRM_VALERE.md
 - [contratos] Detalle: unificar fuente de prioridad — leer renovación viva con fallback "estimada" · auditor (paseo PR-1.2) · S · ✅ PR #69
 - [contratos] Detalle: no pintar "(0d)" cuando fecha_fin es null (línea 52 ContratoDetailPage, sufijo incondicional) · auditor (paseo PR-1.2) · S · ✅ PR #69
 - [contratos] Detalle: tabla CUPS junta visualmente Estado y Dirección ("…EB1Factivo") — falta padding/separación entre columnas · auditor (paseo PR-1.3) · S · 📥 cosmética mínima
+- [infra] **Cache-busting tras deploy**: /renovaciones sirvió bundle viejo tras el deploy de PR-2.2 (pantalla en blanco hasta hard reload; un usuario normal no sabe hacer Ctrl+Shift+R). Revisar headers/cache de Cloudflare Pages (_headers con no-cache para index.html) y/o recarga automática ante chunk 404 (evento `vite:preloadError`) · auditor (paseo PR-2.2, 22-jul) · S · 📥
+- [rendimiento] 4ª congelación del renderer (~30s) al clicar chips en /renovaciones — mismo patrón lista→transición que los 3 casos previos. Expediente PR-4.3 (semana 4); capturar profile de Performance en PR-2.3 si sale barato · auditor (paseo PR-2.2) · — · 📥 expediente PR-4.3 (4 casos)
 - [contratos] Alta por factura (OCR) como paso 0 del asistente PR-3.2 — reutilizar importador calculadora · auditor/DOC2 #3 · M · 📥 anotado en PR-3.2 (semana 3), si no cabe → backlog v2
 
 ---
@@ -80,4 +82,4 @@ Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, neces
 - Telemetría en producción (`client_telemetry`): route_change → módulos más usados primero; errores → fricciones reales.
 - Feedback del equipo.
 
-> Última actualización: 2026-07-22 (PR-2.2: chips renovaciones + nota de caducidad)
+> Última actualización: 2026-07-22b (paseo PR-2.2 PASA: derivadas cache-busting + 4ª congelación)
