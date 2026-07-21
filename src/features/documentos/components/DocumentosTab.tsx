@@ -8,7 +8,21 @@ import {
   getDocumentoSignedUrl,
 } from '../api'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
-import type { EntidadTipo } from '../../../core/types/entities'
+import { useComercializadorasCanal } from '../../comercializadoras/api'
+import type { EntidadTipo, TipoDocumento } from '../../../core/types/entities'
+
+const TIPOS_DOC: { value: TipoDocumento; label: string }[] = [
+  { value: 'contrato', label: 'Contrato' },
+  { value: 'factura', label: 'Factura' },
+  { value: 'dni', label: 'DNI' },
+  { value: 'otro', label: 'Otro' },
+]
+const TIPO_DOC_BADGE: Record<string, string> = {
+  contrato: 'bg-emerald-100 text-emerald-800',
+  factura: 'bg-sky-100 text-sky-800',
+  dni: 'bg-violet-100 text-violet-800',
+  otro: 'bg-slate-100 text-slate-600',
+}
 
 interface Props {
   entidadTipo: EntidadTipo
@@ -28,11 +42,28 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
   const deleteMut = useDeleteDocumento()
   const fileRef = useRef<HTMLInputElement>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; ruta: string; nombre: string } | null>(null)
+  // PR-3.3: metadatos OCR-ready al subir
+  const canales = useComercializadorasCanal()
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [tipoDoc, setTipoDoc] = useState<TipoDocumento>(entidadTipo === 'contrato' ? 'contrato' : 'otro')
+  const [comercializadoraId, setComercializadoraId] = useState('')
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    await uploadMut.mutateAsync({ file, entidadTipo, entidadId })
+    if (file) setPendingFile(file)
+  }
+
+  const handleUpload = async () => {
+    if (!pendingFile) return
+    await uploadMut.mutateAsync({
+      file: pendingFile,
+      entidadTipo,
+      entidadId,
+      tipoDocumento: tipoDoc,
+      comercializadoraId: comercializadoraId || null,
+    })
+    setPendingFile(null)
+    setComercializadoraId('')
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -64,11 +95,38 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
             ref={fileRef}
             type="file"
             className="hidden"
-            onChange={handleUpload}
+            onChange={handleFileChosen}
             disabled={uploadMut.isPending}
           />
         </label>
       </div>
+
+      {pendingFile && (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="truncate text-sm font-medium text-slate-900">{pendingFile.name}</p>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">Tipo de documento *</span>
+              <select value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value as TipoDocumento)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                {TIPOS_DOC.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">Comercializadora (si se conoce)</span>
+              <select value={comercializadoraId} onChange={(e) => setComercializadoraId(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                <option value="">—</option>
+                {canales.data?.map((c) => <option key={c.id} value={c.id}>{c.nombre_canonico}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => { setPendingFile(null); if (fileRef.current) fileRef.current.value = '' }} className="rounded-xl px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">Cancelar</button>
+            <button type="button" onClick={handleUpload} disabled={uploadMut.isPending} className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white disabled:opacity-60">
+              {uploadMut.isPending ? 'Subiendo…' : 'Confirmar subida'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">
@@ -86,9 +144,16 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
           {docs.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-900">{doc.nombre}</p>
+                <p className="flex items-center gap-2 truncate text-sm font-medium text-slate-900">
+                  <span className="truncate">{doc.nombre}</span>
+                  {doc.tipo_documento && (
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${TIPO_DOC_BADGE[doc.tipo_documento]}`}>
+                      {doc.tipo_documento}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-slate-500">
-                  {formatSize(doc.tamanio)} · {doc.tipo?.toUpperCase()}
+                  {formatSize(doc.tamano_bytes)} · {doc.tipo?.toUpperCase()}
                   {doc.subido_por_profile?.full_name && ` · ${doc.subido_por_profile.full_name}`}
                 </p>
               </div>

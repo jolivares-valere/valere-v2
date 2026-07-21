@@ -6,7 +6,22 @@ import type {
   Documento,
   DocumentoInsert,
   EntidadTipo,
+  TipoDocumento,
 } from '../../core/types/entities'
+
+/** Slug de nombre de fichero normalizado (nota OCR-ready PR-3.3). */
+export function normalizarNombreArchivo(nombreOriginal: string, tipoDocumento: TipoDocumento, fecha: Date): string {
+  const sinExt = nombreOriginal.replace(/\.[^.]+$/, '')
+  const slug = sinExt
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 60) || 'documento'
+  const ymd = fecha.toISOString().slice(0, 10).replace(/-/g, '')
+  return `${ymd}_${tipoDocumento}_${slug}`
+}
 
 const RESOURCE = 'documentos'
 
@@ -40,15 +55,21 @@ export function useUploadDocumento() {
       entidadTipo,
       entidadId,
       descripcion,
+      tipoDocumento = 'otro',
+      comercializadoraId = null,
     }: {
       file: File
       entidadTipo: EntidadTipo
       entidadId: string
       descripcion?: string
+      tipoDocumento?: TipoDocumento
+      comercializadoraId?: string | null
     }) => {
       const rawExt = file.name.split('.').pop() ?? 'bin'
       const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) || 'bin'
-      const path = `${entidadTipo}/${entidadId}/${crypto.randomUUID()}.${ext}`
+      // Nombre normalizado (OCR-ready): fecha_tipo_slug + sufijo anticolision
+      const nombreArchivo = `${normalizarNombreArchivo(file.name, tipoDocumento, new Date())}_${crypto.randomUUID().slice(0, 8)}.${ext}`
+      const path = `${entidadTipo}/${entidadId}/${nombreArchivo}`
 
       const { error: uploadError } = await supabase.storage
         .from('documentos')
@@ -62,8 +83,12 @@ export function useUploadDocumento() {
         entidad_id: entidadId,
         nombre: file.name,
         tipo: ext,
+        tipo_documento: tipoDocumento,
+        comercializadora_id: comercializadoraId,
         ruta_storage: path,
-        tamanio: file.size,
+        tamano_bytes: file.size,
+        nombre_archivo: nombreArchivo,
+        nombre_original: file.name,
         mime_type: file.type || null,
         descripcion: descripcion || null,
         subido_por: userId,

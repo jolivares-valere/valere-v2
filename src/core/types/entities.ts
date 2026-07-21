@@ -375,14 +375,20 @@ export interface Renovacion {
   deleted_at: string | null
 }
 
+export type TipoDocumento = 'contrato' | 'factura' | 'dni' | 'otro'
+
 export interface Documento {
   id: string
   entidad_tipo: EntidadTipo
   entidad_id: string
   nombre: string
   tipo: string | null
+  tipo_documento: TipoDocumento | null
+  comercializadora_id: string | null
   ruta_storage: string
-  tamanio: number | null
+  tamano_bytes: number | null
+  nombre_archivo: string | null
+  nombre_original: string | null
   mime_type: string | null
   descripcion: string | null
   subido_por: string | null

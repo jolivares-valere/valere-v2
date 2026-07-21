@@ -2208,6 +2208,8 @@ export type Database = {
           ruta_storage: string
           subido_por: string | null
           tamano_bytes: number | null
+          tipo_documento: string | null
+          comercializadora_id: string | null
           tipo: string | null
           updated_at: string | null
         }
@@ -2233,6 +2235,8 @@ export type Database = {
           ruta_storage: string
           subido_por?: string | null
           tamano_bytes?: number | null
+          tipo_documento?: string | null
+          comercializadora_id?: string | null
           tipo?: string | null
           updated_at?: string | null
         }
@@ -2258,6 +2262,8 @@ export type Database = {
           ruta_storage?: string
           subido_por?: string | null
           tamano_bytes?: number | null
+          tipo_documento?: string | null
+          comercializadora_id?: string | null
           tipo?: string | null
           updated_at?: string | null
         }
