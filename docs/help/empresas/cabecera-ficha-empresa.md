@@ -30,3 +30,7 @@ Al abrir la ficha de una empresa, debajo del nombre aparece una fila de chips co
 - Si los chips muestran esqueletos grises que no cargan, recarga la página; si persiste, avisa a soporte.
 - Si el número de contratos no cuadra, revisa que los contratos tengan el estado correcto en la pestaña Contratos.
 - Si aparece la alarma de Datadis, consulta "Incidencias de datos Datadis" para saber cómo resolverlas.
+
+## Aviso «⚠ N vencidas»
+
+Si la empresa tiene renovaciones **con fecha ya pasada y sin gestionar** (ni renovadas ni perdidas), el chip de renovación muestra además un aviso rojo «⚠ N vencidas». La próxima renovación futura no cuenta lo urgente: este aviso sí. Al verlo, entra en la pestaña Renovaciones de la empresa y gestiona esas filas (caso típico: renovaciones críticas en estado «Detectada» con la fecha vencida).
