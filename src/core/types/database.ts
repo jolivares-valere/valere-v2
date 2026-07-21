@@ -838,12 +838,83 @@ export type Database = {
           },
         ]
       }
+      comercializadora_condiciones: {
+        Row: {
+          activa: boolean
+          cadencia: string
+          comercializadora_id: string
+          comisiona_renovacion: boolean
+          componente: string | null
+          created_at: string
+          id: string
+          notas: string | null
+          producto: string | null
+          tipo_regla: string
+          updated_at: string
+          valor: number | null
+          via: string | null
+          vigencia_desde: string | null
+          vigencia_hasta: string | null
+        }
+        Insert: {
+          activa?: boolean
+          cadencia?: string
+          comercializadora_id: string
+          comisiona_renovacion?: boolean
+          componente?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          producto?: string | null
+          tipo_regla: string
+          updated_at?: string
+          valor?: number | null
+          via?: string | null
+          vigencia_desde?: string | null
+          vigencia_hasta?: string | null
+        }
+        Update: {
+          activa?: boolean
+          cadencia?: string
+          comercializadora_id?: string
+          comisiona_renovacion?: boolean
+          componente?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          producto?: string | null
+          tipo_regla?: string
+          updated_at?: string
+          valor?: number | null
+          via?: string | null
+          vigencia_desde?: string | null
+          vigencia_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comercializadora_condiciones_comercializadora_id_fkey"
+            columns: ["comercializadora_id"]
+            isOneToOne: false
+            referencedRelation: "comercializadoras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comercializadora_condiciones_comercializadora_id_fkey"
+            columns: ["comercializadora_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comercializadoras: {
         Row: {
           activa: boolean | null
           agente_referencia: string | null
           created_at: string | null
           email_contacto: string | null
+          es_canal_venta: boolean
+          grupo: string | null
           id: string
           is_active: boolean | null
           legacy_potencia_com_id: string | null
@@ -851,9 +922,13 @@ export type Database = {
           model: string | null
           name: string
           nif: string | null
+          nombre_canonico: string | null
           nombre_normalizado: string | null
           notes: string | null
+          segmento: string | null
           tipo_energia: string | null
+          updated_at: string
+          via: string | null
           web: string | null
         }
         Insert: {
@@ -861,6 +936,8 @@ export type Database = {
           agente_referencia?: string | null
           created_at?: string | null
           email_contacto?: string | null
+          es_canal_venta?: boolean
+          grupo?: string | null
           id?: string
           is_active?: boolean | null
           legacy_potencia_com_id?: string | null
@@ -868,9 +945,13 @@ export type Database = {
           model?: string | null
           name: string
           nif?: string | null
+          nombre_canonico?: string | null
           nombre_normalizado?: string | null
           notes?: string | null
+          segmento?: string | null
           tipo_energia?: string | null
+          updated_at?: string
+          via?: string | null
           web?: string | null
         }
         Update: {
@@ -878,6 +959,8 @@ export type Database = {
           agente_referencia?: string | null
           created_at?: string | null
           email_contacto?: string | null
+          es_canal_venta?: boolean
+          grupo?: string | null
           id?: string
           is_active?: boolean | null
           legacy_potencia_com_id?: string | null
@@ -885,9 +968,13 @@ export type Database = {
           model?: string | null
           name?: string
           nif?: string | null
+          nombre_canonico?: string | null
           nombre_normalizado?: string | null
           notes?: string | null
+          segmento?: string | null
           tipo_energia?: string | null
+          updated_at?: string
+          via?: string | null
           web?: string | null
         }
         Relationships: []
@@ -1230,6 +1317,7 @@ export type Database = {
           comision_comercial: number | null
           comision_integra: number | null
           comision_jefe: number | null
+          comercializadora_id: string | null
           compania: string
           consumo_po_kwh: number | null
           consumo_sips_kwh: number | null
@@ -1263,6 +1351,7 @@ export type Database = {
           comision_comercial?: number | null
           comision_integra?: number | null
           comision_jefe?: number | null
+          comercializadora_id?: string | null
           compania: string
           consumo_po_kwh?: number | null
           consumo_sips_kwh?: number | null
@@ -1296,6 +1385,7 @@ export type Database = {
           comision_comercial?: number | null
           comision_integra?: number | null
           comision_jefe?: number | null
+          comercializadora_id?: string | null
           compania?: string
           consumo_po_kwh?: number | null
           consumo_sips_kwh?: number | null
@@ -1325,6 +1415,20 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contratos_comercializadora_id_fkey"
+            columns: ["comercializadora_id"]
+            isOneToOne: false
+            referencedRelation: "comercializadoras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_comercializadora_id_fkey"
+            columns: ["comercializadora_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contratos_comercial_id_fkey"
             columns: ["comercial_id"]
