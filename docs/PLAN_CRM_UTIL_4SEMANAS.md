@@ -142,3 +142,13 @@ PR-1.5 todos con DoD completo y verificacion independiente. Extras de la
 semana: S0.2 sellado (cron datadis-consumos-nightly 03:30) y DERAZA
 fusionada con cuadre de 0 huerfanos en 23 tablas. Observaciones no
 bloqueantes en outbox 2026-07-21. Semana 2 autorizada a arrancar.
+── GATE V2 · 2026-07-24 · AUDITOR ──
+VEREDICTO: CIERRA. 3 preguntas de negocio elegidas por el auditor
+(adversarias), respondidas desde la UI en 15-20s cada una (<30s),
+cuadradas contra SQL en el momento: 13 criticas vencidas sin contactar
+(KPI clicable + estado, 2 interacciones); 11 vencidos de TOTAL con
+export verificado por toast; 6 NEXUS de CHEMTROL venciendo 14/10/2026
+via ficha 360. PR-2.1 a 2.4 con DoD completo; PR-2.5 pendiente dentro
+de semana aprobada. Extras: ops datos 1-2 (normalizacion 286 tarifas +
+4 ceros inventados BLUENET) ejecutadas y cuadradas. Badge "N vencidas"
+en cabecera operativo. Semana 3 autorizada a arrancar tras PR-2.5.
