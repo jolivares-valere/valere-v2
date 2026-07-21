@@ -34,3 +34,7 @@ Al abrir la ficha de una empresa, debajo del nombre aparece una fila de chips co
 ## Aviso «⚠ N vencidas»
 
 Si la empresa tiene renovaciones **con fecha ya pasada y sin gestionar** (ni renovadas ni perdidas), el chip de renovación muestra además un aviso rojo «⚠ N vencidas». La próxima renovación futura no cuenta lo urgente: este aviso sí. Al verlo, entra en la pestaña Renovaciones de la empresa y gestiona esas filas (caso típico: renovaciones críticas en estado «Detectada» con la fecha vencida).
+
+## Contador «· N sin fecha»
+
+Si la empresa tiene renovaciones vivas **sin fecha de vencimiento documentada**, el chip de renovación añade «· N sin fecha» en ámbar (caso típico: BLUENET, «— · 18 sin fecha»). Son la bandeja de esa empresa: entra en Renovaciones, abre la bandeja «📥 Sin fecha» y féchalas con el campo directo de la columna Vencimiento.

@@ -50,7 +50,11 @@ Las cuatro tarjetas de arriba (Activas, Críticas, Renovadas, Perdidas) **filtra
 
 ## Bandeja "sin fecha"
 
-Tras la carga del libro de ventas, muchas renovaciones existen **sin fecha de vencimiento documentada** (aparecen con vencimiento vacío y prioridad alta). No son errores: son contratos cuya fecha fin nadie tiene por escrito — los candidatos a estar rodando en renovación tácita. Al trabajarlas: consigue la fecha real (factura del cliente o comercializadora), edita la renovación y rellénala.
+Tras la carga del libro de ventas, muchas renovaciones existen **sin fecha de vencimiento documentada**. No son errores: son contratos cuya fecha fin nadie tiene por escrito — los candidatos a estar rodando en renovación tácita.
+
+- **Abrir la bandeja**: pulsa la tarjeta **«📥 Sin fecha»** (arriba, junto a las demás), o elige «📥 Sin fecha (bandeja)» en el desplegable de mes. Dentro, las filas se ordenan por prioridad: las críticas arriba.
+- **Poner fecha**: en la columna Vencimiento de esas filas hay un **campo de fecha directo** (ámbar). Consigue la fecha real (factura del cliente o comercializadora), písala ahí y guarda: la renovación **sale de la bandeja y entra al pipeline** con su prioridad recalculada automáticamente por la regla estándar (≤15 días crítica, ≤30 alta, ≤60 media, ≤90 baja, resto OK).
+- En la cabecera de la ficha de cada empresa, el chip de renovación muestra «· N sin fecha» en ámbar si tiene renovaciones en la bandeja.
 
 ## Selector de empresa con filtro (al crear/editar)
 

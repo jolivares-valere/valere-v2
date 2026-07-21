@@ -17,6 +17,7 @@ import StatusBadge, { type StatusVariant } from '../../core/components/StatusBad
 import SortableTh from '../../core/components/SortableTh'
 import useListParams from '../../core/hooks/useListParams'
 import { formatDate } from '../../core/utils/dates'
+import { calcDiasVencimiento, calcPrioridad } from '../../core/utils/energy'
 import type { RenovacionInsert, EstadoRenovacion, PrioridadRenovacion } from '../../core/types/entities'
 
 type EditingState = RenovacionConRelaciones | 'new' | null
@@ -167,6 +168,15 @@ export default function RenovacionesPage() {
     setEditing(null)
   }
 
+  /** Acción de la bandeja (PR-2.5): fechar una renovación la saca de la
+   * bandeja y la mete al pipeline con la prioridad recalculada por la regla
+   * unificada de PR-1.3 (calcPrioridad sobre días hasta vencimiento). */
+  const onPonerFecha = async (ren: RenovacionConRelaciones, fecha: string) => {
+    if (!fecha) return
+    const prioridad = calcPrioridad(calcDiasVencimiento(fecha))
+    await updateMut.mutateAsync({ id: ren.id, patch: { fecha_vencimiento_contrato: fecha, prioridad } })
+  }
+
   const onDeleteConfirmed = async () => {
     if (!confirmDeleteId) return
     await deleteMut.mutateAsync(confirmDeleteId)
@@ -198,7 +208,9 @@ export default function RenovacionesPage() {
     else if (filtroEstado) rows = rows.filter((r) => r.estado === filtroEstado)
     if (filtroPrioridad) rows = rows.filter((r) => r.prioridad === filtroPrioridad)
     if (filtroCia) rows = rows.filter((r) => r.contrato?.compania === filtroCia)
-    if (filtroMes) rows = rows.filter((r) => (r.fecha_vencimiento_contrato ?? '').slice(0, 7) === filtroMes)
+    // 'sin-fecha' = la BANDEJA (PR-2.5): renovaciones sin fecha de vencimiento.
+    if (filtroMes === 'sin-fecha') rows = rows.filter((r) => !r.fecha_vencimiento_contrato)
+    else if (filtroMes) rows = rows.filter((r) => (r.fecha_vencimiento_contrato ?? '').slice(0, 7) === filtroMes)
     const q = normalizar(search.trim())
     if (q) {
       rows = rows.filter((r) =>
@@ -217,7 +229,9 @@ export default function RenovacionesPage() {
         case 'vencimiento': {
           const fa = a.fecha_vencimiento_contrato
           const fb = b.fecha_vencimiento_contrato
-          if (!fa && !fb) return 0
+          // Ambas sin fecha (la bandeja entera): desempata por prioridad,
+          // críticas arriba — lo urgente nunca queda enterrado.
+          if (!fa && !fb) return PRIORIDAD_ORDEN[a.prioridad] - PRIORIDAD_ORDEN[b.prioridad]
           if (!fa) return 1 // sin fecha siempre al final
           if (!fb) return -1
           return dir * fa.localeCompare(fb)
@@ -258,6 +272,12 @@ export default function RenovacionesPage() {
     }
     return status
   }, [listaCompleta])
+
+  // Bandeja: sin fecha y vivas (∉ renovado/perdido), sobre el conjunto completo.
+  const sinFecha = useMemo(
+    () => listaCompleta.filter((r) => !r.fecha_vencimiento_contrato && r.estado !== 'renovado' && r.estado !== 'perdido').length,
+    [listaCompleta],
+  )
 
   const aBorrar = lista.find((r) => r.id === confirmDeleteId)
   const k = kpi.data
@@ -307,7 +327,7 @@ export default function RenovacionesPage() {
       </div>
 
       {k && (
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
           <KpiCard
             label="Activas"
             value={k.activas}
@@ -336,6 +356,13 @@ export default function RenovacionesPage() {
             active={filtroEstado === 'perdido'}
             onClick={() => updateParams(filtroEstado === 'perdido' ? { estado: '', prioridad: '' } : { estado: 'perdido', prioridad: '' })}
           />
+          <KpiCard
+            label="📥 Sin fecha"
+            value={sinFecha}
+            color="text-amber-700"
+            active={filtroMes === 'sin-fecha' && filtroEstado === 'activas'}
+            onClick={() => updateParams(filtroMes === 'sin-fecha' && filtroEstado === 'activas' ? { mes: '', estado: '', prioridad: '' } : { mes: 'sin-fecha', estado: 'activas', prioridad: '' })}
+          />
         </div>
       )}
 
@@ -358,6 +385,7 @@ export default function RenovacionesPage() {
           className="rounded-full border border-slate-300 px-3 py-1.5 text-xs"
         >
           <option value="">Todos los meses</option>
+          <option value="sin-fecha">📥 Sin fecha (bandeja)</option>
           {meses.map((m) => (
             <option key={m} value={m}>{mesLabel(m)}</option>
           ))}
@@ -494,7 +522,20 @@ export default function RenovacionesPage() {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 text-xs">{formatDate(ren.fecha_vencimiento_contrato)}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs">
+                      {ren.fecha_vencimiento_contrato ? (
+                        formatDate(ren.fecha_vencimiento_contrato)
+                      ) : (
+                        <input
+                          type="date"
+                          aria-label={`Poner fecha de vencimiento a la renovación de ${ren.empresa?.nombre ?? 'empresa'}`}
+                          title="Poner fecha: al guardarla, la renovación sale de la bandeja y entra al pipeline con su prioridad recalculada"
+                          disabled={updateMut.isPending}
+                          onChange={(e) => onPonerFecha(ren, e.target.value)}
+                          className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-slate-700"
+                        />
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge variant={ESTADO_VARIANT[ren.estado]}>
                         {ESTADO_LABEL[ren.estado]}
@@ -549,7 +590,17 @@ export default function RenovacionesPage() {
                         {cupsStatus.get(ren.id) === 'historico' && <StatusBadge variant="neutral" size="sm">Histórico</StatusBadge>}
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-slate-400">Vence: {formatDate(ren.fecha_vencimiento_contrato)}</p>
+                    {ren.fecha_vencimiento_contrato ? (
+                      <p className="mt-1 text-xs text-slate-400">Vence: {formatDate(ren.fecha_vencimiento_contrato)}</p>
+                    ) : (
+                      <input
+                        type="date"
+                        aria-label={`Poner fecha de vencimiento a la renovación de ${ren.empresa?.nombre ?? 'empresa'}`}
+                        disabled={updateMut.isPending}
+                        onChange={(e) => onPonerFecha(ren, e.target.value)}
+                        className="mt-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-slate-700"
+                      />
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button type="button" onClick={() => setEditing(ren)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Editar renovación de ${ren.empresa?.nombre ?? 'empresa'}`}>
