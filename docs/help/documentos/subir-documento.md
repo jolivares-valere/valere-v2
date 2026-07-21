@@ -16,6 +16,18 @@ related:
 ## Resumen rápido
 Desde la ficha de cualquier entidad (empresa, contrato, CUPS, oportunidad, incidencia) → pestaña **Documentos** → **+ Subir documento**. Soporta PDF, imágenes, Excel, Word.
 
+## Novedad PR-3.3: clasificación al subir
+Al elegir el fichero, antes de confirmar la subida se pide:
+
+- **Tipo de documento** (Contrato / Factura / DNI / Otro) — obligatorio; en el detalle
+  de contrato viene premarcado "Contrato".
+- **Comercializadora** (opcional, del catálogo) — indícala si se conoce.
+
+El fichero se guarda con **nombre normalizado** (`fecha_tipo_nombre`) y el chip de tipo
+aparece en la lista. Esta clasificación prepara el "alta desde documento" (backlog v2):
+subir un contrato firmado pre-rellenará el asistente de alta y estimará la comisión con
+el catálogo de condiciones — cuanto mejor clasificado, mejor funcionará.
+
 ## Tipos de documentos habituales
 
 - **Contratos firmados** (PDF del contrato con la comercializadora).
