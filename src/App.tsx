@@ -44,6 +44,7 @@ const DatadisPage = lazy(() => import('./features/datadis/DatadisPage'))
 const SupplyDetailPage = lazy(() => import('./features/datadis/SupplyDetailPage'))
 const SuministrosPage = lazy(() => import('./features/suministros/SuministrosPage'))
 const ComercializadorasPage = lazy(() => import('./features/comercializadoras/ComercializadorasPage'))
+const AltaVentaPage = lazy(() => import('./features/alta-venta/AltaVentaPage'))
 const CaptacionPage = lazy(() => import('./features/captacion/CaptacionPage'))
 const AnalisisCaptacionPage = lazy(() => import('./features/captacion/AnalisisPage'))
 const CarteraSeniorPage = lazy(() => import('./features/captacion/CarteraSeniorPage'))
@@ -163,6 +164,7 @@ export default function App() {
       <Route path="/contactos" element={<AuthGuard><ContactosPage /></AuthGuard>} />
       <Route path="/suministros" element={<AuthGuard><SuministrosPage /></AuthGuard>} />
       <Route path="/comercializadoras" element={<AuthGuard><ComercializadorasPage /></AuthGuard>} />
+      <Route path="/alta-venta" element={<AuthGuard><AltaVentaPage /></AuthGuard>} />
       <Route path="/contratos" element={<AuthGuard><ContratosPage /></AuthGuard>} />
       <Route path="/contratos/:id" element={<AuthGuard><ContratoDetailPage /></AuthGuard>} />
       <Route path="/oportunidades" element={<AuthGuard><OportunidadesPage /></AuthGuard>} />
