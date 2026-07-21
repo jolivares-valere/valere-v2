@@ -123,7 +123,7 @@ function Chip({
 }
 
 export default function RenovacionesPage() {
-  const { search, sortField, sortDir, getFilter, updateParam, setSearch, toggleSort, clearAll } =
+  const { search, sortField, sortDir, getFilter, updateParam, updateParams, setSearch, toggleSort, clearAll } =
     useListParams<SortField>({
       sortFields: SORT_FIELDS,
       defaultSort: 'vencimiento',
@@ -131,7 +131,10 @@ export default function RenovacionesPage() {
       descFirstFields: ['vencimiento'],
     })
 
-  const filtroEstado = getFilter('estado') as EstadoRenovacion | ''
+  // 'activas' es un valor VIRTUAL (estado ∉ {renovado, perdido}): replica la
+  // semántica exacta de v_renovaciones_kpi para que las tarjetas KPI clicables
+  // cuadren con la lista (PR-2.4).
+  const filtroEstado = getFilter('estado') as EstadoRenovacion | 'activas' | ''
   const filtroPrioridad = getFilter('prioridad') as PrioridadRenovacion | ''
   const filtroCia = getFilter('cia')
   const filtroMes = getFilter('mes') // 'YYYY-MM' sobre fecha de vencimiento
@@ -191,7 +194,8 @@ export default function RenovacionesPage() {
 
   const lista = useMemo(() => {
     let rows = listaCompleta
-    if (filtroEstado) rows = rows.filter((r) => r.estado === filtroEstado)
+    if (filtroEstado === 'activas') rows = rows.filter((r) => r.estado !== 'renovado' && r.estado !== 'perdido')
+    else if (filtroEstado) rows = rows.filter((r) => r.estado === filtroEstado)
     if (filtroPrioridad) rows = rows.filter((r) => r.prioridad === filtroPrioridad)
     if (filtroCia) rows = rows.filter((r) => r.contrato?.compania === filtroCia)
     if (filtroMes) rows = rows.filter((r) => (r.fecha_vencimiento_contrato ?? '').slice(0, 7) === filtroMes)
@@ -304,10 +308,34 @@ export default function RenovacionesPage() {
 
       {k && (
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Activas" value={k.activas} color="text-blue-700" />
-          <KpiCard label="Críticas" value={k.criticas} color="text-red-700" />
-          <KpiCard label="Renovadas" value={k.renovadas} color="text-green-700" />
-          <KpiCard label="Perdidas" value={k.perdidas} color="text-rose-700" />
+          <KpiCard
+            label="Activas"
+            value={k.activas}
+            color="text-blue-700"
+            active={filtroEstado === 'activas' && !filtroPrioridad}
+            onClick={() => updateParams(filtroEstado === 'activas' && !filtroPrioridad ? { estado: '', prioridad: '' } : { estado: 'activas', prioridad: '' })}
+          />
+          <KpiCard
+            label="Críticas"
+            value={k.criticas}
+            color="text-red-700"
+            active={filtroEstado === 'activas' && filtroPrioridad === 'critica'}
+            onClick={() => updateParams(filtroEstado === 'activas' && filtroPrioridad === 'critica' ? { estado: '', prioridad: '' } : { estado: 'activas', prioridad: 'critica' })}
+          />
+          <KpiCard
+            label="Renovadas"
+            value={k.renovadas}
+            color="text-green-700"
+            active={filtroEstado === 'renovado'}
+            onClick={() => updateParams(filtroEstado === 'renovado' ? { estado: '', prioridad: '' } : { estado: 'renovado', prioridad: '' })}
+          />
+          <KpiCard
+            label="Perdidas"
+            value={k.perdidas}
+            color="text-rose-700"
+            active={filtroEstado === 'perdido'}
+            onClick={() => updateParams(filtroEstado === 'perdido' ? { estado: '', prioridad: '' } : { estado: 'perdido', prioridad: '' })}
+          />
         </div>
       )}
 
@@ -341,6 +369,7 @@ export default function RenovacionesPage() {
           className="rounded-full border border-slate-300 px-3 py-1.5 text-xs"
         >
           <option value="">Todos los estados</option>
+          <option value="activas">Activas (en curso)</option>
           {(Object.keys(ESTADO_LABEL) as EstadoRenovacion[]).map((e) => (
             <option key={e} value={e}>{ESTADO_LABEL[e]}</option>
           ))}
@@ -575,11 +604,31 @@ export default function RenovacionesPage() {
   )
 }
 
-function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
+function KpiCard({
+  label,
+  value,
+  color,
+  active,
+  onClick,
+}: {
+  label: string
+  value: number
+  color: string
+  active: boolean
+  onClick: () => void
+}) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={active ? 'Quitar este filtro' : `Filtrar la lista: ${label.toLowerCase()}`}
+      className={`rounded-xl border bg-white p-4 text-left transition-shadow hover:shadow-md ${
+        active ? 'border-slate-900 ring-2 ring-slate-900/20' : 'border-slate-200'
+      }`}
+    >
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${color}`}>{value}</p>
-    </div>
+    </button>
   )
 }

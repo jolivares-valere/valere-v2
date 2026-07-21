@@ -37,6 +37,10 @@ El **nombre de la empresa es un enlace**: al pulsarlo se abre su ficha completa 
 - **Ordenar por columnas**: haz clic en cualquier encabezado (Empresa, Contrato, Vencimiento, Estado, Prioridad) para ordenar ascendente; segundo clic invierte a descendente. La flecha ▲/▼ indica la columna y sentido activos. Al ordenar por Vencimiento, las renovaciones **sin fecha** van siempre al final.
 - El botón **Limpiar** borra a la vez la búsqueda, los filtros y el orden (vuelves a la vista por defecto).
 
+## Tarjetas KPI clicables
+
+Las cuatro tarjetas de arriba (Activas, Críticas, Renovadas, Perdidas) **filtran la lista al pulsarlas**: clic en «Críticas» y la lista muestra exactamente esas renovaciones (el número de la tarjeta y el contador de la lista coinciden). Segundo clic en la misma tarjeta quita el filtro. La tarjeta activa se marca con un borde oscuro. Se combinan con el resto de filtros — p.ej. tarjeta *Críticas* + chip *NEXUS* = «las críticas de NEXUS» en 2 clics. «Activas» significa en curso: toda renovación que aún no está renovada ni perdida (también en el desplegable de estado como «Activas (en curso)»).
+
 ## Filtros-chip y export a Excel
 
 - **Prioridad** y **Comercializadora** se filtran con chips (botones redondos bajo el buscador): un clic activa, otro clic en el mismo chip lo quita. Se combinan entre sí y con el resto de filtros — p.ej. "críticas de NEXUS" = chip *Crítica* + chip *NEXUS*.

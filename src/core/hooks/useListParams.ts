@@ -39,6 +39,10 @@ export interface ListParams<F extends string> {
   getFilter: (key: string) => string
   /** Escribe un param ('' lo borra). Todo menos 'page' resetea a página 1. */
   updateParam: (key: string, value: string) => void
+  /** Escribe VARIOS params a la vez ('' borra). Resetea a página 1. Para
+   * acciones que tocan más de un filtro en el mismo clic (KPIs clicables,
+   * PR-2.4): dos updateParam seguidos se pisarían entre sí. */
+  updateParams: (entries: Record<string, string>) => void
   /** Búsqueda con debounce 300ms sobre el param 'q'. */
   setSearch: (value: string) => void
   /** Alterna orden: mismo campo invierte dirección; campo nuevo, dirección inicial. */
@@ -84,6 +88,19 @@ export default function useListParams<F extends string>(
     [params, setParams],
   )
 
+  const updateParams = useCallback(
+    (entries: Record<string, string>) => {
+      const next = new URLSearchParams(params)
+      for (const [key, value] of Object.entries(entries)) {
+        if (value) next.set(key, value)
+        else next.delete(key)
+      }
+      next.set('page', '1')
+      setParams(next)
+    },
+    [params, setParams],
+  )
+
   const setSearch = useCallback(
     (value: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -112,5 +129,5 @@ export default function useListParams<F extends string>(
     setParams(new URLSearchParams())
   }, [setParams])
 
-  return { page, search, sortField, sortDir, getFilter, updateParam, setSearch, toggleSort, clearAll }
+  return { page, search, sortField, sortDir, getFilter, updateParam, updateParams, setSearch, toggleSort, clearAll }
 }

@@ -46,6 +46,7 @@ export default function EmpresaCabecera({ empresa, onVerIncidencias }: Props) {
 
   const renov = data?.proximaRenovacion ?? null
   const incidencias = data?.incidenciasDatadis ?? 0
+  const vencidas = data?.renovacionesVencidas ?? 0
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
@@ -80,6 +81,15 @@ export default function EmpresaCabecera({ empresa, onVerIncidencias }: Props) {
           </>
         ) : (
           <span className="text-slate-400">—</span>
+        )}
+        {vencidas > 0 && (
+          <span
+            className="inline-flex items-center gap-1 font-semibold text-red-700"
+            title={`${vencidas} renovación${vencidas === 1 ? '' : 'es'} con fecha pasada sin gestionar`}
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {vencidas} vencida{vencidas === 1 ? '' : 's'}
+          </span>
         )}
       </Chip>
 
