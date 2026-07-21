@@ -116,10 +116,9 @@ export function useDeleteDocumento() {
     mutationFn: async ({ id, rutaStorage }: { id: string; rutaStorage: string }) => {
       await supabase.storage.from('documentos').remove([rutaStorage])
 
-      const { error } = await supabase
-        .from('documentos' as never)
-        .update({ deleted_at: new Date().toISOString() } as never)
-        .eq('id', id)
+      // Soft-delete via RPC (fix 21-jul: las policies de lectura deleted_at IS NULL
+      // bloquean el UPDATE directo con 42501; la RPC valida permisos espejo del delete)
+      const { error } = await supabase.rpc('soft_delete' as never, { p_tabla: 'documentos', p_id: id } as never)
       if (error) { logError(error, 'useDeleteDocumento'); throw error }
     },
     onSuccess: () => {

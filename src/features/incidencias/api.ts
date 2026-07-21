@@ -165,10 +165,9 @@ export function useDeleteIncidencia() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('incidencias' as never)
-        .update({ deleted_at: new Date().toISOString() } as never)
-        .eq('id', id)
+      // Soft-delete via RPC (fix 21-jul: las policies de lectura deleted_at IS NULL
+      // bloquean el UPDATE directo con 42501; la RPC valida permisos espejo del delete)
+      const { error } = await supabase.rpc('soft_delete' as never, { p_tabla: 'incidencias', p_id: id } as never)
       if (error) { logError(error, 'useDeleteIncidencia'); throw error }
     },
     onSuccess: () => {
