@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEmpresas, useCreateEmpresa, useUpdateEmpresa, useComerciales, fetchEmpresasForExport } from './api'
 import { useCreateContacto } from '../contactos/api'
@@ -9,6 +9,9 @@ import ContactoForm from '../contactos/components/ContactoForm'
 import ExportButton from '../../core/components/ExportButton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Pagination from '../../core/components/Pagination'
+import SortableTh from '../../core/components/SortableTh'
+import { LoadingRow, ErrorRow, EmptyRow } from '../../core/components/TableStateRows'
+import useListParams from '../../core/hooks/useListParams'
 import { formatDate } from '../../core/utils/dates'
 import { TIPO_EMPRESA_OPTIONS, tipoEmpresaLabel } from './tipos'
 import type { Empresa, EmpresaInsert, ContactoInsert } from '../../core/types/entities'
@@ -19,17 +22,19 @@ const SORTABLE_FIELDS = ['nombre', 'nif', 'tipo', 'ciudad', 'created_at'] as con
 type SortField = (typeof SORTABLE_FIELDS)[number]
 
 export default function EmpresasPage() {
-  const [params, setParams] = useSearchParams()
-  const page = Number(params.get('page') ?? '1')
+  const {
+    page, search, sortField, sortDir,
+    getFilter, updateParam, setSearch, toggleSort,
+  } = useListParams<SortField>({
+    sortFields: SORTABLE_FIELDS,
+    defaultSort: 'created_at',
+    defaultDir: 'desc',
+    // Texto empieza ascendente; fechas, descendente (lo más reciente primero).
+    descFirstFields: ['created_at'],
+  })
   const pageSize = 20
-  const search = params.get('q') ?? ''
-  const tipo = params.get('tipo') ?? ''
-  const comercialFiltro = params.get('comercial') ?? ''
-  const sortParam = params.get('sort') ?? ''
-  const sortField: SortField = (SORTABLE_FIELDS as readonly string[]).includes(sortParam)
-    ? (sortParam as SortField)
-    : 'created_at'
-  const sortDir: 'asc' | 'desc' = params.get('dir') === 'asc' ? 'asc' : 'desc'
+  const tipo = getFilter('tipo')
+  const comercialFiltro = getFilter('comercial')
   const [showForm, setShowForm] = useState(false)
   const [wizardStep, setWizardStep] = useState<'empresa' | 'contacto'>('empresa')
   const [newEmpresa, setNewEmpresa] = useState<Empresa | null>(null)
@@ -48,50 +53,8 @@ export default function EmpresasPage() {
   const { data: comerciales } = useComerciales()
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize))
 
-  const updateParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    if (key !== 'page') next.set('page', '1')
-    setParams(next)
-  }
-
-  const toggleSort = (field: SortField) => {
-    const next = new URLSearchParams(params)
-    if (sortField === field) {
-      next.set('dir', sortDir === 'asc' ? 'desc' : 'asc')
-    } else {
-      next.set('sort', field)
-      // Texto empieza ascendente; fechas, descendente (lo más reciente primero).
-      next.set('dir', field === 'created_at' ? 'desc' : 'asc')
-    }
-    next.set('page', '1')
-    setParams(next)
-  }
-
   const onChangeComercial = (empresaId: string, comercialId: string) => {
     updateEmpresaMut.mutate({ id: empresaId, patch: { comercial_id: comercialId || null } })
-  }
-
-  const sortableTh = (field: SortField, label: string) => {
-    const active = sortField === field
-    return (
-      <th className="px-4 py-3">
-        <button
-          type="button"
-          onClick={() => toggleSort(field)}
-          aria-label={`Ordenar por ${label} ${active && sortDir === 'asc' ? 'descendente' : 'ascendente'}`}
-          className={`inline-flex items-center gap-1 hover:text-slate-900 ${active ? 'text-slate-900 font-semibold' : ''}`}
-        >
-          {label}
-          {active ? (
-            sortDir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-          ) : (
-            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-          )}
-        </button>
-      </th>
-    )
   }
 
   const resetWizard = () => {
@@ -164,10 +127,7 @@ export default function EmpresasPage() {
         <input
           type="search"
           defaultValue={search}
-          onChange={(e) => {
-            const v = e.target.value
-            setTimeout(() => updateParam('q', v), 300)
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nombre o NIF…"
           aria-label="Buscar empresas por nombre o NIF"
           className="w-full max-w-sm rounded-xl border border-slate-300 px-3 py-2 text-sm"
@@ -256,38 +216,25 @@ export default function EmpresasPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
-              {sortableTh('nombre', 'Nombre')}
-              {sortableTh('nif', 'NIF')}
-              {sortableTh('tipo', 'Tipo')}
-              {sortableTh('ciudad', 'Ciudad')}
+              <SortableTh field="nombre" label="Nombre" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+              <SortableTh field="nif" label="NIF" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+              <SortableTh field="tipo" label="Tipo" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+              <SortableTh field="ciudad" label="Ciudad" activeField={sortField} dir={sortDir} onSort={toggleSort} />
               <th className="px-4 py-3">Comercial</th>
-              {sortableTh('created_at', 'Alta')}
+              <SortableTh field="created_at" label="Alta" activeField={sortField} dir={sortDir} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
-            {isLoading && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Cargando…</td></tr>
-            )}
+            {isLoading && <LoadingRow colSpan={6} />}
             {error && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center">
-                  <div className="inline-flex flex-col items-center gap-2 text-red-600">
-                    <span>Error al cargar empresas: {(error as Error).message}</span>
-                    <button
-                      type="button"
-                      onClick={() => refetch()}
-                      disabled={isFetching}
-                      className="rounded-xl border border-red-300 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {isFetching ? 'Reintentando…' : 'Reintentar'}
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              <ErrorRow
+                colSpan={6}
+                message={`Error al cargar empresas: ${(error as Error).message}`}
+                onRetry={() => refetch()}
+                retrying={isFetching}
+              />
             )}
-            {!isLoading && data?.data.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Sin resultados</td></tr>
-            )}
+            {!isLoading && data?.data.length === 0 && <EmptyRow colSpan={6} />}
             {(data?.data as EmpresaRow[] | undefined)?.map((e) => (
               <tr key={e.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-3">
