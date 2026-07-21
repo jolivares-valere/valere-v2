@@ -35,7 +35,14 @@ El **nombre de la empresa es un enlace**: al pulsarlo se abre su ficha completa 
 
 - **Cuadro de búsqueda** (arriba a la izquierda de los filtros): escribe 2-3 letras del nombre de la empresa, de la compañía o del nº de contrato y la lista se filtra al instante. No distingue mayúsculas ni tildes. El contador muestra "X registros (de Y)" mientras filtras.
 - **Ordenar por columnas**: haz clic en cualquier encabezado (Empresa, Contrato, Vencimiento, Estado, Prioridad) para ordenar ascendente; segundo clic invierte a descendente. La flecha ▲/▼ indica la columna y sentido activos. Al ordenar por Vencimiento, las renovaciones **sin fecha** van siempre al final.
-- El botón **Limpiar** borra a la vez la búsqueda y los filtros de estado/prioridad.
+- El botón **Limpiar** borra a la vez la búsqueda, los filtros y el orden (vuelves a la vista por defecto).
+
+## Filtros-chip y export a Excel
+
+- **Prioridad** y **Comercializadora** se filtran con chips (botones redondos bajo el buscador): un clic activa, otro clic en el mismo chip lo quita. Se combinan entre sí y con el resto de filtros — p.ej. "críticas de NEXUS" = chip *Crítica* + chip *NEXUS*.
+- **Mes de vencimiento** y **Estado** se eligen en los desplegables junto al buscador. El filtro de mes incluye también renovaciones ya vencidas de ese mes: nada desaparece por estar vencido.
+- La combinación activa queda **en la dirección (URL)** de la página: puedes copiarla y compartirla, y quien la abra verá exactamente la misma vista.
+- **Exportar Excel** descarga el conjunto FILTRADO completo (todas las filas que cumplen los filtros, en el orden visible), no solo lo que cabe en pantalla. El fichero .xlsx se abre directamente en Excel.
 
 ## Bandeja "sin fecha"
 

@@ -1,13 +1,12 @@
-import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, Plus, Pencil, Trash2, X, RefreshCw, Search } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { Plus, Pencil, Trash2, X, RefreshCw, Search } from 'lucide-react'
 import {
   useRenovaciones,
   useRenovacionesKPI,
   useCreateRenovacion,
   useUpdateRenovacion,
   useDeleteRenovacion,
-  fetchRenovacionesForExport,
 } from './api'
 import type { RenovacionConRelaciones } from './api'
 import RenovacionForm from './components/RenovacionForm'
@@ -15,17 +14,25 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ExportButton from '../../core/components/ExportButton'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
 import StatusBadge, { type StatusVariant } from '../../core/components/StatusBadge'
+import SortableTh from '../../core/components/SortableTh'
+import useListParams from '../../core/hooks/useListParams'
 import { formatDate } from '../../core/utils/dates'
 import type { RenovacionInsert, EstadoRenovacion, PrioridadRenovacion } from '../../core/types/entities'
 
 type EditingState = RenovacionConRelaciones | 'new' | null
 
-type SortField = 'empresa' | 'contrato' | 'vencimiento' | 'estado' | 'prioridad'
+const SORT_FIELDS = ['empresa', 'contrato', 'vencimiento', 'estado', 'prioridad'] as const
+type SortField = (typeof SORT_FIELDS)[number]
 
-// Las renovaciones caben en una sola carga (~507 filas), así que las traemos
-// todas de golpe y la búsqueda/orden client-side operan sobre el total, no
-// sobre una página. Si algún día el volumen crece mucho, migrar a paginación
-// real con controles (tarea futura del backlog de Renovaciones).
+// PATRÓN DE CARGA COMPLETA — decisión (a) de la semana 2 + CONDICIÓN DE
+// CADUCIDAD (auditor, 21-jul-2026): las renovaciones caben en una sola carga
+// (~504 vivas hoy) y el badge Vigente/Histórico necesita el conjunto COMPLETO
+// por CUPS, así que búsqueda, filtros-chip, orden y export de esta página
+// operan client-side sobre el total (el export saca el conjunto FILTRADO, no
+// la página visible). ESTE PATRÓN CADUCA cuando `renovaciones` supere
+// ~2.000-3.000 filas vivas: entonces la opción (b) —vista SQL con el cálculo
+// Vigente/Histórico base-20 y paginación server-side— deja de ser opcional.
+// Entrada de seguimiento en docs/MEJORAS_UI_BACKLOG.md.
 const LISTA_PAGE_SIZE = 1000
 
 const PRIORIDAD_ORDEN: Record<PrioridadRenovacion, number> = {
@@ -84,39 +91,68 @@ const PRIORIDAD_LABEL: Record<PrioridadRenovacion, string> = {
   ok: 'OK',
 }
 
-export default function RenovacionesPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const filterEstado = (searchParams.get('estado') as EstadoRenovacion) || undefined
-  const filterPrioridad = (searchParams.get('prioridad') as PrioridadRenovacion) || undefined
+/** Etiqueta legible de un mes 'YYYY-MM' → 'jul 2026'. */
+const mesLabel = (ym: string): string => {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+}
 
-  const { data, isLoading } = useRenovaciones({
-    filter: { estado: filterEstado, prioridad: filterPrioridad },
-    pageSize: LISTA_PAGE_SIZE,
-  })
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+        active
+          ? 'border-slate-900 bg-slate-900 text-white'
+          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+export default function RenovacionesPage() {
+  const { search, sortField, sortDir, getFilter, updateParam, setSearch, toggleSort, clearAll } =
+    useListParams<SortField>({
+      sortFields: SORT_FIELDS,
+      defaultSort: 'vencimiento',
+      defaultDir: 'desc',
+      descFirstFields: ['vencimiento'],
+    })
+
+  const filtroEstado = getFilter('estado') as EstadoRenovacion | ''
+  const filtroPrioridad = getFilter('prioridad') as PrioridadRenovacion | ''
+  const filtroCia = getFilter('cia')
+  const filtroMes = getFilter('mes') // 'YYYY-MM' sobre fecha de vencimiento
+
+  // Carga completa SIN filtros server-side: los chips filtran en memoria y el
+  // badge Vigente/Histórico se calcula siempre sobre el conjunto total.
+  const { data, isLoading } = useRenovaciones({ pageSize: LISTA_PAGE_SIZE })
   const kpi = useRenovacionesKPI()
   const createMut = useCreateRenovacion()
   const updateMut = useUpdateRenovacion()
   const deleteMut = useDeleteRenovacion()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [busqueda, setBusqueda] = useState('')
-  const [sortField, setSortField] = useState<SortField | null>(null)
-  const [sortAsc, setSortAsc] = useState(true)
+  // Texto visible del buscador (controlado): la URL (q) se actualiza con
+  // debounce vía setSearch; este estado local permite que "Limpiar" vacíe
+  // también el cuadro, no solo el param.
+  const [busqueda, setBusqueda] = useState(search)
 
-  const onSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortAsc((prev) => !prev)
-    } else {
-      setSortField(field)
-      setSortAsc(true)
-    }
-  }
-
-  const setFilter = (key: string, value: string | null) => {
-    const next = new URLSearchParams(searchParams)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    setSearchParams(next)
+  const onLimpiar = () => {
+    setBusqueda('')
+    clearAll()
   }
 
   const onSubmit = async (values: RenovacionInsert) => {
@@ -137,9 +173,29 @@ export default function RenovacionesPage() {
   const submitting = createMut.isPending || updateMut.isPending
   const listaCompleta = data?.data ?? []
 
+  // Opciones de chips derivadas de los datos reales (nada inventado).
+  const companias = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of listaCompleta) if (r.contrato?.compania) set.add(r.contrato.compania)
+    return [...set].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+  }, [listaCompleta])
+
+  const meses = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of listaCompleta) {
+      const f = r.fecha_vencimiento_contrato
+      if (f) set.add(f.slice(0, 7))
+    }
+    return [...set].sort()
+  }, [listaCompleta])
+
   const lista = useMemo(() => {
     let rows = listaCompleta
-    const q = normalizar(busqueda.trim())
+    if (filtroEstado) rows = rows.filter((r) => r.estado === filtroEstado)
+    if (filtroPrioridad) rows = rows.filter((r) => r.prioridad === filtroPrioridad)
+    if (filtroCia) rows = rows.filter((r) => r.contrato?.compania === filtroCia)
+    if (filtroMes) rows = rows.filter((r) => (r.fecha_vencimiento_contrato ?? '').slice(0, 7) === filtroMes)
+    const q = normalizar(search.trim())
     if (q) {
       rows = rows.filter((r) =>
         normalizar(
@@ -147,8 +203,7 @@ export default function RenovacionesPage() {
         ).includes(q),
       )
     }
-    if (!sortField) return rows
-    const dir = sortAsc ? 1 : -1
+    const dir = sortDir === 'asc' ? 1 : -1
     return [...rows].sort((a, b) => {
       switch (sortField) {
         case 'empresa':
@@ -171,10 +226,10 @@ export default function RenovacionesPage() {
           return 0
       }
     })
-  }, [listaCompleta, busqueda, sortField, sortAsc])
+  }, [listaCompleta, filtroEstado, filtroPrioridad, filtroCia, filtroMes, search, sortField, sortDir])
 
-  // Estado de rotación por CUPS, calculado sobre TODO el conjunto cargado (las
-  // 507), no sobre la página filtrada: por cada CUPS con varias renovaciones,
+  // Estado de rotación por CUPS, calculado SIEMPRE sobre el conjunto completo
+  // cargado (nunca sobre el filtrado): por cada CUPS con varias renovaciones,
   // la del contrato con fecha_inicio más reciente = 'vigente'; el resto =
   // 'historico' (rotación pasada, visible sin tocar datos).
   const cupsStatus = useMemo(() => {
@@ -204,6 +259,7 @@ export default function RenovacionesPage() {
   const k = kpi.data
   const total = data?.count ?? 0
   const cargadas = listaCompleta.length
+  const hayFiltros = Boolean(filtroEstado || filtroPrioridad || filtroCia || filtroMes || search.trim())
 
   return (
     <div className="p-4 md:p-8">
@@ -211,7 +267,7 @@ export default function RenovacionesPage() {
         <div>
           <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Renovaciones</h1>
           <p className="text-sm text-slate-500">
-            {busqueda.trim()
+            {hayFiltros
               ? `${lista.length} de ${cargadas} cargadas`
               : cargadas < total
                 ? `${cargadas} de ${total} — aumenta el límite para verlas todas`
@@ -221,7 +277,9 @@ export default function RenovacionesPage() {
         <div className="flex gap-2">
           <ExportButton<RenovacionConRelaciones>
             filename="renovaciones"
-            fetchRows={() => fetchRenovacionesForExport({ estado: filterEstado, prioridad: filterPrioridad })}
+            // Exporta el conjunto FILTRADO completo (lo que hay en pantalla,
+            // todas las filas — no una página), en el orden visible.
+            fetchRows={() => Promise.resolve(lista)}
             columns={[
               { header: 'Empresa', value: (r) => r.empresa?.nombre },
               { header: 'Nº contrato', value: (r) => r.contrato?.numero_contrato },
@@ -253,47 +311,67 @@ export default function RenovacionesPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
-            type="text"
+            type="search"
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => { setBusqueda(e.target.value); setSearch(e.target.value) }}
             placeholder="Buscar empresa, compañía o nº contrato…"
             className="w-72 rounded-xl border border-slate-300 py-1.5 pl-8 pr-3 text-xs"
             aria-label="Buscar renovaciones"
           />
         </div>
         <select
-          value={filterEstado ?? ''}
-          onChange={(e) => setFilter('estado', e.target.value || null)}
-          className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs"
+          value={filtroMes}
+          onChange={(e) => updateParam('mes', e.target.value)}
+          aria-label="Filtrar por mes de vencimiento"
+          className="rounded-full border border-slate-300 px-3 py-1.5 text-xs"
+        >
+          <option value="">Todos los meses</option>
+          {meses.map((m) => (
+            <option key={m} value={m}>{mesLabel(m)}</option>
+          ))}
+        </select>
+        <select
+          value={filtroEstado}
+          onChange={(e) => updateParam('estado', e.target.value)}
+          aria-label="Filtrar por estado"
+          className="rounded-full border border-slate-300 px-3 py-1.5 text-xs"
         >
           <option value="">Todos los estados</option>
           {(Object.keys(ESTADO_LABEL) as EstadoRenovacion[]).map((e) => (
             <option key={e} value={e}>{ESTADO_LABEL[e]}</option>
           ))}
         </select>
-        <select
-          value={filterPrioridad ?? ''}
-          onChange={(e) => setFilter('prioridad', e.target.value || null)}
-          className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs"
-        >
-          <option value="">Todas las prioridades</option>
-          {(Object.keys(PRIORIDAD_LABEL) as PrioridadRenovacion[]).map((p) => (
-            <option key={p} value={p}>{PRIORIDAD_LABEL[p]}</option>
-          ))}
-        </select>
-        {(filterEstado || filterPrioridad || busqueda.trim()) && (
+        {hayFiltros && (
           <button
             type="button"
-            onClick={() => { setSearchParams({}); setBusqueda('') }}
+            onClick={onLimpiar}
             className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
           >
             <X className="h-3 w-3" /> Limpiar
           </button>
         )}
+      </div>
+
+      <div className="mb-1 flex flex-wrap items-center gap-1.5" aria-label="Filtrar por prioridad">
+        <span className="mr-1 text-xs text-slate-400">Prioridad:</span>
+        {(Object.keys(PRIORIDAD_LABEL) as PrioridadRenovacion[]).map((p) => (
+          <Chip key={p} active={filtroPrioridad === p} onClick={() => updateParam('prioridad', filtroPrioridad === p ? '' : p)}>
+            {PRIORIDAD_LABEL[p]}
+          </Chip>
+        ))}
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-1.5" aria-label="Filtrar por comercializadora">
+        <span className="mr-1 text-xs text-slate-400">Comercializadora:</span>
+        {companias.map((c) => (
+          <Chip key={c} active={filtroCia === c} onClick={() => updateParam('cia', filtroCia === c ? '' : c)}>
+            {c}
+          </Chip>
+        ))}
       </div>
 
       {isLoading ? (
@@ -324,9 +402,9 @@ export default function RenovacionesPage() {
         <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
           <RefreshCw className="mx-auto mb-2 h-8 w-8 text-slate-400" />
           <p className="mb-3 text-sm text-slate-500">
-            {busqueda.trim() ? 'Sin resultados para esta búsqueda' : 'Sin renovaciones registradas'}
+            {hayFiltros ? 'Sin resultados para estos filtros' : 'Sin renovaciones registradas'}
           </p>
-          {!busqueda.trim() && (
+          {!hayFiltros && (
             <button
               type="button"
               onClick={() => setEditing('new')}
@@ -342,12 +420,12 @@ export default function RenovacionesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <SortableTh label="Empresa" field="empresa" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
-                  <SortableTh label="Contrato" field="contrato" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <SortableTh field="empresa" label="Empresa" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+                  <SortableTh field="contrato" label="Contrato" activeField={sortField} dir={sortDir} onSort={toggleSort} />
                   <th className="px-4 py-3">CUPS</th>
-                  <SortableTh label="Vencimiento" field="vencimiento" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
-                  <SortableTh label="Estado" field="estado" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
-                  <SortableTh label="Prioridad" field="prioridad" sortField={sortField} sortAsc={sortAsc} onSort={onSort} />
+                  <SortableTh field="vencimiento" label="Vencimiento" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+                  <SortableTh field="estado" label="Estado" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+                  <SortableTh field="prioridad" label="Prioridad" activeField={sortField} dir={sortDir} onSort={toggleSort} />
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -494,35 +572,6 @@ export default function RenovacionesPage() {
         onCancel={() => setConfirmDeleteId(null)}
       />
     </div>
-  )
-}
-
-function SortableTh({
-  label,
-  field,
-  sortField,
-  sortAsc,
-  onSort,
-}: {
-  label: string
-  field: SortField
-  sortField: SortField | null
-  sortAsc: boolean
-  onSort: (field: SortField) => void
-}) {
-  const activo = sortField === field
-  return (
-    <th className="px-4 py-3">
-      <button
-        type="button"
-        onClick={() => onSort(field)}
-        className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-slate-900 ${activo ? 'text-slate-900' : ''}`}
-        aria-label={`Ordenar por ${label}`}
-      >
-        {label}
-        {activo && (sortAsc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-      </button>
-    </th>
   )
 }
 
