@@ -16,9 +16,9 @@
 - Encoding respetado: CRLF (+BOM en EmpresasPage, que ya lo tenía).
 
 ## PENDIENTE
-- [ ] Paseo independiente del auditor tras deploy Cloudflare: búsqueda con debounce (Network/historial como testigo), orden 5 columnas con `sort`+`dir` en URL, URL compartible que restaura estado exacto en pestaña nueva, paginación con total, estados vacío/error honestos. Cero diferencias fuera del debounce = PASA.
+- [x] Paseo independiente del auditor: PASA (21-jul tarde, veredicto abajo). Guion era: búsqueda con debounce (Network/historial como testigo), orden 5 columnas con `sort`+`dir` en URL, URL compartible que restaura estado exacto en pestaña nueva, paginación con total, estados vacío/error honestos. Cero diferencias fuera del debounce = PASA.
 - [ ] PR-2.2 Renovaciones sobre el componente único (siguiente sesión): migrar búsqueda/orden a `useListParams` + filtros-chip (prioridad, comercializadora, mes, estado) + export CSV del conjunto filtrado + nota de caducidad en código y backlog.
-- [ ] Veredicto del paseo PR-2.1 → anotarlo aquí y en ESTADO.md.
+- [x] Veredicto del paseo PR-2.1 anotado aquí y en ESTADO.md.
 
 ## Datos de contexto para PR-2.2 (niveles de madurez detectados)
 - Empresas: patrón server-side completo (ya canónico, base extraída).
@@ -26,3 +26,10 @@
 - Contratos: `useContratos()` sin paginación, filtro estado client-side — el más crudo, se moderniza en PR-2.3.
 
 GATE V2 (viernes 24-jul): 3 preguntas de negocio reales de Juan respondidas desde la UI en <30 segundos cada una, cronometradas por el auditor.
+
+## VEREDICTO DEL PASEO PR-2.1 (auditor, 21-jul tarde) — PASA
+- Búsqueda + debounce: "DERAZA" → 1 resultado; la URL escribió solo el término final (`?q=DERAZA&page=1`), sin estados intermedios (el cambio intencionado funciona como se anotó). ✓
+- Orden por columna: clic en NIF → flecha y orden aplicados; resto de columnas con indicador neutro. ✓
+- URL compartible (testigo fuerte): apertura en frío de `?sort=nombre&dir=desc&page=2` restaura estado exacto (Nombre desc, página 2: TEATRO → SURGLASS → SOCOESREMA…, 235 en total, buscador vacío). ✓
+- Total y paginación correctos. De regalo: DERAZA aparece UNA sola vez en la lista global — la fusión también se ve limpia desde la UI. ✓
+- Conclusión: 1/5 de semana 2 con DoD completo; los 4 PRs siguientes se montan sobre piezas ya auditadas en regresión → sus paseos se centran en lo nuevo (chips, CSV, KPIs clicables, bandeja).
