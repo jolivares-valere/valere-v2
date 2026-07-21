@@ -48,7 +48,8 @@ Cruce de `docs/analisis_plataformas_junio/DOC2_MEJORAS_PRIORIZADAS_CRM_VALERE.md
 - [renovaciones] Mostrar el **código CUPS** en cada fila del listado. Hoy sólo se ve el nombre de empresa, que se repite en empresas multi-sede (ej. BLUENET = 18 CUPS, REAL CANOE = varios) y PARECE duplicado sin serlo. Verificado en BBDD: 0 duplicados de CUPS enlazado; son puntos distintos + histórico de rotación · Juan · M · 📥
 - [renovaciones] Para renovaciones sin CUPS visible (rotación/enlace perdido): mostrar "sin CUPS" o el nº de contrato como identificador, para que nunca haya dos filas indistinguibles · Juan · S · 📥
 - [renovaciones] (Opcional) Agrupar por empresa con las sedes/CUPS desplegables (estilo árbol): BLUENET ocupa 1 fila que despliega sus 18 · Juan · L · 📥
-- [renovaciones] Búsqueda rápida + orden por encabezados + selector de empresa filtrable (código ya preparado en `APLICAR_RENOVACIONES_UX.ps1`, pendiente aplicar) · Juan · M · 📦
+- [renovaciones] Búsqueda rápida + orden por encabezados + selector de empresa filtrable (código ya preparado en `APLICAR_RENOVACIONES_UX.ps1`, pendiente aplicar) · Juan · M · ✅ cubierta por PR-2.2 (useListParams + chips); el script APLICAR_* queda obsoleto
+- [renovaciones] ⏳ **CADUCIDAD del patrón de carga completa** (decisión (a) semana 2, condición del auditor 21-jul-2026): cuando `renovaciones` supere **~2.000-3.000 filas vivas**, la opción (b) deja de ser opcional — vista SQL con el cálculo Vigente/Histórico base-20 + filtros y paginación server-side. Hoy ~504 vivas y creciendo despacio. Nota gemela en código: `RenovacionesPage.tsx`, junto a `LISTA_PAGE_SIZE` · auditor · L · 📥 dormida hasta el umbral (revisar en cada gate mensual)
 - [search] Buscador global multi-entidad v2: añadir renovaciones e incidencias Datadis a `GlobalSearch`, buscar contratos por nombre de empresa, revisar filtro `estado_relacion='cliente'` (hoy excluye leads) · auditor (paseo Zoco 16-jul) · M · 📥 backlog v2
 - [empresas] Cabecera: fallback del chip Comercial al comercial dominante de los contratos cuando `empresas.comercial_id` es nulo (estilo "heredado"), o alternativa: acción rápida "asignar comercial" desde el propio chip · auditor (cuadre PR-1.1) · S · 📥 pendiente decisión Juan en paseo PR-1.1
 - [empresas] Cabecera: el chip de renovación debe contar lo URGENTE, no solo lo próximo — añadir aviso compacto "⚠ N vencidas" (renovaciones con fecha pasada no gestionadas, caso PAZ Y BIEN: badge "13/04/2027 · Baja" sobre 4 críticas vencidas) y tratar el caso BLUENET "— · 18 sin fecha" · auditor (paseo PR-1.3) · S · 📥 decidir tras verlo pintado
@@ -79,4 +80,4 @@ Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, neces
 - Telemetría en producción (`client_telemetry`): route_change → módulos más usados primero; errores → fricciones reales.
 - Feedback del equipo.
 
-> Última actualización: 2026-07-17 (cruce DOC2 ↔ backlog, semana 1 cerrada)
+> Última actualización: 2026-07-22 (PR-2.2: chips renovaciones + nota de caducidad)
