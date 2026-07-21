@@ -47,6 +47,7 @@ export const FUNCION_RUTAS_PERMITIDAS: Record<string, RegExp[]> = {
     /^\/contactos(\/|$)/,
     /^\/contratos(\/|$)/,
     /^\/comercializadoras(\/|$)/,
+    /^\/alta-venta$/,
     /^\/oportunidades(\/|$)/,
     /^\/dashboard$/,
     /^\/calendario$/,

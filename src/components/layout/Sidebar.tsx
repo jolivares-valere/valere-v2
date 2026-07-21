@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, Briefcase, Building2, Calendar, ChevronDown,
   ChevronLeft, ChevronRight, Database, FileSearch, FileText, GitBranch, LayoutDashboard, Mail,
-  PhoneCall, RefreshCw, Settings, ShieldCheck, Store, Sun, Target, Upload, Users, X, Zap
+  PhoneCall, PlusCircle, RefreshCw, Settings, ShieldCheck, Store, Sun, Target, Upload, Users, X, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
@@ -18,6 +18,7 @@ interface SidebarProps {
 const crmItems: Item[] = [
   { to: '/hoy',            label: 'Hoy',           icon: Target },
   { to: '/dashboard',      label: 'Dashboard',     icon: LayoutDashboard },
+  { to: '/alta-venta',     label: 'Nueva venta',   icon: PlusCircle },
   { to: '/empresas',       label: 'Empresas',      icon: Building2 },
   { to: '/contactos',      label: 'Contactos',     icon: Users },
   { to: '/suministros',    label: 'Suministros',   icon: Zap },
