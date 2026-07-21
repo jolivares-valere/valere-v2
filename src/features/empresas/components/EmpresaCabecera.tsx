@@ -47,6 +47,7 @@ export default function EmpresaCabecera({ empresa, onVerIncidencias }: Props) {
   const renov = data?.proximaRenovacion ?? null
   const incidencias = data?.incidenciasDatadis ?? 0
   const vencidas = data?.renovacionesVencidas ?? 0
+  const sinFecha = data?.renovacionesSinFecha ?? 0
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
@@ -81,6 +82,14 @@ export default function EmpresaCabecera({ empresa, onVerIncidencias }: Props) {
           </>
         ) : (
           <span className="text-slate-400">—</span>
+        )}
+        {sinFecha > 0 && (
+          <span
+            className="font-medium text-amber-700"
+            title={`${sinFecha} renovación${sinFecha === 1 ? '' : 'es'} sin fecha de vencimiento documentada — en la bandeja de Renovaciones`}
+          >
+            · {sinFecha} sin fecha
+          </span>
         )}
         {vencidas > 0 && (
           <span

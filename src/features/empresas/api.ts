@@ -156,6 +156,9 @@ export interface EmpresaCabeceraData {
    * gestionar: lo URGENTE que la próxima renovación no cuenta (PR-2.4,
    * observación del auditor en el paseo PR-1.3 — caso PAZ Y BIEN). */
   renovacionesVencidas: number
+  /** Renovaciones vivas SIN fecha de vencimiento (la bandeja, PR-2.5):
+   * el "— · N sin fecha" pactado en el gate V1 (caso BLUENET). */
+  renovacionesSinFecha: number
 }
 
 /**
@@ -171,7 +174,7 @@ export function useEmpresaCabecera(empresaId: string | undefined, comercialId?: 
       // Cast: datadis_incidencias y renovaciones no están en los tipos generados.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
-      const [contratosRes, renovRes, vencidasRes, incidRes, comercialRes] = await Promise.all([
+      const [contratosRes, renovRes, vencidasRes, sinFechaRes, incidRes, comercialRes] = await Promise.all([
         sb.from('contratos')
           .select('id', { count: 'exact', head: true })
           .eq('empresa_id', empresaId)
@@ -191,6 +194,12 @@ export function useEmpresaCabecera(empresaId: string | undefined, comercialId?: 
           .is('deleted_at', null)
           .not('estado', 'in', '(renovado,perdido)')
           .lt('fecha_vencimiento_contrato', new Date().toISOString()),
+        sb.from('renovaciones')
+          .select('id', { count: 'exact', head: true })
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null)
+          .not('estado', 'in', '(renovado,perdido)')
+          .is('fecha_vencimiento_contrato', null),
         sb.from('datadis_incidencias')
           .select('id', { count: 'exact', head: true })
           .eq('empresa_id', empresaId),
@@ -199,7 +208,7 @@ export function useEmpresaCabecera(empresaId: string | undefined, comercialId?: 
           : Promise.resolve({ data: null, error: null, count: null }),
       ])
 
-      for (const r of [contratosRes, renovRes, vencidasRes, incidRes, comercialRes]) {
+      for (const r of [contratosRes, renovRes, vencidasRes, sinFechaRes, incidRes, comercialRes]) {
         if (r.error) {
           logError(r.error, 'useEmpresaCabecera')
           throw r.error
@@ -214,6 +223,7 @@ export function useEmpresaCabecera(empresaId: string | undefined, comercialId?: 
           : null,
         incidenciasDatadis: incidRes.count ?? 0,
         renovacionesVencidas: vencidasRes.count ?? 0,
+        renovacionesSinFecha: sinFechaRes.count ?? 0,
       }
     },
   })
