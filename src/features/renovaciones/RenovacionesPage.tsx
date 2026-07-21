@@ -168,12 +168,16 @@ export default function RenovacionesPage() {
     setEditing(null)
   }
 
-  /** Acción de la bandeja (PR-2.5): fechar una renovación la saca de la
-   * bandeja y la mete al pipeline con la prioridad recalculada por la regla
-   * unificada de PR-1.3 (calcPrioridad sobre días hasta vencimiento). */
+  /** Acción de la bandeja (PR-2.5, regla corregida tras el paseo): fechar
+   * saca de la bandeja y recalcula prioridad SIN DEGRADAR. La prioridad
+   * canónica de renovaciones es asignación de NEGOCIO (fuente única, PR-1.3)
+   * y puede ser más urgente que la estimada por días; al fechar se queda la
+   * MÁS urgente de ambas — la fecha solo puede subir urgencia, nunca bajarla
+   * (invariante del auditor: vencer antes nunca con prioridad menor). */
   const onPonerFecha = async (ren: RenovacionConRelaciones, fecha: string) => {
     if (!fecha) return
-    const prioridad = calcPrioridad(calcDiasVencimiento(fecha))
+    const estimada = calcPrioridad(calcDiasVencimiento(fecha))
+    const prioridad = PRIORIDAD_ORDEN[estimada] < PRIORIDAD_ORDEN[ren.prioridad] ? estimada : ren.prioridad
     await updateMut.mutateAsync({ id: ren.id, patch: { fecha_vencimiento_contrato: fecha, prioridad } })
   }
 
