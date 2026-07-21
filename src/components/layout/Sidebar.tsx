@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, Briefcase, Building2, Calendar, ChevronDown,
   ChevronLeft, ChevronRight, Database, FileSearch, FileText, GitBranch, LayoutDashboard, Mail,
-  PhoneCall, RefreshCw, Settings, ShieldCheck, Sun, Target, Upload, Users, X, Zap
+  PhoneCall, RefreshCw, Settings, ShieldCheck, Store, Sun, Target, Upload, Users, X, Zap
 } from 'lucide-react'
 import { useAuth } from '../../core/hooks/useAuth'
 
@@ -24,6 +24,7 @@ const crmItems: Item[] = [
   { to: '/actividades',    label: 'Actividades',   icon: Activity },
   { to: '/calendario',     label: 'Calendario',    icon: Calendar },
   { to: '/contratos',      label: 'Contratos',     icon: FileText },
+  { to: '/comercializadoras', label: 'Comercializadoras', icon: Store },
   { to: '/oportunidades',  label: 'Oportunidades', icon: GitBranch },
   { to: '/informes',       label: 'Informes',      icon: BarChart3 },
   { to: '/incidencias',    label: 'Incidencias',   icon: AlertTriangle },

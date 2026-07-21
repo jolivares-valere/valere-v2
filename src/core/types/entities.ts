@@ -106,6 +106,7 @@ export interface Contrato {
   comercial_id: string | null
   numero_contrato: string | null
   compania: string
+  comercializadora_id?: string | null
   tarifa_acceso: string | null
   tarifa_cliente: string | null
   tipo_energia: TipoEnergia | null
@@ -403,6 +404,40 @@ export interface Notificacion {
 }
 
 type AutoCols = 'id' | 'created_at' | 'updated_at' | 'deleted_at'
+export type ViaAcceso = 'directa' | 'zoco' | 'xentia'
+
+/** Catalogo maestro de comercializadoras (PR-3.1). Tabla compartida con la calculadora (vista retailers). */
+export interface Comercializadora {
+  id: string
+  name?: string | null
+  nombre_canonico: string | null
+  grupo: string | null
+  segmento: string | null
+  via: ViaAcceso | null
+  es_canal_venta?: boolean
+  activa: boolean | null
+  notes?: string | null
+}
+
+/** Condicion de comision por comercializadora x producto (doc REGLAS v2). */
+export interface ComercializadoraCondicion {
+  id: string
+  comercializadora_id: string
+  producto: string | null
+  tipo_regla: 'pct_fee' | 'pct_margen' | 'fijo_tarifa' | 'eur_kw' | 'tramos'
+  componente: 'energia' | 'potencia' | 'periodo' | 'servicio' | null
+  valor: number | null
+  via: ViaAcceso | null
+  cadencia: 'one_shot' | 'mensual' | 'trimestral'
+  comisiona_renovacion: boolean
+  vigencia_desde: string | null
+  vigencia_hasta: string | null
+  activa: boolean
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Insert<T> = Omit<T, Extract<keyof T, AutoCols>>
 export type Update<T> = Partial<Insert<T>>
 

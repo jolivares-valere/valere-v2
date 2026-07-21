@@ -100,6 +100,39 @@ PR-3.3 Documentos: bucket Storage (RLS is_staff) + subir/ver PDF desde la ficha
 GATE V3: un usuario NO desarrollador (Julia o Antonio) da de alta una venta
 completa sin ayuda y encuentra el PDF de un cliente.
 
+### REPLANIFICACION LIGERA SEMANA 3 (21-jul, con doc REGLAS v2 de Drive)
+Insumo leido: "REGLAS DE COMISIONES Y CANALES - VALERE v2 (vigente)" (Drive,
+BACKUP CRM VALERE). Confirmados hoy y editados en el doc: CYE = 50% fee;
+Eleia via Zoco.
+
+PR-3.1 AMPLIADO a catalogo + CONDICIONES (insumo del doc, semilla de F4):
+  - `comercializadoras` (maestro ABIERTO): nombre unico, grupo/segmento como
+    entidades distintas (EDP GC != EDP EMPRESAS; ENDESA pyme), via por defecto
+    [directa|zoco|xentia], activa, retailer_id opcional (puente calculadora).
+  - `comercializadora_condiciones` (hija): producto, tipo_regla [pct_fee|
+    pct_margen|fijo_tarifa|eur_kw|tramos], componente [energia|potencia|
+    periodo|servicio], valor EDITABLE, via override, cadencia [one_shot|
+    mensual|trimestral], comisiona_renovacion, vigencia (adendas Audax/ADX/
+    NEXUS caducan 31/12/2026), notas.
+  - SEED: 20 entidades del doc (18 + NAGINI grafia unica + ELEIA sin
+    condiciones) + 28 condiciones dictadas.
+  - `contratos.comercializadora_id` FK nullable; selector en ContratoForm
+    (texto libre FUERA); compania se sigue rellenando con el nombre canonico
+    (compatibilidad listas/chips PR-2.3).
+  - RLS: select authenticated; write admin/jefe_equipo; delete admin.
+  - CA plan: 0 comercializadoras fuera de catalogo en altas nuevas (SQL).
+  - OPERACIONES DE DATOS APARTE (cada una con OK de Juan + cuadre auditor):
+    backfill comercializadora_id por match exacto; GANA ENERGIA->GANA (2);
+    SILVER ENERGIA->SILVER (4); Endesa Energia->ENDESA (1); EDP (3) decidir
+    segmento GC/Empresas; "Pendiente" (1) no es comercializadora.
+
+PR-3.2 asistente alta 4 pasos: formulario ADAPTATIVO por tarifa (2.0TD =
+  2 potencias + 3 energias; resto 6+6 - leccion BLUENET ceros inventados);
+  NAGINI como primera alta real de prueba.
+PR-3.3 documentos: bucket Storage RLS is_staff + PDF desde ficha; el auditor
+  verifica RLS del bucket (anon/client sin acceso).
+GATE V3 (viernes): Julia o Antonio, alta completa <2 min + encuentra un PDF.
+
 ## SEMANA 4 — DATO VIVO + PUSH (T5) [L2/L4/L5 + Z7]
 
 PR-4.1 Curva en la pestaña Suministros: gráfica mensual + zoom diario desde

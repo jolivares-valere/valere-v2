@@ -5,12 +5,13 @@ import { z } from 'zod'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../core/supabase/client'
 import type { Contrato, ContratoInsert } from '../../../core/types/entities'
+import { useComercializadorasCanal } from '../../comercializadoras/api'
 
 const ESTADOS_CONTRATO = ['tramite', 'activo', 'vencido', 'incidencia', 'baja', 'cancelado', 'borrador'] as const
 
 const schema = z.object({
   empresa_id: z.string().uuid('Empresa obligatoria'),
-  compania: z.string().min(2, 'Mínimo 2 caracteres'),
+  comercializadora_id: z.string().uuid('Selecciona comercializadora del catálogo'),
   numero_contrato: z.string().optional().transform((v) => v || null),
   estado: z.enum(ESTADOS_CONTRATO),
   tipo_energia: z.enum(['electrica', 'gas', 'dual']).or(z.literal('')).transform((v) => v || null),
@@ -47,12 +48,13 @@ function useEmpresasOptions() {
 
 export default function ContratoForm({ defaultValues, onSubmit, onCancel, submitting }: Props) {
   const empresas = useEmpresasOptions()
+  const canales = useComercializadorasCanal()
 
   const form = useForm<ContratoFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       empresa_id: defaultValues?.empresa_id ?? '',
-      compania: defaultValues?.compania ?? '',
+      comercializadora_id: defaultValues?.comercializadora_id ?? '',
       numero_contrato: defaultValues?.numero_contrato ?? '',
       estado: (defaultValues?.estado as typeof ESTADOS_CONTRATO[number]) ?? 'tramite',
       tipo_energia: defaultValues?.tipo_energia ?? '',
@@ -71,11 +73,18 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
       })
     }
   }, [empresas.data, defaultValues?.empresa_id])
+  // Contratos previos al catálogo (PR-3.1): resolver comercializadora por compania legacy
+  useEffect(() => {
+    if (canales.data && !form.getValues('comercializadora_id') && defaultValues?.compania) {
+      const match = canales.data.find((c) => c.nombre_canonico === defaultValues.compania)
+      if (match) form.setValue('comercializadora_id', match.id)
+    }
+  }, [canales.data, defaultValues?.compania])
 
   const handle = form.handleSubmit(async (raw) => {
     const v = raw as unknown as {
       empresa_id: string
-      compania: string
+      comercializadora_id: string
       numero_contrato: string | null
       estado: typeof ESTADOS_CONTRATO[number]
       tipo_energia: 'electrica' | 'gas' | 'dual' | null
@@ -90,7 +99,8 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
       contacto_firmante_id: defaultValues?.contacto_firmante_id ?? null,
       comercial_id: defaultValues?.comercial_id ?? null,
       numero_contrato: v.numero_contrato,
-      compania: v.compania,
+      comercializadora_id: v.comercializadora_id,
+      compania: canales.data?.find((c) => c.id === v.comercializadora_id)?.nombre_canonico ?? defaultValues?.compania ?? '',
       tarifa_acceso: v.tarifa_acceso,
       tarifa_cliente: defaultValues?.tarifa_cliente ?? null,
       tipo_energia: v.tipo_energia,
@@ -142,7 +152,20 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
           )}
         </label>
 
-        {field('compania', 'Compañía *')}
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-slate-700">Comercializadora *</span>
+          <select {...form.register('comercializadora_id')} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+            <option value="">— Selecciona del catálogo —</option>
+            {canales.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre_canonico}{c.via === 'zoco' ? ' (vía Zoco)' : c.via === 'xentia' ? ' (vía Xentia)' : ''}
+              </option>
+            ))}
+          </select>
+          {form.formState.errors.comercializadora_id && (
+            <span className="mt-1 block text-xs text-red-600">{String(form.formState.errors.comercializadora_id?.message)}</span>
+          )}
+        </label>
         {field('numero_contrato', 'Nº contrato')}
 
         <label className="block">
