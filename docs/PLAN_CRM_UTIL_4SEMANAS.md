@@ -133,3 +133,12 @@ Retro de 30 min. Se abre el backlog v2 (lo que quedó fuera + energía S1/S2).
 Cada viernes: verificación del gate (paseo + SQL + cronómetros) y veredicto
 CIERRA/NO CIERRA por escrito en este documento. Si algo no cierra, la causa
 y el recorte de alcance quedan registrados. Mismo rigor que Fase 0-1 y Datadis.
+
+── GATE V1 · 2026-07-21 (adelantado desde el 24) · AUDITOR ──
+VEREDICTO: CIERRA. Paseo de 5 clientes (CHEMTROL, PAZ Y BIEN, BLUENET,
+DERAZA post-fusion B45728805, Bidafarma): T1 cumplido en los 5, buscador
+a ficha 3-5s (<10s), datos cuadrados por SQL, cero callejones. PR-1.1 a
+PR-1.5 todos con DoD completo y verificacion independiente. Extras de la
+semana: S0.2 sellado (cron datadis-consumos-nightly 03:30) y DERAZA
+fusionada con cuadre de 0 huerfanos en 23 tablas. Observaciones no
+bloqueantes en outbox 2026-07-21. Semana 2 autorizada a arrancar.
