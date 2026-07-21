@@ -87,6 +87,9 @@ export function useContratos(options?: QueryOptions) {
       if (f.empresa_id) q = q.eq('empresa_id', f.empresa_id as string)
       if (f.comercial_id) q = q.eq('comercial_id', f.comercial_id as string)
       if (f.compania) q = q.ilike('compania', `%${String(f.compania)}%`)
+      // Filtro exacto para los chips de comercializadora (PR-2.3): un chip
+      // "NEXUS" no debe arrastrar también "NEXUS RENOVABLES".
+      if (f.compania_eq) q = q.eq('compania', f.compania_eq as string)
 
       const sortField = options?.sort?.field ?? 'fecha_fin'
       const sortAsc = options?.sort?.direction === 'asc'
@@ -104,6 +107,7 @@ export async function fetchContratosForExport(filter?: {
   empresa_id?: string
   comercial_id?: string
   compania?: string
+  compania_eq?: string
 }): Promise<ContratoConEmpresa[]> {
   let q = supabase
     .from('contratos')
@@ -114,10 +118,35 @@ export async function fetchContratosForExport(filter?: {
   if (filter?.empresa_id) q = q.eq('empresa_id', filter.empresa_id)
   if (filter?.comercial_id) q = q.eq('comercial_id', filter.comercial_id)
   if (filter?.compania) q = q.ilike('compania', `%${filter.compania}%`)
+  if (filter?.compania_eq) q = q.eq('compania', filter.compania_eq)
 
   const { data, error } = await q.order('fecha_fin', { ascending: false, nullsFirst: false }).limit(10000)
   if (error) { logError(error, 'fetchContratosForExport'); throw error }
   return (data ?? []) as unknown as ContratoConEmpresa[]
+}
+
+/**
+ * Comercializadoras distintas con contratos vivos, para los chips de filtro
+ * del listado (PR-2.3). Una query ligera de una sola columna, cacheada 5 min.
+ */
+export function useComercializadorasDeContratos() {
+  return useQuery({
+    queryKey: [RESOURCE, 'companias'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select('compania')
+        .is('deleted_at', null)
+        .limit(10000)
+      if (error) { logError(error, 'useComercializadorasDeContratos'); throw error }
+      const set = new Set<string>()
+      for (const row of (data ?? []) as { compania: string | null }[]) {
+        if (row.compania) set.add(row.compania)
+      }
+      return [...set].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+    },
+  })
 }
 
 export interface ContratoConCups extends Contrato {

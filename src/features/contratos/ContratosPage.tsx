@@ -1,5 +1,5 @@
-﻿import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+﻿import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, X, Flame, ChevronRight } from 'lucide-react'
 import {
   useContratos,
@@ -9,28 +9,93 @@ import {
   fetchContratosForExport,
   useContratosPorVencer,
   useResumenVencimientos,
+  useComercializadorasDeContratos,
 } from './api'
 import { useCrearTareaDesdeContrato } from '../../core/hooks/useAutomatizaciones'
 import ContratoForm from './components/ContratoForm'
 import PrioridadBadge from './components/PrioridadBadge'
+import EstadoBadge from './components/EstadoBadge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ExportButton from '../../core/components/ExportButton'
+import Pagination from '../../core/components/Pagination'
+import SortableTh from '../../core/components/SortableTh'
+import { LoadingRow, ErrorRow, EmptyRow } from '../../core/components/TableStateRows'
+import useListParams from '../../core/hooks/useListParams'
 import { SkeletonRow, SkeletonCard } from '../../components/ui/Skeleton'
 import { calcDiasVencimiento, calcPrioridad, formatComision } from '../../core/utils/energy'
 import { formatDate } from '../../core/utils/dates'
 import type { ContratoConEmpresa, ContratoPorVencer } from './api'
-import type { ContratoInsert } from '../../core/types/entities'
+import type { ContratoInsert, EstadoContrato } from '../../core/types/entities'
 
 type EditingState = ContratoConEmpresa | 'new' | null
 
-export default function ContratosPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const vencimientoMode = searchParams.get('vencimiento') === '1'
-  // H1 (auditoría enlaces F2): el Dashboard enlaza con ?estado=activo|incidencia.
-  // Antes este parámetro se descartaba en silencio; ahora filtra de verdad.
-  const estadoFilter = searchParams.get('estado')
+// Campos ordenables server-side (columnas reales de `contratos`; la relación
+// empresa no es ordenable desde aquí sin vista, y no hace falta para el CA).
+const SORT_FIELDS = ['compania', 'cups', 'fecha_fin', 'estado'] as const
+type SortField = (typeof SORT_FIELDS)[number]
 
-  const { data, isLoading } = useContratos()
+const PAGE_SIZE = 20
+
+const ESTADO_LABEL: Record<EstadoContrato, string> = {
+  borrador: 'Borrador',
+  tramite: 'Trámite',
+  activo: 'Activo',
+  vencido: 'Vencido',
+  baja: 'Baja',
+  incidencia: 'Incidencia',
+  cancelado: 'Cancelado',
+}
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+        active
+          ? 'border-slate-900 bg-slate-900 text-white'
+          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+export default function ContratosPage() {
+  const { page, sortField, sortDir, getFilter, updateParam, toggleSort, clearAll } =
+    useListParams<SortField>({
+      sortFields: SORT_FIELDS,
+      defaultSort: 'fecha_fin',
+      defaultDir: 'desc',
+      descFirstFields: ['fecha_fin'],
+    })
+
+  const vencimientoMode = getFilter('vencimiento') === '1'
+  // H1 (auditoría enlaces F2): el Dashboard enlaza con ?estado=activo|incidencia.
+  // El param se mantiene con el mismo nombre; ahora además es un chip.
+  const estadoFilter = getFilter('estado') as EstadoContrato | ''
+  const ciaFilter = getFilter('cia')
+
+  const { data, isLoading, error, refetch, isFetching } = useContratos({
+    page,
+    pageSize: PAGE_SIZE,
+    filter: {
+      estado: estadoFilter || undefined,
+      compania_eq: ciaFilter || undefined,
+    },
+    sort: { field: sortField, direction: sortDir },
+  })
+  const { data: companias } = useComercializadorasDeContratos()
   const porVencer = useContratosPorVencer(100)
   const resumen = useResumenVencimientos()
   const createMut = useCreateContrato()
@@ -39,19 +104,6 @@ export default function ContratosPage() {
   const crearTarea = useCrearTareaDesdeContrato()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-
-  const clearEstado = () => {
-    const next = new URLSearchParams(searchParams)
-    next.delete('estado')
-    setSearchParams(next)
-  }
-
-  const toggleVencimiento = () => {
-    const next = new URLSearchParams(searchParams)
-    if (vencimientoMode) next.delete('vencimiento')
-    else next.set('vencimiento', '1')
-    setSearchParams(next)
-  }
 
   const onSubmit = async (values: ContratoInsert) => {
     if (editing && editing !== 'new') {
@@ -79,8 +131,10 @@ export default function ContratosPage() {
   }
 
   const submitting = createMut.isPending || updateMut.isPending
-  const todos = data?.data ?? []
-  const lista = estadoFilter ? todos.filter((c) => c.estado === estadoFilter) : todos
+  const lista = data?.data ?? []
+  const total = data?.count ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const hayFiltros = Boolean(estadoFilter || ciaFilter)
   const aBorrar = lista.find((c) => c.id === confirmDeleteId)
 
   return (
@@ -88,12 +142,19 @@ export default function ContratosPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Contratos</h1>
-          <p className="text-sm text-slate-500">{lista.length} contratos vigentes</p>
+          <p className="text-sm text-slate-500">
+            {hayFiltros ? `${total} contratos con estos filtros` : `${total} contratos en total`}
+          </p>
         </div>
         <div className="flex gap-2">
           <ExportButton<ContratoConEmpresa>
             filename="contratos"
-            fetchRows={() => fetchContratosForExport()}
+            // Exporta el conjunto FILTRADO completo (server-side, hasta 10.000
+            // filas), no la página visible.
+            fetchRows={() => fetchContratosForExport({
+              estado: estadoFilter || undefined,
+              compania_eq: ciaFilter || undefined,
+            })}
             columns={[
               { header: 'Empresa', value: (c) => c.empresa?.nombre },
               { header: 'NIF', value: (c) => c.empresa?.nif },
@@ -121,11 +182,10 @@ export default function ContratosPage() {
         </div>
       </div>
 
-      {/* Filtro: Solo próximos a vencer */}
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={toggleVencimiento}
+          onClick={() => updateParam('vencimiento', vencimientoMode ? '' : '1')}
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
             vencimientoMode
               ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-300'
@@ -136,17 +196,33 @@ export default function ContratosPage() {
           Próximos a vencer
           {vencimientoMode && <X className="ml-1 h-3 w-3" />}
         </button>
-        {estadoFilter && (
+        {(hayFiltros || vencimientoMode) && (
           <button
             type="button"
-            onClick={clearEstado}
-            className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-800 ring-1 ring-blue-300 transition hover:bg-blue-200"
-            title="Quitar filtro de estado"
+            onClick={clearAll}
+            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
           >
-            Estado: {estadoFilter}
-            <X className="ml-1 h-3 w-3" />
+            <X className="h-3 w-3" /> Limpiar
           </button>
         )}
+      </div>
+
+      <div className="mb-1 flex flex-wrap items-center gap-1.5" aria-label="Filtrar por estado">
+        <span className="mr-1 text-xs text-slate-400">Estado:</span>
+        {(Object.keys(ESTADO_LABEL) as EstadoContrato[]).map((e) => (
+          <Chip key={e} active={estadoFilter === e} onClick={() => updateParam('estado', estadoFilter === e ? '' : e)}>
+            {ESTADO_LABEL[e]}
+          </Chip>
+        ))}
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-1.5" aria-label="Filtrar por comercializadora">
+        <span className="mr-1 text-xs text-slate-400">Comercializadora:</span>
+        {(companias ?? []).map((c) => (
+          <Chip key={c} active={ciaFilter === c} onClick={() => updateParam('cia', ciaFilter === c ? '' : c)}>
+            {c}
+          </Chip>
+        ))}
       </div>
 
       {vencimientoMode && resumen.data && resumen.data.total > 0 && (
@@ -173,40 +249,6 @@ export default function ContratosPage() {
 
       {vencimientoMode ? (
         <VencimientoList loading={porVencer.isLoading} rows={porVencer.data ?? []} />
-      ) : isLoading ? (
-        <>
-          <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Empresa</th>
-                  <th className="px-4 py-3">CUPS</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Fin</th>
-                  <th className="px-4 py-3">Prioridad</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}
-              </tbody>
-            </table>
-          </div>
-          <div className="md:hidden space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-        </>
-      ) : lista.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
-          <p className="mb-3 text-sm text-slate-500">Sin contratos registrados</p>
-          <button
-            type="button"
-            onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
-          >
-            <Plus className="h-3.5 w-3.5" /> Añadir el primero
-          </button>
-        </div>
       ) : (
         <>
           <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -214,14 +256,27 @@ export default function ContratosPage() {
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Empresa</th>
-                  <th className="px-4 py-3">CUPS</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Fin</th>
+                  <SortableTh field="compania" label="Compañía" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+                  <SortableTh field="cups" label="CUPS" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+                  <SortableTh field="fecha_fin" label="Fin" activeField={sortField} dir={sortDir} onSort={toggleSort} />
+                  <SortableTh field="estado" label="Estado" activeField={sortField} dir={sortDir} onSort={toggleSort} />
                   <th className="px-4 py-3">Prioridad</th>
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {isLoading && <LoadingRow colSpan={7} />}
+                {error && (
+                  <ErrorRow
+                    colSpan={7}
+                    message={`Error al cargar contratos: ${(error as Error).message}`}
+                    onRetry={() => refetch()}
+                    retrying={isFetching}
+                  />
+                )}
+                {!isLoading && !error && lista.length === 0 && (
+                  <EmptyRow colSpan={7} label={hayFiltros ? 'Sin resultados para estos filtros' : 'Sin contratos registrados'} />
+                )}
                 {lista.map((c) => {
                   const dias = calcDiasVencimiento(c.fecha_fin)
                   const prioridad = calcPrioridad(dias)
@@ -237,9 +292,10 @@ export default function ContratosPage() {
                           <div className="text-xs text-slate-500">{formatComision(c.comision_eur)}</div>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{c.compania ?? '—'}</td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.cups ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 capitalize">{c.tipo_punto?.replace('_', ' ') ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{formatDate(c.fecha_fin) ?? '—'}</td>
+                      <td className="px-4 py-3"><EstadoBadge estado={c.estado} /></td>
                       <td className="px-4 py-3">
                         <PrioridadBadge prioridad={prioridad} />
                       </td>
@@ -263,36 +319,48 @@ export default function ContratosPage() {
             </table>
           </div>
 
-          <ul className="md:hidden space-y-3">
-            {lista.map((c) => {
-              const dias = calcDiasVencimiento(c.fecha_fin)
-              const prioridad = calcPrioridad(dias)
-              return (
-                <li key={c.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <Link to={`/contratos/${c.id}`} className="font-medium text-slate-900 hover:underline">
-                        {c.empresa?.nombre ?? c.cups ?? '—'}
-                      </Link>
-                      <p className="mt-1 font-mono text-[11px] text-slate-500">{c.cups ?? ''}</p>
-                      <p className="mt-1 text-xs text-slate-500 capitalize">
-                        {c.tipo_punto?.replace('_', ' ') ?? '—'} · fin {formatDate(c.fecha_fin) ?? '—'}
-                      </p>
-                      <div className="mt-2"><PrioridadBadge prioridad={prioridad} /></div>
+          <div className="md:hidden">
+            {isLoading && (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            )}
+            <ul className="space-y-3">
+              {lista.map((c) => {
+                const dias = calcDiasVencimiento(c.fecha_fin)
+                const prioridad = calcPrioridad(dias)
+                return (
+                  <li key={c.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/contratos/${c.id}`} className="font-medium text-slate-900 hover:underline">
+                          {c.empresa?.nombre ?? c.cups ?? '—'}
+                        </Link>
+                        <p className="mt-1 font-mono text-[11px] text-slate-500">{c.cups ?? ''}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {c.compania ?? '—'} · fin {formatDate(c.fecha_fin) ?? '—'}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <EstadoBadge estado={c.estado} />
+                          <PrioridadBadge prioridad={prioridad} />
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Editar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button type="button" onClick={() => setEditing(c)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Editar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => setConfirmDeleteId(c.id)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar contrato ${c.numero_contrato ?? c.compania} de ${c.empresa?.nombre ?? 'empresa'}`}>
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+
+          <Pagination page={page} totalPages={totalPages} onPageChange={(p) => updateParam('page', String(p))} />
         </>
       )}
 

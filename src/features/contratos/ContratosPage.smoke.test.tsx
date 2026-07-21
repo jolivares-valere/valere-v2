@@ -12,6 +12,7 @@ vi.mock('./api', () => ({
   fetchContratosForExport: vi.fn(),
   useContratosPorVencer: () => ({ isLoading: false, data: [] }),
   useResumenVencimientos: () => ({ data: null }),
+  useComercializadorasDeContratos: () => ({ data: [] }),
 }))
 vi.mock('../../core/hooks/useAutomatizaciones', () => ({
   useCrearTareaDesdeContrato: () => ({ mutate: vi.fn(), isPending: false }),
