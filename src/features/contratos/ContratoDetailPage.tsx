@@ -1,7 +1,12 @@
-﻿import { useParams } from 'react-router-dom'
+﻿import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Pencil, Trash2, X } from 'lucide-react'
 import BackButton from '../../core/components/BackButton'
 import EntidadNoEncontrada from '../../core/components/EntidadNoEncontrada'
-import { useContratoById } from './api'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import ContratoForm from './components/ContratoForm'
+import { useContratoById, useUpdateContrato, useDeleteContrato } from './api'
+import type { ContratoInsert } from '../../core/types/entities'
 import { useRenovacionViva } from '../renovaciones/api'
 import EstadoBadge from './components/EstadoBadge'
 import PrioridadBadge from './components/PrioridadBadge'
@@ -12,8 +17,15 @@ import { formatDate } from '../../core/utils/dates'
 
 export default function ContratoDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { data, isLoading } = useContratoById(id)
   const renovacionViva = useRenovacionViva(id)
+  const updateMut = useUpdateContrato()
+  const deleteMut = useDeleteContrato()
+  // F3 (Julia, gate V3): editar y eliminar TAMBIEN desde el detalle del contrato
+  // (el camino natural desde la ficha de empresa no tenia acciones)
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (isLoading) return <div className="p-8 text-slate-500">Cargando…</div>
   if (!data) return <EntidadNoEncontrada entidad="contrato" backTo="/contratos" backLabel="Volver a Contratos" />
@@ -39,6 +51,12 @@ export default function ContratoDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
+            <Pencil className="h-3.5 w-3.5" /> Editar
+          </button>
+          <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
+            <Trash2 className="h-3.5 w-3.5" /> Eliminar
+          </button>
           <EstadoBadge estado={contrato.estado} />
           <PrioridadBadge prioridad={prioridad} />
           {prioridadEstimada && (
@@ -112,6 +130,41 @@ export default function ContratoDetailPage() {
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <DocumentosTab entidadTipo="contrato" entidadId={contrato.id} />
       </div>
+
+      {editing && (
+        <div role="dialog" aria-modal="true" aria-label="Editar contrato" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Editar contrato</h2>
+              <button type="button" onClick={() => setEditing(false)} aria-label="Cerrar" className="rounded p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <ContratoForm
+              defaultValues={contrato}
+              submitting={updateMut.isPending}
+              onCancel={() => setEditing(false)}
+              onSubmit={async (values: ContratoInsert) => {
+                await updateMut.mutateAsync({ id: contrato.id, patch: values })
+                setEditing(false)
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={confirmDelete}
+        title="Eliminar contrato"
+        message={`¿Eliminar el contrato ${contrato.numero_contrato ?? 'sin nº'} de ${contrato.compania}? (soft delete)`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        submitting={deleteMut.isPending}
+        onConfirm={async () => {
+          await deleteMut.mutateAsync(contrato.id)
+          setConfirmDelete(false)
+          navigate(-1)
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }

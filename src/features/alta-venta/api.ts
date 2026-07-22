@@ -67,6 +67,18 @@ export interface EmpresaMinInput {
   nombre: string
   nif: string | null
   ciudad: string | null
+  created_by: string | null
+}
+
+/** F4 (gate V3): nº de contratos VIVOS con ese numero_contrato (aviso de duplicado). */
+export async function checkNumeroContratoDuplicado(numero: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('contratos')
+    .select('id', { count: 'exact', head: true })
+    .eq('numero_contrato', numero.trim())
+    .is('deleted_at', null)
+  if (error) { logError(error, 'checkNumeroContratoDuplicado'); return 0 }
+  return count ?? 0
 }
 
 /** Alta minima de empresa (el resto de la ficha se completa despues). */

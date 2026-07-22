@@ -20,6 +20,12 @@ const schema = z.object({
   fecha_inicio: z.string().optional().transform((v) => v || null),
   fecha_fin: z.string().optional().transform((v) => v || null),
   observaciones: z.string().optional().transform((v) => v || null),
+}).superRefine((v, ctx) => {
+  // F1 (Julia, gate V3): un contrato ACTIVO necesita fecha de inicio;
+  // en tramite puede no tenerla (depende del ATR).
+  if (v.estado === 'activo' && !v.fecha_inicio) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fecha_inicio'], message: 'Un contrato activo necesita fecha de inicio; déjalo en trámite si aún no la sabes' })
+  }
 })
 
 export type ContratoFormValues = z.input<typeof schema>
@@ -82,6 +88,8 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
   }, [canales.data, defaultValues?.compania])
 
   const handle = form.handleSubmit(async (raw) => {
+    // F4: trazabilidad de altas hechas desde el modal
+    const uid = (await supabase.auth.getUser()).data.user?.id ?? null
     const v = raw as unknown as {
       empresa_id: string
       comercializadora_id: string
@@ -118,8 +126,8 @@ export default function ContratoForm({ defaultValues, onSubmit, onCancel, submit
       estado: v.estado,
       observaciones: v.observaciones,
       external_id: defaultValues?.external_id ?? null,
-      created_by: defaultValues?.created_by ?? null,
-      updated_by: defaultValues?.updated_by ?? null,
+      created_by: defaultValues?.created_by ?? uid,
+      updated_by: uid,
     }
     await onSubmit(insert)
   })
