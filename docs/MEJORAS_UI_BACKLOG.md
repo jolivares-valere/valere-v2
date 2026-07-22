@@ -92,3 +92,10 @@ Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, neces
   UNIFICAR: migrar consumidores de `tipo` a `tipo_documento` + backfill + drop del check
   legacy. Cazado por el auditor en el alta NAGINI (documentos_tipo_check violado: el
   codigo heredado escribia la EXTENSION 'pdf' en `tipo`).
+
+
+## App Gastos Valere (añadido 22-jul-2026, EF `gastos` creada por sesión paralela)
+- [S] Endurecer RLS de gastos_tarjeta/justificantes_gasto: authenticated→true actual
+  permite a cualquier logueado (futuro role client) leer/escribir gastos de empresa.
+- [S] Webhook Make en claro en el HTML público de la PWA → spameable; mover a EF con secret.
+- [S] Commitear el fuente de la EF gastos al repo (hoy solo existe desplegada).
