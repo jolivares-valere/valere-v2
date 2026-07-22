@@ -1,6 +1,9 @@
 # HOJA DE DECISION — 22 CUPS sin tarifa + hallazgos derivados — 2026-07-22
-ESTADO: ANALISIS COMPLETO, NADA ESCRITO EN BBDD. SQLs listos, esperan OK de Juan
-+ cuadre del auditor.
+ESTADO: ✅ RESUELTO 22-jul (ejecutado por el circuito Juan+auditor, VERIFICADO por
+Cowork en BBDD): Grupo 1 ejecutado (17 CUPS sin tarifa restantes = los 16 sin fuente
++ AERCAL pendiente factura) · Hallazgo A ejecutado (0 contratos con coma) · RLTB
+dictado y migrado (canonica RLTB.x: 51 cups + 58 contratos, RL1-RL6 unificados).
+QUEDA: grupo 2 (AERCAL, confirmar con factura) y grupo 3 (16, factura/SIPS).
 
 ## Grupo 1 — resolubles desde su contrato (5 CUPS, deterministas)
 El contrato vinculado tiene tarifa (en grafia de coma):

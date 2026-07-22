@@ -99,7 +99,11 @@ Caso origen: alta real NAGINI 90508 (JIMENEZ ROSALES, SILVER→NAGINI, CUPS …A
   igualas este mes?" · "¿quién lleva 2+ cuotas sin pagar?". Estimación: 1 sesión.
 
 ## Orden propuesto y por qué
-A1 → B1 → C1 → C2 → C3 → D1 → D2 (~7 sesiones + paseos).
+DECIDIDO POR JUAN (22-jul): D ANTES QUE C → A1 → B1 → D1 → D2 → C1 → C2 → C3
+(~7 sesiones + paseos). Razonado: la morosidad de cuotas de clientes es sangría
+directa y D estrena el motor expectativa+casado+semáforo en el caso más simple
+(pagador=cliente, sin vía ni retenciones) antes de aplicarlo a liquidaciones.
+[Propuesta original: A1 → B1 → C1 → C2 → C3 → D1 → D2.]
 - A1 primero: invariante de datos + mata las fricciones vivas del gate de hoy.
 - B1 antes que liquidaciones: sin apuntes esperados no hay nada que casar.
 - C antes que D (decisión de negocio a confirmar): las liquidaciones de
