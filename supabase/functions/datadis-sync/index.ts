@@ -165,6 +165,10 @@ serve(async (req) => {
     let camposComercialesProtegidos = 0
     const incidencias: Incidencia[] = []
     const processedEmpresaIds = new Set<string>()
+    // S0.2-ter: mantener cups.datadis_autorizado FRESCO (true=en supplies del NIF hoy;
+    // false=el NIF ya no lo autoriza o el NIF entero perdio autorizacion)
+    const matchedCupsIds = new Set<string>()
+    const allProcessedCupsIds = new Set<string>()
 
     const nifList = [...nifToGroups.keys()]
     const BATCH = 4
@@ -172,7 +176,10 @@ serve(async (req) => {
       const slice = nifList.slice(i, i + BATCH)
       await Promise.all(slice.map(async (nif) => {
         const gs = nifToGroups.get(nif)!
-        for (const g of gs) processedEmpresaIds.add(g.empresa_id)
+        for (const g of gs) {
+          processedEmpresaIds.add(g.empresa_id)
+          for (const row of g.cupsByBase.values()) allProcessedCupsIds.add(row.id)
+        }
         const empresaIdRef = gs[0].empresa_id
         const nombreRef = gs[0].nombre
         const totalCrmCups = gs.reduce((n, g) => n + g.cupsByBase.size, 0)
@@ -196,9 +203,11 @@ serve(async (req) => {
           const found = baseToRow.get(key)
           if (found) {
             matchedNif++
+            matchedCupsIds.add(found.row.id)
             autorizados[found.nombre] = (autorizados[found.nombre] ?? 0) + 1
             if (!dryRun) {
               const patch: Record<string, unknown> = {
+                datadis_autorizado: true,
                 datadis_distributor_code: s.distributorCode ?? null,
                 datadis_distribuidor_cod: s.distributorCode ?? null,
                 datadis_point_type: s.pointType ?? null,
@@ -262,6 +271,14 @@ serve(async (req) => {
         }
       }
       out.incidencias_zombis_purgadas = zombis.length
+
+      // S0.2-ter: desmarcar autorizacion de los CUPS procesados que NO aparecieron
+      // en los supplies de su NIF (revocada o nunca autorizado ese punto).
+      const noAutorizados = [...allProcessedCupsIds].filter((id) => !matchedCupsIds.has(id))
+      for (let i = 0; i < noAutorizados.length; i += CHUNK) {
+        await sb.from('cups').update({ datadis_autorizado: false }).in('id', noAutorizados.slice(i, i + CHUNK))
+      }
+      out.flag_autorizado = { marcados_true: matchedCupsIds.size, marcados_false: noAutorizados.length }
     }
 
     out.autorizados_por_empresa = autorizados
