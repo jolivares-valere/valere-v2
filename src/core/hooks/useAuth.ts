@@ -51,7 +51,8 @@ function bootstrapFromSession(session: Session): UserProfile {
   }
 }
 
-// Mantener una sola suscripción global entre renders/StrictMode double-invoke.
+// Singleton global: una sola suscripción para toda la vida del módulo.
+// Protege contra StrictMode double-invoke (React 18/19) y HMR zombie subscriptions.
 let authSubscription: { unsubscribe: () => void } | null = null
 let inFlightProfile: Promise<UserProfile | null> | null = null
 
@@ -68,7 +69,6 @@ function ensureAuthInitialized() {
 
     if (session?.user) {
       store.setUser(bootstrapFromSession(session))
-      // Asociar usuario a eventos Sentry (FASE 30.10). No-op si DSN no definido.
       setSentryUser({ id: session.user.id, email: session.user.email ?? null })
     } else {
       store.setUser(null)
@@ -79,11 +79,18 @@ function ensureAuthInitialized() {
 
     if (session?.user && !inFlightProfile) {
       const userId = session.user.id
-      useAuthStore.getState().setProfileLoaded(false)
+      store.setProfileLoaded(false)
       inFlightProfile = fetchProfile(userId)
         .then((profile) => {
-          if (profile && useAuthStore.getState().session?.user.id === userId) {
+          const currentUserId = useAuthStore.getState().session?.user.id
+          if (profile && currentUserId === userId) {
             useAuthStore.getState().setUser(profile)
+            useAuthStore.getState().setProfileLoaded(true)
+          } else if (!profile && currentUserId === userId) {
+            // Perfil no encontrado o error de red: forzar re-login para evitar
+            // redirect falso a /pending-approval con bootstrap approved=false.
+            logError(new Error('profile null after fetch'), 'useAuth.profileNull')
+            supabase.auth.signOut().catch(() => undefined)
           }
           return profile
         })
@@ -92,15 +99,24 @@ function ensureAuthInitialized() {
           return null
         })
         .finally(() => {
-          useAuthStore.getState().setProfileLoaded(true)
           inFlightProfile = null
         })
     } else if (!session?.user) {
-      useAuthStore.getState().setProfileLoaded(true)
+      store.setProfileLoaded(true)
     }
   })
 
   authSubscription = data.subscription
+}
+
+// Limpiar la suscripción al recargar el módulo en HMR (Vite dev) para evitar
+// subscripciones zombie que disparen doble los eventos de auth.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    authSubscription?.unsubscribe()
+    authSubscription = null
+    inFlightProfile = null
+  })
 }
 
 export function useAuth() {
