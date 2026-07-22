@@ -249,6 +249,19 @@ serve(async (req) => {
       if (incidencias.length > 0) {
         await sb.from('datadis_incidencias').insert(incidencias)
       }
+
+      // S0.2-bis: barrido de zombis — las incidencias de empresas que YA NO están en el
+      // conjunto procesado (fusión, soft-delete, autorización revocada) no se borraban
+      // nunca (el refresco solo tocaba empresas procesadas). Se purgan aquí.
+      const { data: vivas } = await sb.from('datadis_incidencias').select('empresa_id')
+      const zombis = [...new Set((vivas ?? []).map((r: { empresa_id: string }) => r.empresa_id))]
+        .filter((id) => !processedEmpresaIds.has(id))
+      if (zombis.length > 0) {
+        for (let i = 0; i < zombis.length; i += CHUNK) {
+          await sb.from('datadis_incidencias').delete().in('empresa_id', zombis.slice(i, i + CHUNK))
+        }
+      }
+      out.incidencias_zombis_purgadas = zombis.length
     }
 
     out.autorizados_por_empresa = autorizados
