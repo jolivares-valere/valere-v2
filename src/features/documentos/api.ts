@@ -109,7 +109,13 @@ export function useUploadDocumento() {
         .insert(insert as never)
         .select('*')
         .single()
-      if (error) { logError(error, 'uploadDocumento.insert'); throw error }
+      if (error) {
+        // Borrado compensatorio: el fichero ya subio; si la fila falla, no dejar huerfano
+        // (re-paseo PR-3.3: habia 2 huerfanos de inserts fallidos pre-fix)
+        void supabase.storage.from('documentos').remove([path])
+        logError(error, 'uploadDocumento.insert')
+        throw error
+      }
       return data as unknown as Documento
     },
     onSuccess: (_d, vars) => {

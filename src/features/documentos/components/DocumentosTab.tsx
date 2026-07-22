@@ -37,7 +37,7 @@ function formatSize(bytes: number | null): string {
 }
 
 export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
-  const { data: docs, isLoading } = useDocumentosPorEntidad(entidadTipo, entidadId)
+  const { data: docs, isLoading, isError, refetch } = useDocumentosPorEntidad(entidadTipo, entidadId)
   const uploadMut = useUploadDocumento()
   const deleteMut = useDeleteDocumento()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -54,7 +54,7 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
   }
 
   const handleUpload = async () => {
-    if (!pendingFile) return
+    if (!pendingFile || uploadMut.isPending) return // guard doble-click (creaba filas duplicadas)
     await uploadMut.mutateAsync({
       file: pendingFile,
       entidadTipo,
@@ -133,6 +133,11 @@ export default function DocumentosTab({ entidadTipo, entidadId }: Props) {
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-14 animate-pulse rounded-lg bg-slate-100" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-xs text-red-700">
+          Error cargando los documentos.{' '}
+          <button type="button" onClick={() => refetch()} className="underline">Reintentar</button>
         </div>
       ) : !docs?.length ? (
         <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
