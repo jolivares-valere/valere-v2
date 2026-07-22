@@ -9,6 +9,16 @@ import type {
   TipoDocumento,
 } from '../../core/types/entities'
 
+/** Mapa tipo_documento -> columna LEGACY `tipo` (check en minusculas SIN 'dni' ni extensiones).
+ *  El codigo heredado escribia la EXTENSION ('pdf') y violaba documentos_tipo_check.
+ *  Deuda de esquema anotada en backlog: unificar tipo -> tipo_documento. */
+const TIPO_LEGACY: Record<TipoDocumento, string> = {
+  contrato: 'contrato',
+  factura: 'factura',
+  dni: 'documentacion',
+  otro: 'otro',
+}
+
 /** Slug de nombre de fichero normalizado (nota OCR-ready PR-3.3). */
 export function normalizarNombreArchivo(nombreOriginal: string, tipoDocumento: TipoDocumento, fecha: Date): string {
   const sinExt = nombreOriginal.replace(/\.[^.]+$/, '')
@@ -82,7 +92,7 @@ export function useUploadDocumento() {
         entidad_tipo: entidadTipo,
         entidad_id: entidadId,
         nombre: file.name,
-        tipo: ext,
+        tipo: TIPO_LEGACY[tipoDocumento],
         tipo_documento: tipoDocumento,
         comercializadora_id: comercializadoraId,
         ruta_storage: path,
