@@ -33,3 +33,18 @@ Toda sesion que despliegue en produccion debe dejar rastro en outbox/ESTADO.md,
 tambien las "laterales". Dos falsas alarmas en un dia (CSV, gastos) se resolvieron
 en minutos porque hubo verificacion — pero costaron tiempo de auditoria que un
 parte de una linea habria ahorrado.
+
+## ADDENDUM — registrada como APP SATELITE OFICIAL EN CURSO (Juan, 22-jul noche)
+"Gastos Valere" (PWA movil, obra de Juan con Claude en otro chat). Encargos que
+Juan traslada a ese chat:
+1. BUG trimestre: TRIMESTRE='2026-T2' fijo en codigo, estamos en T3 → calcularlo
+   de la fecha actual (archivo y bandeja de pendientes miran al trimestre correcto).
+2. Subir el fuente al repo: supabase/functions/gastos/ (regla de la casa: todo lo
+   desplegado deja rastro en el repo).
+3. Vision de integracion: "Gastos Valere" es la otra cara del MODULO DE INGRESOS
+   (ANEXO 2 = lo que pagan los clientes; gastos = lo que paga Valere). Ambos casan
+   contra Holded (tablas holded_* ya existen). El PR de integracion futuro puede
+   vincular gastos_tarjeta con la conciliacion contable — a tener en el diseño.
+NOTA de matiz (Cowork): la auditoria del acta dice "RLS correcta"; el detalle fino
+es que la RLS EXISTE pero es laxa (authenticated→true) — el endurecimiento a
+is_staff() sigue en backlog como estaba.
