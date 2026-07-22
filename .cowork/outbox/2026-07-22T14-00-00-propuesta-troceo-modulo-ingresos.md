@@ -1,7 +1,16 @@
 # PROPUESTA DE TROCEO — MÓDULO DE INGRESOS (para aprobación de Juan + auditor)
 Fecha: 2026-07-22 · Autor: Cowork · Insumo: 3 especs validadas en Drive (ENTREGABLES JUNIO)
-ESTADO: PROPUESTA — nada ejecutado. Ni esquema ni código. Migraciones siempre en repo;
-escrituras en producción siempre con OK explícito de Juan.
+ESTADO: ✅ APROBADO por auditor (22-jul) con 3 notas — y preaprobado en estructura
+por Juan (detalle pendiente de su lectura). Nada arranca hasta cerrar el mes
+(salvo A1 si cabe en semana 4). Migraciones siempre en repo; escrituras con OK.
+
+NOTAS DEL AUDITOR (vinculantes):
+1. C1: las transiciones esperada→retrasada→impagada se calculan ON-LOAD en fase 1
+   (sin job nocturno; el cron llega en fase 2 si hace falta).
+2. El orden C antes que D (o al revés) LO DECIDE JUAN — sin dependencia técnica.
+3. B1 REQUIERE el campo "producto" de A1 conectado a las condiciones del catálogo
+   (la retro se calcula sobre la condición vigente por producto) → A1 es prerequisito
+   duro de B1, no solo orden recomendado.
 
 ## Lectura hecha
 1. ESPEC PR — Cierre automático de contrato anterior + Retrocomisiones · v1

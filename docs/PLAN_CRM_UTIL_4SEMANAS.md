@@ -133,6 +133,17 @@ PR-3.3 documentos: bucket Storage RLS is_staff + PDF desde ficha; el auditor
   verifica RLS del bucket (anon/client sin acceso).
 GATE V3 (viernes): Julia o Antonio, alta completa <2 min + encuentra un PDF.
 
+### VEREDICTOS SEMANA 3 (auditor, 22-jul) — SELLADA 3/3
+- PR-3.1 catalogo comercializadoras: PASA (paseo 22-jul; doc v2 pintado linea a
+  linea, RLS verificada en pg_policies, selector 20 opciones sin texto libre).
+- PR-3.2 asistente alta 4 pasos: PASA (evidencia: alta real NAGINI 90508
+  JIMENEZ ROSALES; SQL: 180 CUPS 2.0TD sin P4-P6/E4-E6 — NULL, no 0).
+- PR-3.3 documentos OCR-ready: PASA (mismo caso 90508: subida clasificada,
+  listado visible, abierto a 1 clic; tras 4 fixes de fondo cazados por el circuito:
+  soft-delete RLS transversal, tamano_bytes, tipo legacy, FK listado).
+- Limpieza demo/test: CUADRADA (0 demos / 0 huerfanos / 545=545).
+- QUEDA: GATE V3 (Julia, en curso 22-jul) para cerrar el objetivo de la semana.
+
 ## SEMANA 4 — DATO VIVO + PUSH (T5) [L2/L4/L5 + Z7]
 
 PR-4.1 Curva en la pestaña Suministros: gráfica mensual + zoom diario desde
