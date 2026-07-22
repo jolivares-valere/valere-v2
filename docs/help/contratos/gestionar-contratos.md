@@ -110,3 +110,14 @@ El PDF queda asociado al contrato. Accesible desde la pestaña Documentos siempr
 - ¿Cómo convierto un contrato en una incidencia?
 - ¿Qué pasa cuando un contrato pasa a "vencido" automáticamente?
 - ¿Puedo ver el historial de cambios de un contrato?
+
+
+## Editar o eliminar un contrato desde su detalle (añadido gate V3)
+Desde la ficha de una empresa → pestaña Contratos → clic en el contrato, en el
+detalle tienes ahora los botones **Editar** (abre el formulario con sus datos) y
+**Eliminar** (borrado recuperable, pide confirmación). Ya no hace falta ir a la
+lista global /contratos para modificar un contrato.
+
+Regla de estados: un contrato **Activo** exige fecha de inicio. Si aún no se sabe
+(el ATR no ha activado), déjalo **En trámite**; al activarse, edítalo, pon la
+fecha y pásalo a Activo.

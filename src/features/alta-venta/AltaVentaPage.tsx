@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { supabase } from '../../core/supabase/client'
 import { calcDiasVencimiento, calcPrioridad } from '../../core/utils/energy'
 import { useComercializadorasCanal } from '../comercializadoras/api'
 import {
+  checkNumeroContratoDuplicado,
   useBuscarEmpresas,
   useComisionaRenovacion,
   useCreateContratoAsistente,
@@ -100,22 +102,34 @@ export default function AltaVentaPage() {
       return null
     }
     if (paso === 3) {
+      // F1 (Julia, gate V3): la fecha de inicio NO es obligatoria — depende del ATR.
+      // Sin fecha, el contrato nace en 'tramite' (espec A1).
       if (!comercializadoraId) return 'Selecciona comercializadora del catalogo'
-      if (!fechaInicio) return 'Fecha de inicio obligatoria'
       return null
     }
     return null
   }
 
-  const siguiente = () => {
+  const [dupAviso, setDupAviso] = useState<string | null>(null)
+
+  const siguiente = async () => {
     const err = validarPaso()
     if (err) { toast.error(err); return }
+    // F4 (auditor, gate V3): aviso NO bloqueante de nº de contrato duplicado
+    if (paso === 3 && numeroContrato.trim()) {
+      const n = await checkNumeroContratoDuplicado(numeroContrato)
+      setDupAviso(n > 0 ? `Ya existe ${n} contrato${n > 1 ? 's' : ''} vivo con el nº ${numeroContrato.trim()} — revisa que no sea un duplicado antes de crear.` : null)
+    } else if (paso === 3) {
+      setDupAviso(null)
+    }
     setPaso((p) => Math.min(4, p + 1))
   }
 
   const crearVenta = async () => {
     setCreando(true)
     try {
+      // F4: trazabilidad — created_by en todo lo que el asistente crea
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null
       // 1) empresa
       let eId = creados.empresaId ?? empresaId
       if (!eId) {
@@ -123,6 +137,7 @@ export default function AltaVentaPage() {
           nombre: empresaNombre.trim(),
           nif: nifNuevo.trim() || null,
           ciudad: ciudadNueva.trim() || null,
+          created_by: uid,
         })
         eId = e.id
         setCreados((c) => ({ ...c, empresaId: eId }))
@@ -155,7 +170,11 @@ export default function AltaVentaPage() {
           comercializadora_id: comercializadoraId,
           compania,
           numero_contrato: numeroContrato.trim() || null,
-          estado: 'activo',
+          // F1: sin fecha de inicio el contrato nace EN TRAMITE (espec A1);
+          // al confirmarse el ATR se edita, se pone la fecha y se pasa a activo.
+          estado: fechaInicio ? 'activo' : 'tramite',
+          created_by: uid,
+          updated_by: uid,
           tipo_energia: 'electrica',
           tipo_precio: tipoPrecio,
           tarifa_acceso: tarifa,
@@ -339,8 +358,9 @@ export default function AltaVentaPage() {
               </select></label>
             <label className="block"><span className={labelCls}>Nº contrato</span>
               <input value={numeroContrato} onChange={(e) => setNumeroContrato(e.target.value)} className={inputCls} /></label>
-            <label className="block"><span className={labelCls}>Fecha inicio *</span>
-              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className={inputCls} /></label>
+            <label className="block"><span className={labelCls}>Fecha inicio (si se conoce)</span>
+              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className={inputCls} />
+              <span className="mt-1 block text-xs text-slate-400">Sin fecha, el contrato nace «en trámite» hasta que active el ATR.</span></label>
             <label className="block"><span className={labelCls}>Fecha fin</span>
               <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className={inputCls} /></label>
           </div>
@@ -375,11 +395,17 @@ export default function AltaVentaPage() {
 
       {paso === 4 && (
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          {dupAviso && (
+            <p className="rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-800">⚠ {dupAviso}</p>
+          )}
+          {!fechaInicio && (
+            <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">ℹ El contrato nacerá <b>en trámite</b> (sin fecha de inicio). Cuando active el ATR, edítalo: pon la fecha y pásalo a activo.</p>
+          )}
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-slate-500">Empresa</dt><dd className="font-medium">{empresaNombre || '—'}</dd>
             <dt className="text-slate-500">CUPS</dt><dd className="font-mono text-xs">{cupsId ? cupsExistentes.data?.find((c) => c.id === cupsId)?.codigo_cups : codigoCups.toUpperCase()}</dd>
             <dt className="text-slate-500">Comercializadora</dt><dd className="font-medium">{canal?.nombre_canonico ?? '—'}</dd>
-            <dt className="text-slate-500">Vigencia</dt><dd>{fechaInicio || '—'} → {fechaFin || 'sin fecha fin'}</dd>
+            <dt className="text-slate-500">Vigencia</dt><dd>{fechaInicio || 'pendiente de activación'} → {fechaFin || 'sin fecha fin'}</dd>
           </dl>
 
           <div className="rounded-xl bg-slate-50 p-3">

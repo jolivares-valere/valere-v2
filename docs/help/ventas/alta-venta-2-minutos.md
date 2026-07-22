@@ -23,8 +23,14 @@ Menu CRM -> **Nueva venta** (`/alta-venta`).
 |---|---|
 | 1. Empresa | Busca por nombre o NIF. Si no existe, "+ Crear empresa nueva" (nombre, NIF, ciudad; el resto de la ficha se completa despues). |
 | 2. CUPS | Elige un CUPS existente de la empresa o crea uno nuevo (codigo ES…, direccion, tarifa de acceso). |
-| 3. Contrato | Comercializadora DEL CATALOGO (sin texto libre), tipo de precio, fechas. Si el CUPS es nuevo, el formulario se ADAPTA a la tarifa: 2.0TD pide 2 potencias + 3 energias; el resto, 6 + 6. Los periodos que no aplican no existen (no se rellenan con 0). |
+| 3. Contrato | Comercializadora DEL CATALOGO (sin texto libre), tipo de precio, fechas. La fecha de INICIO es opcional: casi nunca se sabe al firmar (depende del ATR). Si el CUPS es nuevo, el formulario se ADAPTA a la tarifa: 2.0TD pide 2 potencias + 3 energias; el resto, 6 + 6. Los periodos que no aplican no existen (no se rellenan con 0). |
 | 4. Renovacion | Se autogenera con prioridad estimada por dias al vencimiento; puedes ajustarla si el negocio manda otra cosa. Sin fecha fin -> entra en la bandeja "Sin fecha". |
+
+## Contrato sin fecha de inicio = nace "en tramite"
+Si no pones fecha de inicio (lo normal al firmar), el contrato se crea en estado
+**en tramite**. Cuando la comercializadora confirme la activacion del ATR: abre el
+contrato -> Editar -> pon la fecha de inicio y cambia el estado a **Activo** (el
+sistema no deja activar sin fecha).
 
 ## Detalles importantes
 - Si la comercializadora no comisiona renovacion (Naturgy, Endesa, Plenitude), el paso 4
