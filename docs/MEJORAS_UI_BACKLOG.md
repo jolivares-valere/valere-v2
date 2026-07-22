@@ -83,3 +83,12 @@ Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, neces
 - Feedback del equipo.
 
 > Última actualización: 2026-07-22b (paseo PR-2.2 PASA: derivadas cache-busting + 4ª congelación)
+
+
+## Deuda de esquema (añadido 22-jul-2026, paseo PR-3.3)
+- [M] `documentos.tipo` (legacy, check propio con 'documentacion', 'autorizacion', etc.)
+  convive con `documentos.tipo_documento` (nuevo, contrato/factura/dni/otro, OCR-ready).
+  Hoy el frontend escribe ambas (mapa TIPO_LEGACY en documentos/api.ts; dni→documentacion).
+  UNIFICAR: migrar consumidores de `tipo` a `tipo_documento` + backfill + drop del check
+  legacy. Cazado por el auditor en el alta NAGINI (documentos_tipo_check violado: el
+  codigo heredado escribia la EXTENSION 'pdf' en `tipo`).
