@@ -168,30 +168,36 @@ PR-4.2 PUSH v1 — informe de los lunes: Edge Function + cron (07:00, patrón
   ESTADO: DESPLEGADO (logo real sin modificar + colores de marca reales,
   email-safe table+inline-style). Pendiente solo confirmación visual de Juan.
 
-F2 edición de suministros — ESTADO: CODIFICADO 23-jul (trabajo autónomo,
-  autorización explícita de Juan). Nuevo EditarSuministroModal.tsx (mismo
-  patrón que EditarLeadModal) + useActualizarCups() (update simple sobre
-  `cups`, RLS ya lo permitía, sin migración) + botón "Editar" en
-  SuministrosTable, wireado en la pestaña de empresa. Edita solo campos
-  comerciales (CUPS validado con validateCUPS(), tarifa, dirección/ciudad,
-  comercializadora, estado) — NO potencias/FV/Datadis (módulos propios).
-  tsc limpio; vitest bloqueado por limitación de entorno (ver ESTADO.md
-  23-jul-g). Pendiente: paseo del auditor/Julia + `git push` de Juan.
+F2 edición de suministros — ESTADO: PASA (paseo auditor 23-jul). Nuevo
+  EditarSuministroModal.tsx (mismo patrón que EditarLeadModal) +
+  useActualizarCups() (update simple sobre `cups`, RLS ya lo permitía, sin
+  migración) + botón "Editar" en SuministrosTable, wireado en la pestaña de
+  empresa. Edita solo campos comerciales (CUPS validado con validateCUPS(),
+  tarifa, dirección/ciudad, comercializadora, estado) — NO potencias/FV/
+  Datadis (módulos propios). VERIFICADO: guarda correctamente y rechaza CUPS
+  inválido, cuadrado por SQL (el guardado con CUPS inválido no persiste).
+  Hallazgo UX a backlog (no bloquea): el rechazo de CUPS inválido es
+  silencioso para el usuario — ver `MEJORAS_UI_BACKLOG.md`.
 
 PR-4.3 Velocidad percibida: skeletons + paginación en rutas principales, sin
   recargas completas. CA: paseo Chrome sin ningún spinner >2s.
-  ESTADO: CODIFICADO 23-jul (trabajo autónomo). OportunidadesPage ya no
-  bloquea la página entera con "Cargando pipeline…" (cabecera+acciones
-  siempre visibles, tablero con columnas skeleton mientras carga); 6
-  widgets del Dashboard con texto plano "Cargando..." pasan a SkeletonText.
-  Empresas/Contratos/Renovaciones ya tenían skeletons+paginación de trabajo
-  previo (sin cambios). Gap conocido, fuera de alcance por proximidad al
-  gate: SuministrosPage (listado global) sin paginar. tsc limpio; vitest
-  bloqueado por limitación de entorno. Pendiente: paseo Chrome del CA +
-  `git push` de Juan.
+  ESTADO: PASA (paseo auditor 23-jul, sin spinner >2s en navegación
+  intra-SPA). OportunidadesPage ya no bloquea la página entera con
+  "Cargando pipeline…" (cabecera+acciones siempre visibles, tablero con
+  columnas skeleton mientras carga); 6 widgets del Dashboard con texto
+  plano "Cargando..." pasan a SkeletonText. Empresas/Contratos/Renovaciones
+  ya tenían skeletons+paginación de trabajo previo (sin cambios). Hallazgo
+  UX a backlog (no bloquea): panel de curva inline (`CurvaConsumo` en
+  SuministrosTab) frágil, sin CA propio — ver `MEJORAS_UI_BACKLOG.md`. Gap
+  conocido fuera de alcance: SuministrosPage (listado global) sin paginar.
+
+**SEMANA 4: 4/4 PASA (veredicto del auditor, 23-jul).** PR-4.1, PR-4.2, F2 y
+PR-4.3 completos y verificados. 2 hallazgos UX menores a backlog v2 (arriba),
+ninguno bloqueante.
 
 GATE V4 — CIERRE DEL MES: Juan demuestra los 5 trabajos en vivo, cronometrados.
 Retro de 30 min. Se abre el backlog v2 (lo que quedó fuera + energía S1/S2).
+Fecha: viernes 31 de julio.
 
 ---
 

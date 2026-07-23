@@ -99,3 +99,16 @@ Fuera de este paquete: subida PDF/Excel con extracción (propuesta aparte, neces
   permite a cualquier logueado (futuro role client) leer/escribir gastos de empresa.
 - [S] Webhook Make en claro en el HTML público de la PWA → spameable; mover a EF con secret.
 - [S] Commitear el fuente de la EF gastos al repo (hoy solo existe desplegada).
+
+## Semana 4 — F2/PR-4.3 (añadido 23-jul-2026, paseo auditor gate V4 — semana 4 4/4 PASA)
+- [suministros] Panel de curva inline frágil (`CurvaConsumo` dentro de
+  `SuministrosTab`): el auditor lo marcó como punto débil de UX en el paseo
+  de PR-4.1/PR-4.3, sin CA propio que lo cubra. Revisar robustez del panel
+  (estados de carga/error, comportamiento con curva incompleta) · origen
+  auditor · S · 📥 backlog.
+- [suministros] `EditarSuministroModal` rechaza CUPS inválido de forma
+  silenciosa: el auditor cuadró por SQL que el guardado con CUPS inválido NO
+  persiste (correcto), pero el modal no da al usuario una señal clara del
+  motivo del rechazo más allá del error de validación del campo — mejorar
+  feedback (toast explícito o resaltado más visible) · origen auditor · S ·
+  📥 backlog.
