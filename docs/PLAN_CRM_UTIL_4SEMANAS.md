@@ -165,9 +165,30 @@ PR-4.2 PUSH v1 — informe de los lunes: Edge Function + cron (07:00, patrón
   Datadis. CA: email del lunes recibido y sus cifras cuadran con la UI Y CON SQL
   DIRECTO por separado (nota del auditor 23-jul: UI y email podrían compartir el
   mismo error de origen — la verificación no se apoya solo en email-vs-UI).
+  ESTADO: DESPLEGADO (logo real sin modificar + colores de marca reales,
+  email-safe table+inline-style). Pendiente solo confirmación visual de Juan.
+
+F2 edición de suministros — ESTADO: CODIFICADO 23-jul (trabajo autónomo,
+  autorización explícita de Juan). Nuevo EditarSuministroModal.tsx (mismo
+  patrón que EditarLeadModal) + useActualizarCups() (update simple sobre
+  `cups`, RLS ya lo permitía, sin migración) + botón "Editar" en
+  SuministrosTable, wireado en la pestaña de empresa. Edita solo campos
+  comerciales (CUPS validado con validateCUPS(), tarifa, dirección/ciudad,
+  comercializadora, estado) — NO potencias/FV/Datadis (módulos propios).
+  tsc limpio; vitest bloqueado por limitación de entorno (ver ESTADO.md
+  23-jul-g). Pendiente: paseo del auditor/Julia + `git push` de Juan.
 
 PR-4.3 Velocidad percibida: skeletons + paginación en rutas principales, sin
   recargas completas. CA: paseo Chrome sin ningún spinner >2s.
+  ESTADO: CODIFICADO 23-jul (trabajo autónomo). OportunidadesPage ya no
+  bloquea la página entera con "Cargando pipeline…" (cabecera+acciones
+  siempre visibles, tablero con columnas skeleton mientras carga); 6
+  widgets del Dashboard con texto plano "Cargando..." pasan a SkeletonText.
+  Empresas/Contratos/Renovaciones ya tenían skeletons+paginación de trabajo
+  previo (sin cambios). Gap conocido, fuera de alcance por proximidad al
+  gate: SuministrosPage (listado global) sin paginar. tsc limpio; vitest
+  bloqueado por limitación de entorno. Pendiente: paseo Chrome del CA +
+  `git push` de Juan.
 
 GATE V4 — CIERRE DEL MES: Juan demuestra los 5 trabajos en vivo, cronometrados.
 Retro de 30 min. Se abre el backlog v2 (lo que quedó fuera + energía S1/S2).
