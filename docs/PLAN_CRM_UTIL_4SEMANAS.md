@@ -162,8 +162,9 @@ PR-4.1 Curva en la pestaña Suministros: gráfica mensual + zoom diario desde
 
 PR-4.2 PUSH v1 — informe de los lunes: Edge Function + cron (07:00, patrón
   x-cron-secret): email al staff con renovaciones críticas del mes + incidencias
-  Datadis. CA: email del lunes recibido y sus cifras cuadran con la UI (el
-  auditor las compara).
+  Datadis. CA: email del lunes recibido y sus cifras cuadran con la UI Y CON SQL
+  DIRECTO por separado (nota del auditor 23-jul: UI y email podrían compartir el
+  mismo error de origen — la verificación no se apoya solo en email-vs-UI).
 
 PR-4.3 Velocidad percibida: skeletons + paginación en rutas principales, sin
   recargas completas. CA: paseo Chrome sin ningún spinner >2s.
@@ -214,3 +215,24 @@ completa el alta y sus hallazgos se convierten en fixes verificados.
 CONDICIÓN: el cronómetro (<2 min) se certifica con la PRÓXIMA alta real
 Nagini de Julia, sin ensayo previo; Cowork verifica por SQL (nace en
 trámite, created_by relleno). Semana 4 autorizada a arrancar el 23-jul.
+── PR-4.1 CURVA · 2026-07-23 · AUDITOR ──
+VEREDICTO: PASA. Vista v_consumos_diarios cuadra 4 CUPS día a día; gráfica
+de 24 meses (08/2024→07/2026) con el último mes marcado como parcial de
+forma honesta; CSV y badge 🟡/🟢 correctos. HALLAZGO UX (no bloqueante):
+el panel de curva inline es frágil — se colapsa con scroll o clic fuera —
+y hay un warning de width(-1) al montar el gráfico; considerar modal o
+minHeight fijo (anotado en backlog). PENDIENTE: el auditor certificará el
+zoom diario y la cuadratura al kWh en la próxima pasada.
+── PR-4.2 PUSH DE LOS LUNES · 2026-07-23 · AUDITOR + JUAN ──
+Verificación auditor por SQL independiente: 2 críticas exactas (REAL CANOE
+05-jul, PANADERÍAS EL MIMBRE 17-jul), query correcta. CORRECCIÓN VINCULANTE
+del auditor: destinatarios pasan de solo role=master a role IN
+('master','consultant') — el equipo operativo (Julia, Antonio arodriguez@,
+administración) está en 'consultant', no en 'master'; con solo-master no se
+enteraban quienes tienen que actuar. Total 6 destinatarios (3+3), verificado
+por SQL antes de desplegar. Juan autorizó deploy + secreto Vault + cron
+push-lunes-weekly (lunes 07:00 UTC, jobid 7, activo) + un envío de prueba
+previo (test_to override en la EF) dirigido SOLO a jolivares@ para ver el
+email real antes de soltar el cron. Envío de prueba: status 200, 2 críticas,
+11 incidencias, cuadrado contra audit_log. PENDIENTE: confirmación visual de
+Juan sobre el email recibido.
