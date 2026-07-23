@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 import { fetchSuministrosByEmpresa, fetchCurvaUltimaFecha } from '../api'
 import SuministrosTable from './SuministrosTable'
+import CurvaConsumo from './CurvaConsumo'
 import { useDatadisIncidencias } from '../../datadis/incidencias.api'
 
 /** Pestaña "Suministros" dentro de la ficha de empresa del CRM comercial. */
 export default function SuministrosTab({ empresaId }: { empresaId: string }) {
+  // PR-4.1: CUPS cuya curva está abierta bajo la tabla (null = cerrada).
+  const [curvaAbierta, setCurvaAbierta] = useState<{ id: string; codigo: string } | null>(null)
   const { data: rows = [], isLoading, error } = useQuery({
     queryKey: ['suministros-empresa', empresaId],
     queryFn: () => fetchSuministrosByEmpresa(empresaId),
@@ -58,7 +62,19 @@ export default function SuministrosTab({ empresaId }: { empresaId: string }) {
       )}
       {error && <p className="text-sm text-red-600">Error al cargar los suministros.</p>}
       {!isLoading && !error && (
-        <SuministrosTable rows={rows} showEmpresa={false} curva={curvaQuery.data ?? {}} />
+        <SuministrosTable
+          rows={rows}
+          showEmpresa={false}
+          curva={curvaQuery.data ?? {}}
+          onVerCurva={(r) => setCurvaAbierta((prev) => (prev?.id === r.id ? null : { id: r.id, codigo: r.codigo_cups }))}
+        />
+      )}
+      {curvaAbierta && (
+        <CurvaConsumo
+          cupsId={curvaAbierta.id}
+          codigoCups={curvaAbierta.codigo}
+          onClose={() => setCurvaAbierta(null)}
+        />
       )}
     </div>
   )

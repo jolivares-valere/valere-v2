@@ -47,11 +47,14 @@ export default function SuministrosTable({
   rows,
   showEmpresa = false,
   curva,
+  onVerCurva,
 }: {
   rows: SuministroRow[]
   showEmpresa?: boolean
   /** Mapa cups_id → última fecha con curva; si se pasa, pinta la columna Curva. */
   curva?: Record<string, string | null>
+  /** PR-4.1: si se pasa, la columna Curva ofrece "Ver" (abre la gráfica). */
+  onVerCurva?: (row: SuministroRow) => void
 }) {
   if (rows.length === 0) {
     return (
@@ -130,7 +133,22 @@ export default function SuministrosTable({
                     </span>
                   )}
                 </td>
-                {curva && <td className="px-3 py-2">{curvaBadge(curva[r.id])}</td>}
+                {curva && (
+                  <td className="px-3 py-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      {curvaBadge(curva[r.id])}
+                      {onVerCurva && (
+                        <button
+                          onClick={() => onVerCurva(r)}
+                          className="rounded-md border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50"
+                          title={curva[r.id] ? 'Ver curva de consumo' : 'Ver estado de la curva (sin datos aún)'}
+                        >
+                          Ver
+                        </button>
+                      )}
+                    </span>
+                  </td>
+                )}
                 <td className="px-3 py-2">{estadoBadge(r.estado)}</td>
               </tr>
             )
