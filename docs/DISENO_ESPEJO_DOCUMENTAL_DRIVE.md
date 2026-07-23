@@ -1,9 +1,34 @@
 # Diseño — Espejo documental Drive (fase puente ★)
 
-> Estado: DISEÑADO, pendiente credenciales de Juan (cuenta de servicio Google
-> + carpeta compartida). Decisión de arquitectura confirmada por Juan
-> 2026-07-23: **Opción A — Edge Function + pg_cron** (no Make, ver
-> justificación abajo).
+> Estado: CREDENCIALES LISTAS (23-jul-2026). Decisión de arquitectura
+> confirmada por Juan 2026-07-23: **Opción A — Edge Function + pg_cron**
+> (no Make, ver justificación abajo).
+>
+> **Pivote de autenticación (23-jul-2026):** la cuenta de servicio de
+> Google Cloud quedó bloqueada por la política de organización
+> `iam.disableServiceAccountKeyCreation` (baseline "secure by default
+> organizations" de Google, aplicada automáticamente a
+> valereconsultores.com) — no permite descargar claves JSON de cuentas de
+> servicio. En vez de pedir a Juan que abra una excepción de política de
+> seguridad, se optó por **OAuth 2.0 con la cuenta personal de Juan**
+> (jolivares@valereconsultores.com), que no está cubierta por esa política.
+>
+> Completado: proyecto GCP `valere-espejo-documental`, Drive API
+> habilitada, pantalla de consentimiento OAuth (tipo Interno), cliente
+> OAuth de escritorio creado, autorización concedida por Juan, y
+> `refresh_token` obtenido. Las 7 credenciales (client_id, client_secret,
+> refresh_token, y los 4 folder IDs de Drive) están guardadas en
+> **Supabase Vault** del proyecto `PROYECTO VALERE` bajo los nombres
+> `espejo_drive_client_id`, `espejo_drive_client_secret`,
+> `espejo_drive_refresh_token`, `espejo_drive_folder_id_root`,
+> `espejo_drive_folder_id_empresa`, `espejo_drive_folder_id_contrato`,
+> `espejo_drive_folder_id_oportunidades`. Nunca en el repo ni en texto
+> plano en ningún documento.
+>
+> **Pendiente**: codificar la Edge Function `espejo-documental` (usa
+> refresh-token flow para autenticarse contra la API de Drive, en vez de
+> JWT firmado con clave de cuenta de servicio), desplegarla, configurar
+> `pg_cron`, y hacer la prueba end-to-end.
 
 ## Objetivo
 
@@ -82,16 +107,21 @@ respaldo del CRM consolidado en un sitio, separado por función). Dentro,
 las 3 subcarpetas espejo de la estructura de Storage: `empresa/`,
 `contrato/`, `oportunidades/`.
 
-### Qué necesita Juan (bloqueante, ver guía aparte)
+### Qué necesitaba Juan (COMPLETADO 23-jul-2026)
 
-1. Cuenta de servicio de Google Cloud con la Drive API habilitada.
-2. Clave JSON de esa cuenta de servicio.
-3. Compartir la carpeta `ESPEJO DOCUMENTAL CRM` con el email de la cuenta
-   de servicio (rol Editor).
+~~1. Cuenta de servicio de Google Cloud con la Drive API habilitada.~~
+~~2. Clave JSON de esa cuenta de servicio.~~
+~~3. Compartir la carpeta `ESPEJO DOCUMENTAL CRM` con el email de la cuenta~~
+~~   de servicio (rol Editor).~~
 
-Guía paso a paso enviada aparte (chat). Las credenciales las guarda Cowork
-como secreto en Supabase Vault — nunca en el repo ni en texto plano en
-ningún documento.
+Sustituido por el flujo OAuth descrito arriba (pivote 23-jul-2026): Juan
+creó el proyecto GCP, configuró la pantalla de consentimiento, creó el
+cliente OAuth de escritorio y concedió el permiso de acceso a su propio
+Drive. No hizo falta compartir ninguna carpeta — el mismo dueño de la
+carpeta (Juan) es el titular de las credenciales OAuth.
+
+Las credenciales las guarda Cowork como secreto en Supabase Vault — nunca
+en el repo ni en texto plano en ningún documento.
 
 ### Qué construye Cowork (tras recibir credenciales)
 
