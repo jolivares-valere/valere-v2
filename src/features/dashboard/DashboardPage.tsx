@@ -18,6 +18,7 @@ import { useResumenVencimientos } from '../contratos/api'
 import IncidenciasDatadisCard from './components/IncidenciasDatadisCard'
 import StatusBadge from '../../core/components/StatusBadge'
 import { formatDate } from '../../core/utils/dates'
+import { SkeletonText } from '../../components/ui/Skeleton'
 
 const ETAPA_LABEL: Record<string, string> = {
   prospecto: 'Prospecto',
@@ -170,7 +171,7 @@ export default function DashboardPage() {
             </span>
           )}
         </h2>
-        {opKPI.isLoading && <p className="text-sm text-slate-500">Cargando...</p>}
+        {opKPI.isLoading && <SkeletonText lines={4} className="py-1" />}
         {!opKPI.isLoading && (opKPI.data?.length ?? 0) === 0 && (
           <p className="text-sm text-slate-500">No hay oportunidades abiertas.</p>
         )}
@@ -205,7 +206,7 @@ export default function DashboardPage() {
             Contratos huerfanos
             <span className="ml-auto text-xs text-slate-500">{huerfanos.data?.length ?? 0}</span>
           </h2>
-          {huerfanos.isLoading && <p className="text-sm text-slate-500">Cargando...</p>}
+          {huerfanos.isLoading && <SkeletonText lines={3} className="py-1" />}
           {!huerfanos.isLoading && (huerfanos.data?.length ?? 0) === 0 && (
             <p className="text-sm text-slate-500">Sin contratos huerfanos.</p>
           )}
@@ -228,7 +229,7 @@ export default function DashboardPage() {
 
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-slate-900">Mis tareas pendientes</h2>
-          {tareas.isLoading && <p className="text-sm text-slate-500">Cargando...</p>}
+          {tareas.isLoading && <SkeletonText lines={3} className="py-1" />}
           {!tareas.isLoading && (tareas.data?.length ?? 0) === 0 && (
             <p className="text-sm text-slate-500">Sin tareas pendientes.</p>
           )}
@@ -276,7 +277,7 @@ function PrecioPoolWidget() {
           </span>
         )}
       </div>
-      {isLoading && <p className="text-sm text-slate-500">Cargando precios...</p>}
+      {isLoading && <SkeletonText lines={2} className="max-w-sm py-1" />}
       {isError && <p className="text-sm text-red-600">No se pudieron cargar los precios de OMIE.</p>}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -314,7 +315,7 @@ function AlertasContratos({ loading, rows }: { loading: boolean; rows: AlertaVen
   return (
     <div className="border-b border-slate-100 p-4 lg:border-b-0 lg:border-r">
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contratos que vencen (90 dias)</h3>
-      {loading && <p className="text-sm text-slate-500">Cargando...</p>}
+      {loading && <SkeletonText lines={3} className="py-1" />}
       {!loading && rows.length === 0 && <p className="text-sm text-slate-500">Sin alertas en este periodo.</p>}
       <ul className="divide-y divide-slate-100">
         {rows.map((r) => (
@@ -342,7 +343,7 @@ function AlertasOportunidades({ loading, rows }: { loading: boolean; rows: Oport
   return (
     <div className="p-4">
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Oportunidades sin actividad (+30 dias)</h3>
-      {loading && <p className="text-sm text-slate-500">Cargando...</p>}
+      {loading && <SkeletonText lines={3} className="py-1" />}
       {!loading && rows.length === 0 && <p className="text-sm text-slate-500">Sin alertas en este periodo.</p>}
       <ul className="divide-y divide-slate-100">
         {rows.map((r) => (

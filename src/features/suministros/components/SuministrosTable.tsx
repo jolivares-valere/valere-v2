@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Sun, CheckCircle2, XCircle } from 'lucide-react'
+import { Sun, CheckCircle2, XCircle, Pencil } from 'lucide-react'
 import type { SuministroRow } from '../api'
 
 function tarifaBadge(t: string | null) {
@@ -48,6 +48,7 @@ export default function SuministrosTable({
   showEmpresa = false,
   curva,
   onVerCurva,
+  onEditar,
 }: {
   rows: SuministroRow[]
   showEmpresa?: boolean
@@ -55,6 +56,8 @@ export default function SuministrosTable({
   curva?: Record<string, string | null>
   /** PR-4.1: si se pasa, la columna Curva ofrece "Ver" (abre la gráfica). */
   onVerCurva?: (row: SuministroRow) => void
+  /** F2: si se pasa, cada fila muestra un botón "Editar" (CUPS y demás datos). */
+  onEditar?: (row: SuministroRow) => void
 }) {
   if (rows.length === 0) {
     return (
@@ -79,6 +82,7 @@ export default function SuministrosTable({
             <th className="px-3 py-2 text-center">Datadis</th>
             {curva && <th className="px-3 py-2">Curva</th>}
             <th className="px-3 py-2">Estado</th>
+            {onEditar && <th className="px-3 py-2" />}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -150,6 +154,18 @@ export default function SuministrosTable({
                   </td>
                 )}
                 <td className="px-3 py-2">{estadoBadge(r.estado)}</td>
+                {onEditar && (
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={() => onEditar(r)}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50"
+                      title="Editar suministro"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Editar
+                    </button>
+                  </td>
+                )}
               </tr>
             )
           })}

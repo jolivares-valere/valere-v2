@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/core/supabase/client'
 
 /**
@@ -102,6 +103,52 @@ export async function fetchAllSuministros(): Promise<SuministroRow[]> {
 
   if (error) throw error
   return (data ?? []).map((r) => mapRow(r as Record<string, unknown>))
+}
+
+/**
+ * F2 (semana 4) — edición de suministros tras crear.
+ *
+ * Origen: hallazgo real de Julia en el ensayo del gate V3 — el CUPS y demás
+ * datos del suministro no se podían corregir tras darlo de alta. Edita solo
+ * los campos "comerciales" del suministro (CUPS, tarifa, dirección/ciudad,
+ * comercializadora, estado). NO toca potencias contratadas (p1_kw..p6_kw),
+ * campos FV ni campos Datadis — esos pertenecen a sus propios módulos
+ * (Potencias, seguimiento FV, sincronización Datadis) y tocarlos aquí
+ * arriesga efectos secundarios no deseados entre módulos.
+ */
+export interface ActualizarCupsInput {
+  cupsId: string
+  empresaId: string
+  codigo_cups: string
+  tarifa_acceso: string | null
+  direccion_suministro: string | null
+  ciudad_suministro: string | null
+  comercializadora_actual: string | null
+  estado: string
+}
+
+export function useActualizarCups() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: ActualizarCupsInput) => {
+      const { error } = await supabase
+        .from('cups')
+        .update({
+          codigo_cups: input.codigo_cups,
+          tarifa_acceso: input.tarifa_acceso,
+          direccion_suministro: input.direccion_suministro,
+          ciudad_suministro: input.ciudad_suministro,
+          comercializadora_actual: input.comercializadora_actual,
+          estado: input.estado,
+        })
+        .eq('id', input.cupsId)
+      if (error) throw error
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['suministros-empresa', variables.empresaId] })
+      queryClient.invalidateQueries({ queryKey: ['suministros-todos'] })
+    },
+  })
 }
 
 /** PR-4.1: filas diarias de la vista v_consumos_diarios (≤ ~700 por CUPS a 23m).

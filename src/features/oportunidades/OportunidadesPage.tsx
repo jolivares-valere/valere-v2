@@ -7,6 +7,7 @@ import { useTareasPendientesPorOportunidad } from '../actividades/api'
 import KanbanColumn from './components/KanbanColumn'
 import OportunidadForm from './components/OportunidadForm'
 import ExportButton from '../../core/components/ExportButton'
+import { SkeletonCard } from '../../components/ui/Skeleton'
 import { formatDate } from '../../core/utils/dates'
 import { useCrearContratoDesdeOportunidad } from '../../core/hooks/useAutomatizaciones'
 import type { EtapaOportunidad, OportunidadInsert } from '../../core/types/entities'
@@ -93,14 +94,17 @@ export default function OportunidadesPage() {
 
   const submitting = createMut.isPending || updateMut.isPending
 
-  if (isLoading) return <div className="p-8 text-slate-500">Cargando pipeline…</div>
-
+  // F2/PR-4.3: no bloqueamos la página entera con un spinner — cabecera y
+  // acciones se renderizan siempre; solo el tablero muestra skeletons
+  // mientras carga (paseo Chrome sin spinner de página completa >2s).
   return (
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-display font-bold text-valere-blue-dark">Pipeline</h1>
-          <p className="text-sm text-slate-500">{data?.length ?? 0} oportunidades en el pipeline</p>
+          <p className="text-sm text-slate-500">
+            {isLoading ? 'Cargando…' : `${data?.length ?? 0} oportunidades en el pipeline`}
+          </p>
         </div>
         <div className="flex gap-2">
           <ExportButton<OportunidadConEmpresa>
@@ -131,21 +135,35 @@ export default function OportunidadesPage() {
         </div>
       </div>
 
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {ETAPAS.map(({ etapa, titulo, probabilidad }) => (
-            <KanbanColumn
-              key={etapa}
-              etapa={etapa}
-              titulo={titulo}
-              probabilidad={probabilidad}
-              items={(data ?? []).filter((o) => canonicalEtapa(o.etapa) === etapa)}
-              tareasPorOportunidad={tareasPendientes.data}
-              onCardClick={(op) => setEditing(op)}
-            />
+      {isLoading ? (
+        <div className="flex gap-4 overflow-x-auto pb-4" aria-busy="true">
+          {ETAPAS.map(({ etapa, titulo }) => (
+            <div key={etapa} className="w-72 shrink-0 space-y-3">
+              <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+                {titulo}
+              </div>
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ))}
         </div>
-      </DndContext>
+      ) : (
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {ETAPAS.map(({ etapa, titulo, probabilidad }) => (
+              <KanbanColumn
+                key={etapa}
+                etapa={etapa}
+                titulo={titulo}
+                probabilidad={probabilidad}
+                items={(data ?? []).filter((o) => canonicalEtapa(o.etapa) === etapa)}
+                tareasPorOportunidad={tareasPendientes.data}
+                onCardClick={(op) => setEditing(op)}
+              />
+            ))}
+          </div>
+        </DndContext>
+      )}
 
       {editing && (
         <>
