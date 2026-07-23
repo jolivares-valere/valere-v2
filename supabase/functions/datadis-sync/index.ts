@@ -117,6 +117,14 @@ serve(async (req) => {
   } catch { /* default dry */ }
 
   const out: Record<string, unknown> = { dry_run: dryRun, modelo: 'authorizedNif (partner)' }
+  // S0.2-ter fleco (23-jul): el sync tambien deja parte en datadis_runs (antes su
+  // salida HTTP se perdia y el run nocturno no tenia rastro auditable).
+  let runId: string | null = null
+  try {
+    const { data: rr } = await sb.from('datadis_runs')
+      .insert({ worker: 'datadis-sync', dry_run: dryRun }).select('id').single()
+    runId = (rr as { id?: string } | null)?.id ?? null
+  } catch { /* no bloquea */ }
   try {
     // Empresas con NIF + sus CUPS en el CRM. Agrupamos por empresa.
     const { data: cupsCrm, error: cErr } = await sb
@@ -290,11 +298,35 @@ serve(async (req) => {
   } catch (e) {
     out.ok = false
     out.error = (e as Error).message
+    await cerrarRun(sb, runId, out)
     return j(out, 200)
   }
   out.ok = true
+  await cerrarRun(sb, runId, out)
   return j(out, 200)
 })
+
+async function cerrarRun(sb: ReturnType<typeof createClient>, runId: string | null, out: Record<string, unknown>) {
+  if (!runId) return
+  try {
+    await sb.from('datadis_runs').update({
+      finished_at: new Date().toISOString(),
+      cups_procesados: Object.values((out.autorizados_por_empresa as Record<string, number>) ?? {}).reduce((a, b) => a + b, 0),
+      llamadas: (out.nifs_a_consultar as number) ?? 0,
+      filas_insertadas: typeof out.actualizados === 'number' ? out.actualizados : 0,
+      errores: [],
+      resumen: {
+        ok: out.ok, modelo: out.modelo,
+        nifs_a_consultar: out.nifs_a_consultar ?? null,
+        sin_autorizacion: (out.sin_autorizacion as unknown[] | undefined)?.length ?? null,
+        incidencias: out.incidencias ?? null,
+        incidencias_zombis_purgadas: out.incidencias_zombis_purgadas ?? null,
+        flag_autorizado: out.flag_autorizado ?? null,
+        error: out.error ?? null,
+      },
+    }).eq('id', runId)
+  } catch { /* no bloquea */ }
+}
 
 function j(obj: unknown, status: number) {
   return new Response(JSON.stringify(obj, null, 2), { status, headers: { 'Content-Type': 'application/json', ...CORS } })

@@ -285,6 +285,9 @@ serve(async (req) => {
       try {
         const { status, body } = await getJson(jwt, `get-contract-detail?cups=${cupsQ}&distributorCode=${dist}&authorizedNif=${authNif}`)
         llamadas++; bump(statusStats.contrato, status)
+        // v7: los 400 dejan huella con su CUPS (fleco 23-jul: un CUPS con flag=true
+        // dio 400 en todo y el parte no decia CUAL era)
+        if (status === 400) errores.push({ cups: item.codigo, etapa: 'contrato_400', error: (typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 150) })
         if (status === 200) {
           const arr = asArray(body)
           const rows = arr.map((r) => {
@@ -325,6 +328,7 @@ serve(async (req) => {
       try {
         const { status, body } = await getJson(jwt, `get-max-power?cups=${cupsQ}&distributorCode=${dist}&startDate=${toMonth(item.desde)}&endDate=${toMonth(item.hasta)}&authorizedNif=${authNif}`)
         llamadas++; bump(statusStats.maximetro, status)
+        if (status === 400) errores.push({ cups: item.codigo, etapa: 'maximetro_400', error: (typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 150) })
         if (status === 200) {
           const arr = asArray(body)
           const rows = arr.map((r) => ({
@@ -352,6 +356,7 @@ serve(async (req) => {
             `&measurementType=0&pointType=${item.pointType}&authorizedNif=${authNif}`
           const { status, body } = await getJson(jwt, path)
           llamadas++; bump(statusStats.consumo, status)
+          if (status === 400) errores.push({ cups: item.codigo, etapa: 'consumo_400', error: (typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 150) })
           if (status !== 200) continue
           const pts = asArray(body, 'timeCurveList')
           if (pts.length === 0 && consumoVacios.length < 6) {

@@ -146,6 +146,15 @@ GATE V3 (viernes): Julia o Antonio, alta completa <2 min + encuentra un PDF.
 
 ## SEMANA 4 — DATO VIVO + PUSH (T5) [L2/L4/L5 + Z7]
 
+### REPLANIFICACIÓN SEMANA 4 (Juan + auditor, 23-jul) — VINCULANTE
+- Se AÑADE F2 (edición de suministros tras crear: CUPS editable desde la ficha)
+  — hallazgo real de Julia en el ensayo del gate V3, aplazado a esta semana.
+- GATE V4 = CIERRE DEL MES: VIERNES 31 de julio.
+- Orden: PR-4.1 curva → PR-4.2 push lunes → F2 → PR-4.3 velocidad.
+- Flecos del cron (asignados a Cowork, 23-jul): (a) los 400 dejan huella con su
+  CUPS y etapa (consumos v7) · (b) datadis-sync deja parte en datadis_runs
+  (sync v11). Desplegados 23-jul; verificación en los runs de la madrugada del 24.
+
 PR-4.1 Curva en la pestaña Suministros: gráfica mensual + zoom diario desde
   datadis_consumptions; 🟡 si el backfill del CUPS está incompleto; botón
   descargar CSV (L5). CA: curva de CHEMTROL visible; CUPS sin datos = aviso
@@ -196,3 +205,12 @@ via ficha 360. PR-2.1 a 2.4 con DoD completo; PR-2.5 pendiente dentro
 de semana aprobada. Extras: ops datos 1-2 (normalizacion 286 tarifas +
 4 ceros inventados BLUENET) ejecutadas y cuadradas. Badge "N vencidas"
 en cabecera operativo. Semana 3 autorizada a arrancar tras PR-2.5.
+── GATE V3 · 2026-07-23 · AUDITOR ──
+VEREDICTO: CIERRA CONDICIONAL. El ensayo del 22-jul fue un alta REAL de
+Julia (Nagini) que destapó 3 hallazgos (F1 fecha inicio, F3 acciones en
+detalle contrato, F4 created_by+duplicados) — los 3 corregidos y mergeados
+en <24h (F2 a semana 4). El circuito funciona: usuario no desarrollador
+completa el alta y sus hallazgos se convierten en fixes verificados.
+CONDICIÓN: el cronómetro (<2 min) se certifica con la PRÓXIMA alta real
+Nagini de Julia, sin ensayo previo; Cowork verifica por SQL (nace en
+trámite, created_by relleno). Semana 4 autorizada a arrancar el 23-jul.
