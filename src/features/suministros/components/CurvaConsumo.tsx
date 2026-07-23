@@ -104,8 +104,8 @@ export default function CurvaConsumo({ cupsId, codigoCups, onClose }: {
                 <XAxis dataKey="fecha" tickFormatter={(f: string) => f.slice(8)} tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} width={48} />
                 <Tooltip
-                  formatter={(v: number) => [`${v.toFixed(1)} kWh`, 'Consumo']}
-                  labelFormatter={(f: string) => new Date(f + 'T00:00:00').toLocaleDateString('es-ES')}
+                  formatter={(v) => [`${Number(v).toFixed(1)} kWh`, 'Consumo']}
+                  labelFormatter={(f) => new Date(String(f) + 'T00:00:00').toLocaleDateString('es-ES')}
                 />
                 <Bar dataKey="consumo_kwh" fill="#2563eb" radius={[3, 3, 0, 0]} />
               </BarChart>
@@ -122,8 +122,8 @@ export default function CurvaConsumo({ cupsId, codigoCups, onClose }: {
                 <XAxis dataKey="mes" tickFormatter={fmtMes} tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} width={48} />
                 <Tooltip
-                  formatter={(v: number) => [`${v.toFixed(0)} kWh`, 'Consumo']}
-                  labelFormatter={(m: string) => `${fmtMes(m)}${meses.find((x) => x.mes === m)?.completo === false ? ' · mes con huecos' : ''}`}
+                  formatter={(v) => [`${Number(v).toFixed(0)} kWh`, 'Consumo']}
+                  labelFormatter={(m) => `${fmtMes(String(m))}${meses.find((x) => x.mes === m)?.completo === false ? ' · mes con huecos' : ''}`}
                 />
                 <Bar dataKey="consumo_kwh" radius={[3, 3, 0, 0]} fill="#2563eb" />
               </BarChart>
