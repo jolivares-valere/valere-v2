@@ -103,3 +103,25 @@ export async function fetchAllSuministros(): Promise<SuministroRow[]> {
   if (error) throw error
   return (data ?? []).map((r) => mapRow(r as Record<string, unknown>))
 }
+
+/** PR-4.1: filas diarias de la vista v_consumos_diarios (≤ ~700 por CUPS a 23m).
+ *  RLS heredada de datadis_consumptions (security_invoker). */
+export async function fetchConsumosDiarios(cupsId: string): Promise<import('./curva').ConsumoDiario[]> {
+  const { data, error } = await supabase
+    .from('v_consumos_diarios' as never)
+    .select('fecha, consumo_kwh, excedente_kwh, horas, horas_estimadas' as never)
+    .eq('cups_id' as never, cupsId as never)
+    .order('fecha' as never, { ascending: true })
+    .limit(800)
+  if (error) throw error
+  return (data ?? []).map((r) => {
+    const x = r as Record<string, unknown>
+    return {
+      fecha: x.fecha as string,
+      consumo_kwh: Number(x.consumo_kwh) || 0,
+      excedente_kwh: Number(x.excedente_kwh) || 0,
+      horas: Number(x.horas) || 0,
+      horas_estimadas: Number(x.horas_estimadas) || 0,
+    }
+  })
+}
