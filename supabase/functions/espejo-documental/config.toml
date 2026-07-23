@@ -1,0 +1,4 @@
+# Edge Function espejo-documental (fase puente ★) — reconciliación bucket
+# 'documentos' -> Google Drive (OAuth refresh-token, ver docs/DISENO_ESPEJO_DOCUMENTAL_DRIVE.md).
+# Cron con x-cron-secret, mismo patrón que push-lunes / datadis-sync.
+verify_jwt = false

@@ -25,10 +25,16 @@
 > `espejo_drive_folder_id_oportunidades`. Nunca en el repo ni en texto
 > plano en ningún documento.
 >
-> **Pendiente**: codificar la Edge Function `espejo-documental` (usa
-> refresh-token flow para autenticarse contra la API de Drive, en vez de
-> JWT firmado con clave de cuenta de servicio), desplegarla, configurar
-> `pg_cron`, y hacer la prueba end-to-end.
+> **CERRADO (23-jul-2026):** Edge Function `espejo-documental` codificada
+> y desplegada (`supabase/functions/espejo-documental/`), `pg_cron` diario
+> 06:00 UTC activo (job `espejo-documental-daily`). Prueba end-to-end
+> confirmada: dry_run detectó 27/27 pendientes, pasada real subió 27/27 sin
+> fallos, segunda pasada confirmó 0 pendientes (idempotencia vía
+> `espejo_drive_log`), y se verificó el conteo por carpeta en Drive
+> (empresa 20, contrato 2, oportunidades 5 = 27, cuadra con el bucket).
+> Migraciones aplicadas documentadas en
+> `supabase/migrations/_MANUAL_cron_espejo_documental.sql`. La fase puente
+> ★ queda completa.
 
 ## Objetivo
 
@@ -123,22 +129,29 @@ carpeta (Juan) es el titular de las credenciales OAuth.
 Las credenciales las guarda Cowork como secreto en Supabase Vault — nunca
 en el repo ni en texto plano en ningún documento.
 
-### Qué construye Cowork (tras recibir credenciales)
+### Qué construyó Cowork (COMPLETADO 23-jul-2026)
 
-1. Migración: tabla `espejo_drive_log` (RLS: solo `service_role` escribe;
-   `authenticated` lectura opcional para un futuro panel de estado).
-2. Secreto en Vault: la clave JSON de la cuenta de servicio +
-   `espejo_drive_folder_id` (o los 3 IDs de subcarpeta, según convenga).
-3. Edge Function `espejo-documental` (`verify_jwt = false` + x-cron-secret):
-   lógica de reconciliación descrita arriba.
-4. `pg_cron`: frecuencia a decidir — sin los límites de Make ya no hay techo
-   duro; propuesta razonable 1×/día (o 3×/día si Juan quiere latencia menor
-   de recuperación ante fallo) dado que el bucket crece lento (27 ficheros
-   en meses de uso).
-5. Prueba end-to-end: subir un PDF de prueba a `documentos`, confirmar que
-   aparece en Drive en la siguiente pasada del cron (o invocación manual) y
-   que una segunda pasada NO lo vuelve a subir (idempotencia vía
-   `espejo_drive_log`).
+1. ✅ Migración: tabla `espejo_drive_log` (RLS: solo `service_role` escribe;
+   `authenticated` lectura opcional para un futuro panel de estado) + RPCs
+   `check_espejo_cron_secret`, `espejo_drive_listar_objetos`,
+   `espejo_drive_credenciales`. Documentado en
+   `supabase/migrations/_MANUAL_cron_espejo_documental.sql`.
+2. ✅ Secretos en Vault: `espejo_drive_client_id`, `espejo_drive_client_secret`,
+   `espejo_drive_refresh_token` (OAuth, no clave de cuenta de servicio — ver
+   pivote arriba) + los 4 folder IDs de Drive.
+3. ✅ Edge Function `espejo-documental` (`verify_jwt = false` + x-cron-secret):
+   lógica de reconciliación descrita arriba, en `supabase/functions/espejo-documental/`.
+   Nota de implementación: el nombre de fichero en Drive se aplana
+   (`<tipo>__<entidad_id>__.../fichero.pdf` → `<tipo>__<entidad_id>__..._fichero.pdf`)
+   en vez de crear subcarpetas por entidad — evita colisiones de nombres
+   genéricos (uuid.pdf) entre empresas distintas y permite rastrear el
+   origen por el nombre. Subcarpetas por entidad quedan fuera de alcance.
+4. ✅ `pg_cron`: diario 06:00 UTC (job `espejo-documental-daily`).
+5. ✅ Prueba end-to-end: dry_run detectó 27/27 pendientes (bucket real, sin
+   necesidad de fichero de prueba adicional), pasada real subió 27/27 sin
+   fallos, segunda pasada confirmó idempotencia (0 pendientes), y se
+   verificó el conteo por carpeta en Drive vía API (empresa 20, contrato 2,
+   oportunidades 5 = 27, cuadra exactamente con el bucket `documentos`).
 
 ## Fuera de alcance de este PR
 
